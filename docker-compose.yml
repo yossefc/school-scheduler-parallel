@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: school_db
+    environment:
+      POSTGRES_DB: school_scheduler
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: school123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+      - ./database:/database
+    networks:
+      - school_network
+
+  n8n:
+    image: n8nio/n8n
+    container_name: school_n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=n8n123
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./exports:/exports
+    networks:
+      - school_network
+
+  solver:
+    build: ./solver
+    container_name: school_solver
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://admin:school123@postgres:5432/school_scheduler
+    depends_on:
+      - postgres
+    networks:
+      - school_network
+    volumes:
+      - ./solver:/app
+      - ./logs:/logs
+
+volumes:
+  postgres_data:
+  n8n_data:
+
+networks:
+  school_network:
+    driver: bridge

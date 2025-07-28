@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת שעות בית ספרית</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .stats {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .stats span {
+            margin: 0 20px;
+            font-weight: bold;
+            color: #1976d2;
+        }
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        select {
+            padding: 12px;
+            font-size: 16px;
+            margin: 0 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            min-width: 200px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #2196F3;
+            color: white;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        td {
+            background-color: #fff;
+            transition: all 0.3s;
+            min-height: 60px;
+        }
+        td:hover {
+            background-color: #e1f5fe;
+            transform: scale(1.02);
+        }
+        .period-header {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        .period-time {
+            font-size: 11px;
+            color: #666;
+            display: block;
+        }
+        .subject {
+            font-weight: bold;
+            color: #1976d2;
+            font-size: 16px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .teacher {
+            font-size: 13px;
+            color: #666;
+        }
+        .class-name {
+            font-size: 13px;
+            color: #f57c00;
+            font-weight: bold;
+        }
+        .break {
+            background-color: #ffe0b2 !important;
+            color: #e65100;
+            font-style: italic;
+        }
+        .empty-slot {
+            background-color: #fafafa;
+            color: #ccc;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #666;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        @media print {
+            .controls, .stats, button {
+                display: none;
+            }
+            body {
+                margin: 0;
+                background: white;
+            }
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>מערכת שעות בית ספרית</h1>
+        
+        <div class="stats" id="statsContainer">
+            <span>טוען נתונים...</span>
+        </div>
+        
+        <div class="controls">
+            <select id="viewType" onchange="updateOptions()">
+                <option value="class">תצוגה לפי כיתה</option>
+                <option value="teacher">תצוגה לפי מורה</option>
+            </select>
+            
+            <select id="nameSelect">
+                <option value="">בחר...</option>
+            </select>
+            
+            <button onclick="loadSchedule()">הצג מערכת</button>
+            <button onclick="exportToExcel()">ייצא לאקסל</button>
+            <button onclick="window.print()">הדפס</button>
+            <button onclick="refreshData()">רענן נתונים</button>
+        </div>
+        
+        <div id="scheduleContainer">
+            <div class="loading">בחר כיתה או מורה לצפייה במערכת השעות</div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_URL = 'http://localhost:8000/api';
+        const DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+        const PERIODS = 10;
+        
+        let currentSchedule = [];
+        let allClasses = [];
+        let allTeachers = [];
+        
+        // Heures des périodes
+        const PERIOD_TIMES = {
+            1: '08:00-08:45',
+            2: '08:50-09:35',
+            3: '09:40-10:25',
+            4: '10:30-10:45',
+            5: '10:45-11:30',
+            6: '11:35-12:20',
+            7: '12:25-13:10',
+            8: '13:15-14:00',
+            9: '14:05-14:50',
+            10: '14:55-15:40'
+        };
+        
+        // Charger les données initiales
+        async function init() {
+            showMessage('Chargement des données...', 'loading');
+            
+            try {
+                // Charger les statistiques
+                const statsResponse = await fetch(`${API_URL}/stats`);
+                if (statsResponse.ok) {
+                    const data = await statsResponse.json();
+                    const stats = data.general || {};
+                    document.getElementById('statsContainer').innerHTML = `
+                        <span>כיתות: ${stats.total_classes || 0}</span>
+                        <span>מורים: ${stats.total_teachers || 0}</span>
+                        <span>שיעורים: ${stats.total_lessons || 0}</span>
+                        <span>מקצועות: ${stats.total_subjects || 0}</span>
+                    `;
+                }
+                
+                // Charger les classes
+                const classResponse = await fetch(`${API_URL}/classes`);
+                if (classResponse.ok) {
+                    const data = await classResponse.json();
+                    allClasses = data.classes || [];
+                    console.log('Classes loaded:', allClasses);
+                } else {
+                    throw new Error('Impossible de charger les classes');
+                }
+                
+                // Charger les professeurs
+                const teacherResponse = await fetch(`${API_URL}/teachers`);
+                if (teacherResponse.ok) {
+                    const data = await teacherResponse.json();
+                    allTeachers = data.teachers || [];
+                    console.log('Teachers loaded:', allTeachers);
+                } else {
+                    throw new Error('Impossible de charger les professeurs');
+                }
+                
+                updateOptions();
+                showMessage('Données chargées avec succès', 'success');
+                
+            } catch (error) {
+                console.error('Erreur lors du chargement:', error);
+                showMessage('Erreur de connexion au serveur. Assurez-vous que le serveur est lancé.', 'error');
+            }
+        }
+        
+        // Mettre à jour les options du select
+        function updateOptions() {
+            const viewType = document.getElementById('viewType').value;
+            const nameSelect = document.getElementById('nameSelect');
+            
+            nameSelect.innerHTML = '<option value="">בחר...</option>';
+            
+            if (viewType === 'class') {
+                allClasses.forEach(cls => {
+                    const option = document.createElement('option');
+                    option.value = cls;
+                    option.textContent = cls;
+                    nameSelect.appendChild(option);
+                });
+            } else {
+                allTeachers.forEach(teacher => {
+                    const option = document.createElement('option');
+                    option.value = teacher;
+                    option.textContent = teacher;
+                    nameSelect.appendChild(option);
+                });
+            }
+        }
+        
+        // Charger l'emploi du temps
+        async function loadSchedule() {
+            const viewType = document.getElementById('viewType').value;
+            const name = document.getElementById('nameSelect').value;
+            
+            if (!name) {
+                alert('אנא בחר כיתה או מורה');
+                return;
+            }
+            
+            const container = document.getElementById('scheduleContainer');
+            container.innerHTML = '<div class="loading">טוען מערכת שעות...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/schedule/${viewType}/${encodeURIComponent(name)}`);
+                
+                if (!response.ok) {
+                    throw new Error('שגיאה בטעינת הנתונים');
+                }
+                
+                const data = await response.json();
+                currentSchedule = data.schedule || [];
+                
+                console.log('Schedule loaded:', currentSchedule);
+                
+                if (currentSchedule.length === 0) {
+                    container.innerHTML = '<div class="error">לא נמצאו נתונים למערכת זו</div>';
+                } else {
+                    displaySchedule(currentSchedule, viewType);
+                }
+                
+            } catch (error) {
+                container.innerHTML = `<div class="error">שגיאה: ${error.message}</div>`;
+                console.error('Erreur:', error);
+            }
+        }
+        
+        // Afficher l'emploi du temps
+        function displaySchedule(schedule, viewType) {
+            const container = document.getElementById('scheduleContainer');
+            const name = document.getElementById('nameSelect').value;
+            
+            let html = `<h2>מערכת שעות - ${name}</h2>`;
+            html += '<table>';
+            
+            // En-tête
+            html += '<tr><th>שעה</th>';
+            DAYS.forEach(day => {
+                html += `<th>${day}</th>`;
+            });
+            html += '</tr>';
+            
+            // Corps du tableau
+            for (let period = 1; period <= PERIODS; period++) {
+                html += '<tr>';
+                html += `<td class="period-header">
+                    <strong>${period}</strong>
+                    <span class="period-time">${PERIOD_TIMES[period] || ''}</span>
+                </td>`;
+                
+                for (let day = 0; day < 6; day++) {
+                    const lesson = schedule.find(l => 
+                        l.day_of_week === day && l.period_number === period
+                    );
+                    
+                    if (lesson) {
+                        html += '<td>';
+                        html += `<span class="subject">${lesson.subject_name}</span>`;
+                        if (viewType === 'class') {
+                            html += `<span class="teacher">${lesson.teacher_name}</span>`;
+                        } else {
+                            html += `<span class="class-name">${lesson.class_name}</span>`;
+                        }
+                        html += '</td>';
+                    } else if (period === 4) {
+                        html += '<td class="break">הפסקה</td>';
+                    } else {
+                        html += '<td class="empty-slot">-</td>';
+                    }
+                }
+                
+                html += '</tr>';
+            }
+            
+            html += '</table>';
+            container.innerHTML = html;
+        }
+        
+        // Export vers Excel (CSV)
+        function exportToExcel() {
+            if (currentSchedule.length === 0) {
+                alert('אין נתונים לייצוא');
+                return;
+            }
+            
+            const viewType = document.getElementById('viewType').value;
+            const name = document.getElementById('nameSelect').value;
+            
+            let csv = '\ufeff'; // BOM pour UTF-8
+            csv += 'יום,שעה,מקצוע,';
+            csv += viewType === 'class' ? 'מורה\n' : 'כיתה\n';
+            
+            currentSchedule.forEach(lesson => {
+                const day = DAYS[lesson.day_of_week];
+                const data = viewType === 'class' ? lesson.teacher_name : lesson.class_name;
+                csv += `${day},${lesson.period_number},${lesson.subject_name},${data}\n`;
+            });
+            
+            // Créer le fichier
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `מערכת_${name}_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+        
+        // Rafraîchir les données
+        function refreshData() {
+            init();
+        }
+        
+        // Afficher un message
+        function showMessage(message, type) {
+            const container = document.getElementById('scheduleContainer');
+            if (type === 'loading') {
+                container.innerHTML = `<div class="loading">${message}</div>`;
+            } else if (type === 'error') {
+                container.innerHTML = `<div class="error">${message}</div>`;
+            } else if (type === 'success') {
+                // Ne pas effacer le contenu, juste montrer temporairement
+                console.log(message);
+            }
+        }
+        
+        // Initialiser au chargement
+        window.onload = init;
+    </script>
+</body>
+</html>
