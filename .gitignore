@@ -89,4 +89,27 @@ exports/*.xls
 
 # Test files
 test_output/
-temp/ 
+temp/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backup files
+*.backup
+*.bak
+
+# Temporary reports and verification files
+verification_report_*.json
+*_report_*.json
+
+# Package lock files (comment out if you want to track them)
+# package-lock.json
+
+# Scripts (uncomment if you want to ignore all scripts)
+# *.ps1
+# *.sh
+# *.bat
+# *.cmd 

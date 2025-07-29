@@ -1,0 +1,24 @@
+﻿# Core dependencies (version allégée pour build rapide)
+flask==3.0.0
+flask-socketio==5.3.5
+flask-cors==4.0.0
+python-socketio==5.10.0
+
+# Database
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+
+# AI/LLM (optionnel pour test)
+# openai==1.6.1
+# anthropic==0.8.1
+
+# Async
+asyncio==3.4.3
+
+# Data processing
+pandas==2.1.4
+pydantic==2.5.3
+
+# Utils
+python-dotenv==1.0.0
+requests==2.31.0

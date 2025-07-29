@@ -11,8 +11,8 @@ import logging
 import os
 from datetime import datetime
 
-from scheduler_ai.agent import ScheduleAIAgent, ConstraintPriority
-from scheduler_ai.llm_router import LLMRouter
+from agent import ScheduleAIAgent, ConstraintPriority
+from llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
 

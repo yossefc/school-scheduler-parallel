@@ -1,0 +1,51 @@
+﻿version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: school_db_dev
+    environment:
+      POSTGRES_DB: school_scheduler
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: school123
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database:/docker-entrypoint-initdb.d
+
+  ai_agent:
+    image: python:3.11-slim
+    container_name: school_ai_dev
+    working_dir: /app
+    command: |
+      bash -c "
+        apt-get update && apt-get install -y gcc g++ curl postgresql-client &&
+        pip install flask flask-socketio flask-cors psycopg2-binary openai anthropic &&
+        python api.py
+      "
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - DB_HOST=postgres
+      - DB_NAME=school_scheduler
+      - DB_USER=admin
+      - DB_PASSWORD=school123
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ./scheduler_ai:/app
+    depends_on:
+      - postgres
+
+  solver:
+    build: ./solver
+    container_name: school_solver_dev
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://admin:school123@postgres:5432/school_scheduler
+    depends_on:
+      - postgres
+    volumes:
+      - ./solver:/app

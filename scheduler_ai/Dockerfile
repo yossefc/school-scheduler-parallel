@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+﻿FROM python:3.11-slim
 
 # Définir le répertoire de travail
 WORKDIR /app
@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     g++ \
     curl \
     postgresql-client \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Copier les fichiers de requirements
@@ -32,12 +33,12 @@ ENV LOG_FILE=/logs/scheduler_ai.log
 # Exposer le port WebSocket
 EXPOSE 5001
 
-# Script de démarrage
-COPY docker-entrypoint.sh /
+# Copier et rendre exécutable le script d'entrée
+COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:5001/health || exit 1
 
 # Commande de démarrage
