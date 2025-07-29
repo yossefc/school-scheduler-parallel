@@ -376,10 +376,8 @@ class ScheduleSolver:
                 for i in range(1, len(day_vars) - 1):
                     gap_var = self.model.NewBoolVar(f"gap_t{teacher_id}_d{day}_s{i}")
                     # Gap = pas de cours ֳ  i, mais cours avant et aprֳ¨s
-                    # Temporairement désactivé - problème de syntaxe OR-Tools
-                    # self.model.AddBoolAnd([day_vars[i-1], day_vars[i+1].Not(), day_vars[i]]).OnlyEnforceIf(gap_var)
-                    # self.model.Add(gap_var == 0).OnlyEnforceIf(day_vars[i])
-                    pass  # Contraintes souples désactivées temporairement
+                    self.model.AddBoolAnd([day_vars[i-1], day_vars[i+1].Not(), day_vars[i]]).OnlyEnforceIf(gap_var)
+                    self.model.Add(gap_var == 0).OnlyEnforceIf(day_vars[i])
                     # Ajouter ֳ  la fonction objectif (ֳ  implֳ©menter)
         
         # 2. ֳ‰viter les matiֳ¨res difficiles en fin de journֳ©e

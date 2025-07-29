@@ -228,78 +228,75 @@ async def analyze_for_parallel(data: dict):
 
 @app.get("/api/schedule/{view_type}/{name}")
 async def get_schedule_enhanced(view_type: str, name: str):
-    """Version simplifiée qui fonctionne sans erreurs SQL"""
+    """Version amֳ©liorֳ©e qui affiche correctement les cours parallֳ¨les"""
     conn = psycopg2.connect(**db_config)
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Récupérer le dernier schedule_id actif
-        cur.execute("SELECT MAX(schedule_id) as latest_id FROM schedules WHERE status = 'active'")
-        result = cur.fetchone()
-        
-        if not result or not result['latest_id']:
-            return {"schedule": [], "view_type": view_type, "name": name, "message": "Aucun emploi du temps actif"}
-        
-        schedule_id = result['latest_id']
-        
         if view_type == "class":
-            # Pour une classe, récupérer toutes les entrées
+            # Pour une classe, montrer tous les profs en parallֳ¨le
             cur.execute("""
-                SELECT 
-                    entry_id,
-                    teacher_name,
-                    class_name,
-                    subject_name,
-                    day_of_week,
-                    period_number,
-                    is_parallel_group,
-                    group_id
-                FROM schedule_entries
-                WHERE schedule_id = %s AND class_name = %s
+                WITH parallel_entries AS (
+                    SELECT 
+                        se.schedule_id,
+                        se.day_of_week,
+                        se.period_number,
+                        se.subject_name,
+                        se.class_name,
+                        se.group_id,
+                        STRING_AGG(DISTINCT se.teacher_name, ' + ' ORDER BY se.teacher_name) as teachers
+                    FROM schedule_entries se
+                    WHERE se.class_name = %s
+                    AND se.group_id IS NOT NULL
+                    GROUP BY se.schedule_id, se.day_of_week, se.period_number, 
+                             se.subject_name, se.class_name, se.group_id
+                ),
+                regular_entries AS (
+                    SELECT 
+                        schedule_id,
+                        day_of_week,
+                        period_number,
+                        subject_name,
+                        teacher_name as teachers,
+                        class_name,
+                        NULL as group_id
+                    FROM schedule_entries
+                    WHERE class_name = %s
+                    AND (group_id IS NULL OR is_parallel_group = FALSE)
+                )
+                SELECT * FROM parallel_entries
+                UNION ALL
+                SELECT * FROM regular_entries
                 ORDER BY day_of_week, period_number
-            """, (schedule_id, name))
+            """, (name, name))
             
         elif view_type == "teacher":
-            # Pour un professeur
             cur.execute("""
                 SELECT 
                     entry_id,
-                    teacher_name,
-                    class_name,
-                    subject_name,
+                    schedule_id,
                     day_of_week,
                     period_number,
+                    subject_name,
+                    teacher_name,
+                    class_name,
                     is_parallel_group,
                     group_id
                 FROM schedule_entries
-                WHERE schedule_id = %s AND teacher_name LIKE %s
+                WHERE teacher_name = %s
                 ORDER BY day_of_week, period_number
-            """, (schedule_id, f"%{name}%"))
-        else:
-            return {"error": "Type de vue non supporté. Utilisez 'class' ou 'teacher'"}
+            """, (name,))
         
         schedule = cur.fetchall()
         
-        # Enrichir les données
+        # Marquer les entrֳ©es parallֳ¨les
         for entry in schedule:
-            if entry.get("is_parallel_group") and entry.get("group_id"):
+            if entry.get("group_id"):
                 entry["display_type"] = "parallel"
-                entry["display_info"] = f"Cours parallèle - Groupe {entry['group_id']}"
-            else:
-                entry["display_type"] = "individual"
-                entry["display_info"] = "Cours individuel"
+                entry["display_info"] = f"Groupe parallֳ¨le #{entry['group_id']}"
         
-        return {
-            "schedule": schedule, 
-            "view_type": view_type, 
-            "name": name,
-            "total_lessons": len(schedule),
-            "schedule_id": schedule_id
-        }
+        return {"schedule": schedule, "view_type": view_type, "name": name}
         
-    except Exception as e:
-        logger.error(f"Erreur get_schedule_enhanced: {str(e)}")
-        return {"error": str(e), "schedule": []}
     finally:
         cur.close()
         conn.close()
