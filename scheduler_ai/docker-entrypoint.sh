@@ -22,13 +22,8 @@ if [ ! -z "$REDIS_URL" ]; then
 fi
 
 # Appliquer les migrations Alembic
-echo "🔄 Skipping database migrations for now..."
-# TODO: Fix alembic configuration
-# if [ -f "alembic.ini" ]; then
-#     alembic upgrade head
-# else
-#     echo "⚠️  No alembic.ini found, skipping migrations..."
-# fi
+echo "🔄 Running database migrations..."
+alembic upgrade head
 
 # Initialiser les données de base si nécessaire
 if [ "$INIT_DATA" = "true" ]; then

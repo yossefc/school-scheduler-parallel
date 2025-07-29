@@ -35,25 +35,13 @@ class LLMRouter:
     """Routeur intelligent pour sélectionner le bon modèle LLM"""
     
     def __init__(self):
-        # Configuration des clients - pour l'instant on les crée seulement si les clés API sont présentes
-        self.openai_client = None
-        self.anthropic_client = None
-        
-        if os.environ.get("OPENAI_API_KEY"):
-            try:
-                self.openai_client = openai.OpenAI(
-                    api_key=os.environ.get("OPENAI_API_KEY")
-                )
-            except Exception as e:
-                logger.warning(f"Failed to initialize OpenAI client: {e}")
-        
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            try:
-                self.anthropic_client = anthropic.Anthropic(
-                    api_key=os.environ.get("ANTHROPIC_API_KEY")
-                )
-            except Exception as e:
-                logger.warning(f"Failed to initialize Anthropic client: {e}")
+        # Configuration des clients
+        self.openai_client = openai.OpenAI(
+            api_key=os.environ.get("OPENAI_API_KEY")
+        )
+        self.anthropic_client = anthropic.Anthropic(
+            api_key=os.environ.get("ANTHROPIC_API_KEY")
+        )
         
         # Tokenizer pour compter les tokens
         self.encoding = tiktoken.encoding_for_model("gpt-4")

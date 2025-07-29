@@ -1,4 +1,4 @@
-"""
+﻿"""
 scheduler_ai/api.py - API Flask et WebSocket pour l'agent IA
 """
 from flask import Flask, request, jsonify
@@ -11,8 +11,8 @@ import logging
 import os
 from datetime import datetime
 
-from agent import ScheduleAIAgent, ConstraintPriority
-from llm_router import LLMRouter
+from scheduler_ai.agent import ScheduleAIAgent, ConstraintPriority
+from scheduler_ai.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
 
@@ -341,4 +341,4 @@ def get_color_for_priority(priority: int) -> str:
     return colors.get(priority, "blue")
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, port=5001, host='0.0.0.0', allow_unsafe_werkzeug=True)
+    socketio.run(app, debug=True, port=5001)

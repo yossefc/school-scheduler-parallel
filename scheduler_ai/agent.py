@@ -1,4 +1,4 @@
-"""
+﻿"""
 scheduler_ai/agent.py - Agent IA pour la gestion intelligente des emplois du temps
 """
 import json
@@ -11,19 +11,11 @@ import asyncio
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from sqlalchemy import create_engine, Column, Integer, String, JSON, DateTime, Boolean
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
 
-# Import du solver existant - pour l'instant on va créer une classe stub
-# from solver_engine import ScheduleSolver
-
-class ScheduleSolver:
-    """Classe stub pour le solver - à remplacer par l'import réel"""
-    def __init__(self):
-        pass
-    def load_data_from_db(self):
-        pass
-    def solve(self, time_limit=60):
-        return []
+# Import du solver existant
+from solver_engine import ScheduleSolver
 
 logger = logging.getLogger(__name__)
 

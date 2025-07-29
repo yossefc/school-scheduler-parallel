@@ -1,0 +1,222 @@
+"""add constraints history table
+
+Revision ID: add_constraints_history_001
+Revises: 
+Create Date: 2024-01-15 10:00:00.000000
+
+"""
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+# revision identifiers, used by Alembic.
+revision = 'add_constraints_history_001'
+down_revision = None
+branch_labels = None
+depends_on = None
+
+
+def upgrade():
+    """
+    Crée la table constraints_history et les index associés
+    """
+    # Créer la table constraints_history
+    op.create_table('constraints_history',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('constraint_id', sa.Integer(), nullable=True),
+        sa.Column('constraint_data', postgresql.JSON(astext_type=sa.Text()), nullable=True),
+        sa.Column('applied_at', sa.DateTime(), nullable=True),
+        sa.Column('applied_by', sa.String(length=100), nullable=True),
+        sa.Column('success', sa.Boolean(), nullable=True),
+        sa.Column('impact_score', sa.Integer(), nullable=True),
+        sa.Column('rollback_data', postgresql.JSON(astext_type=sa.Text()), nullable=True),
+        sa.PrimaryKeyConstraint('id')
+    )
+    
+    # Créer les index pour améliorer les performances
+    op.create_index(
+        'idx_constraints_history_applied_at', 
+        'constraints_history', 
+        ['applied_at'], 
+        unique=False
+    )
+    
+    op.create_index(
+        'idx_constraints_history_constraint_id', 
+        'constraints_history', 
+        ['constraint_id'], 
+        unique=False
+    )
+    
+    op.create_index(
+        'idx_constraints_history_applied_by', 
+        'constraints_history', 
+        ['applied_by'], 
+        unique=False
+    )
+    
+    # Ajouter une colonne à la table constraints pour le tracking
+    op.add_column('constraints', 
+        sa.Column('created_by', sa.String(length=100), nullable=True)
+    )
+    
+    op.add_column('constraints',
+        sa.Column('last_modified_by', sa.String(length=100), nullable=True)
+    )
+    
+    op.add_column('constraints',
+        sa.Column('last_modified_at', sa.DateTime(), nullable=True)
+    )
+    
+    # Créer une table pour les préférences apprises
+    op.create_table('ai_learned_preferences',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('entity_type', sa.String(length=50), nullable=False),
+        sa.Column('entity_name', sa.String(length=100), nullable=False),
+        sa.Column('preference_type', sa.String(length=50), nullable=False),
+        sa.Column('preference_data', postgresql.JSON(astext_type=sa.Text()), nullable=True),
+        sa.Column('confidence', sa.Float(), nullable=True),
+        sa.Column('usage_count', sa.Integer(), default=0),
+        sa.Column('last_used', sa.DateTime(), nullable=True),
+        sa.Column('created_at', sa.DateTime(), nullable=True),
+        sa.PrimaryKeyConstraint('id')
+    )
+    
+    op.create_index(
+        'idx_ai_preferences_entity', 
+        'ai_learned_preferences', 
+        ['entity_type', 'entity_name'], 
+        unique=False
+    )
+    
+    # Créer une table pour l'audit des actions IA
+    op.create_table('ai_action_log',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('action_type', sa.String(length=50), nullable=False),
+        sa.Column('session_id', sa.String(length=100), nullable=True),
+        sa.Column('user_input', sa.Text(), nullable=True),
+        sa.Column('ai_response', sa.Text(), nullable=True),
+        sa.Column('model_used', sa.String(length=50), nullable=True),
+        sa.Column('tokens_used', sa.Integer(), nullable=True),
+        sa.Column('processing_time_ms', sa.Integer(), nullable=True),
+        sa.Column('success', sa.Boolean(), nullable=True),
+        sa.Column('error_message', sa.Text(), nullable=True),
+        sa.Column('created_at', sa.DateTime(), nullable=True),
+        sa.PrimaryKeyConstraint('id')
+    )
+    
+    op.create_index(
+        'idx_ai_action_log_session', 
+        'ai_action_log', 
+        ['session_id'], 
+        unique=False
+    )
+    
+    op.create_index(
+        'idx_ai_action_log_created_at', 
+        'ai_action_log', 
+        ['created_at'], 
+        unique=False
+    )
+    
+    # Créer une vue pour les statistiques des contraintes
+    op.execute("""
+        CREATE OR REPLACE VIEW v_constraint_statistics AS
+        SELECT 
+            c.constraint_type,
+            COUNT(DISTINCT c.constraint_id) as active_count,
+            COUNT(DISTINCT ch.id) as history_count,
+            AVG(ch.impact_score) as avg_impact,
+            SUM(CASE WHEN ch.success THEN 1 ELSE 0 END)::float / 
+                NULLIF(COUNT(ch.id), 0) * 100 as success_rate
+        FROM constraints c
+        LEFT JOIN constraints_history ch ON c.constraint_id = ch.constraint_id
+        WHERE c.is_active = TRUE
+        GROUP BY c.constraint_type
+    """)
+    
+    # Créer une fonction pour nettoyer l'historique ancien
+    op.execute("""
+        CREATE OR REPLACE FUNCTION cleanup_old_history(days_to_keep INTEGER DEFAULT 90)
+        RETURNS INTEGER AS $$
+        DECLARE
+            deleted_count INTEGER;
+        BEGIN
+            DELETE FROM constraints_history 
+            WHERE applied_at < CURRENT_DATE - INTERVAL '1 day' * days_to_keep;
+            
+            GET DIAGNOSTICS deleted_count = ROW_COUNT;
+            
+            DELETE FROM ai_action_log
+            WHERE created_at < CURRENT_DATE - INTERVAL '1 day' * days_to_keep;
+            
+            RETURN deleted_count;
+        END;
+        $$ LANGUAGE plpgsql;
+    """)
+    
+    # Créer un trigger pour l'audit automatique
+    op.execute("""
+        CREATE OR REPLACE FUNCTION audit_constraint_changes()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            IF TG_OP = 'UPDATE' THEN
+                NEW.last_modified_at = CURRENT_TIMESTAMP;
+                IF NEW.last_modified_by IS NULL THEN
+                    NEW.last_modified_by = 'system';
+                END IF;
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        
+        CREATE TRIGGER trg_audit_constraint_changes
+        BEFORE UPDATE ON constraints
+        FOR EACH ROW
+        EXECUTE FUNCTION audit_constraint_changes();
+    """)
+    
+    # Insérer des données de test/démo
+    op.execute("""
+        INSERT INTO ai_learned_preferences (
+            entity_type, entity_name, preference_type, preference_data, 
+            confidence, usage_count, created_at
+        ) VALUES 
+        ('teacher', 'Cohen', 'availability', 
+         '{"preferred_days": [1,2,3], "avoid_periods": [1,9,10]}', 
+         0.85, 5, CURRENT_TIMESTAMP),
+        ('class', '9A', 'subject_timing', 
+         '{"math_morning": true, "sports_afternoon": true}', 
+         0.92, 12, CURRENT_TIMESTAMP)
+    """)
+
+
+def downgrade():
+    """
+    Supprime les tables et modifications créées
+    """
+    # Supprimer les triggers
+    op.execute("DROP TRIGGER IF EXISTS trg_audit_constraint_changes ON constraints")
+    op.execute("DROP FUNCTION IF EXISTS audit_constraint_changes()")
+    op.execute("DROP FUNCTION IF EXISTS cleanup_old_history(INTEGER)")
+    
+    # Supprimer les vues
+    op.execute("DROP VIEW IF EXISTS v_constraint_statistics")
+    
+    # Supprimer les index
+    op.drop_index('idx_ai_action_log_created_at', table_name='ai_action_log')
+    op.drop_index('idx_ai_action_log_session', table_name='ai_action_log')
+    op.drop_index('idx_ai_preferences_entity', table_name='ai_learned_preferences')
+    op.drop_index('idx_constraints_history_applied_by', table_name='constraints_history')
+    op.drop_index('idx_constraints_history_constraint_id', table_name='constraints_history')
+    op.drop_index('idx_constraints_history_applied_at', table_name='constraints_history')
+    
+    # Supprimer les tables
+    op.drop_table('ai_action_log')
+    op.drop_table('ai_learned_preferences')
+    op.drop_table('constraints_history')
+    
+    # Supprimer les colonnes ajoutées
+    op.drop_column('constraints', 'last_modified_at')
+    op.drop_column('constraints', 'last_modified_by')
+    op.drop_column('constraints', 'created_by')

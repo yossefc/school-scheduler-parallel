@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+"""
+Exemples d'utilisation de l'agent IA School Scheduler
+"""
+import asyncio
+import json
+import requests
+import socketio
+from datetime import datetime
+from typing import Dict, Any
+
+# Configuration
+API_BASE = "http://localhost:5001"
+SOLVER_API = "http://localhost:8000"
+
+class AIAgentClient:
+    """Client pour interagir avec l'agent IA"""
+    
+    def __init__(self, base_url: str = API_BASE):
+        self.base_url = base_url
+        self.sio = socketio.Client()
+        self.responses = []
+        
+        # Configurer les handlers
+        self.sio.on('connect', self.on_connect)
+        self.sio.on('ai_response', self.on_ai_response)
+        self.sio.on('error', self.on_error)
+    
+    def on_connect(self):
+        print("✅ Connecté à l'agent IA")
+    
+    def on_ai_response(self, data):
+        print(f"\n🤖 Réponse IA: {json.dumps(data, indent=2, ensure_ascii=False)}")
+        self.responses.append(data)
+    
+    def on_error(self, error):
+        print(f"❌ Erreur: {error}")
+    
+    def connect(self):
+        """Se connecter au serveur WebSocket"""
+        self.sio.connect(self.base_url)
+    
+    def disconnect(self):
+        """Se déconnecter"""
+        self.sio.disconnect()
+    
+    def send_message(self, text: str, message_type: str = "question"):
+        """Envoyer un message à l'agent"""
+        self.sio.emit('message', {
+            'text': text,
+            'type': message_type,
+            'context': {'language': 'fr'}
+        })
+    
+    def apply_constraint(self, constraint: Dict[str, Any]) -> Dict:
+        """Appliquer une contrainte via l'API REST"""
+        response = requests.post(
+            f"{self.base_url}/api/ai/constraint",
+            json={'constraint': constraint}
+        )
+        return response.json()
+    
+    def parse_natural_text(self, text: str, language: str = "fr") -> Dict:
+        """Parser du texte naturel en contrainte"""
+        response = requests.post(
+            f"{self.base_url}/api/ai/constraints/natural",
+            json={'text': text, 'language': language}
+        )
+        return response.json()
+    
+    def explain_conflict(self, conflict_id: str) -> Dict:
+        """Obtenir l'explication d'un conflit"""
+        response = requests.get(f"{self.base_url}/api/ai/explain/{conflict_id}")
+        return response.json()
+    
+    def get_suggestions(self) -> Dict:
+        """Obtenir des suggestions d'amélioration"""
+        response = requests.get(f"{self.base_url}/api/ai/suggestions")
+        return response.json()
+
+def example_1_simple_constraint():
+    """Exemple 1: Ajouter une contrainte simple"""
+    print("\n=== EXEMPLE 1: Contrainte Simple ===")
+    
+    client = AIAgentClient()
+    
+    # Parser du texte naturel
+    text = "Le professeur Cohen ne peut pas enseigner le vendredi"
+    print(f"📝 Texte: {text}")
+    
+    result = client.parse_natural_text(text)
+    print(f"✅ Contrainte parsée: {json.dumps(result, indent=2, ensure_ascii=False)}")
+    
+    # Appliquer la contrainte
+    if result.get('confidence', 0) > 0.7:
+        constraint = result['parsed_constraint']['constraint']
+        application_result = client.apply_constraint(constraint)
+        print(f"📊 Résultat: {json.dumps(application_result, indent=2, ensure_ascii=False)}")
+
+def example_2_websocket_chat():
+    """Exemple 2: Chat interactif via WebSocket"""
+    print("\n=== EXEMPLE 2: Chat WebSocket ===")
+    
+    client = AIAgentClient()
+    client.connect()
+    
+    # Envoyer quelques messages
+    messages = [
+        "Bonjour, je voudrais modifier l'emploi du temps",
+        "Le professeur Levy préfère enseigner le matin",
+        "OK"  # Confirmation
+    ]
+    
+    for msg in messages:
+        print(f"\n👤 Vous: {msg}")
+        client.send_message(msg, "constraint" if "préfère" in msg else "question")
+        # Attendre la réponse
+        import time
+        time.sleep(2)
+    
+    client.disconnect()
+
+def example_3_complex_analysis():
+    """Exemple 3: Analyse complexe avec plusieurs contraintes"""
+    print("\n=== EXEMPLE 3: Analyse Complexe ===")
+    
+    client = AIAgentClient()
+    
+    # Plusieurs contraintes à analyser
+    constraints_texts = [
+        "Les cours de mathématiques doivent être le matin",
+        "Cohen et Levy enseignent ensemble les sciences en parallèle",
+        "Pas plus de 3 heures consécutives pour la classe 9A",
+        "Réunion pédagogique obligatoire le mercredi à 14h"
+    ]
+    
+    parsed_constraints = []
+    for text in constraints_texts:
+        print(f"\n📝 Analyse: {text}")
+        result = client.parse_natural_text(text)
+        if result.get('confidence', 0) > 0.6:
+            parsed_constraints.append(result['parsed_constraint']['constraint'])
+            print(f"✅ Type détecté: {result['parsed_constraint']['constraint']['type']}")
+        else:
+            print(f"⚠️  Confiance faible: {result.get('confidence', 0)}")
+    
+    # Vérifier la faisabilité globale
+    print("\n🔍 Analyse de faisabilité globale...")
+    # Ici on pourrait envoyer toutes les contraintes au solver pour vérification
+
+def example_4_conflict_resolution():
+    """Exemple 4: Résolution de conflits"""
+    print("\n=== EXEMPLE 4: Résolution de Conflits ===")
+    
+    client = AIAgentClient()
+    
+    # Créer un conflit intentionnellement
+    conflicting_constraints = [
+        {
+            "type": "teacher_availability",
+            "entity": "Cohen",
+            "data": {"unavailable_days": [1, 2, 3, 4, 5]},
+            "priority": 2
+        }
+    ]
+    
+    print("🔴 Tentative d'application d'une contrainte impossible...")
+    result = client.apply_constraint(conflicting_constraints[0])
+    
+    if result['status'] == 'conflict':
+        print(f"❌ Conflit détecté!")
+        print(f"📋 Suggestions:")
+        for suggestion in result.get('suggestions', []):
+            print(f"  - {suggestion['description']}")
+
+def example_5_batch_processing():
+    """Exemple 5: Traitement en lot"""
+    print("\n=== EXEMPLE 5: Traitement en Lot ===")
+    
+    # Charger des contraintes depuis un fichier
+    batch_constraints = [
+        "Tous les professeurs de math préfèrent le matin",
+        "Les classes de niveau 9 ne doivent pas avoir cours après 16h",
+        "Sport uniquement l'après-midi",
+        "Pas de cours difficiles le vendredi après-midi"
+    ]
+    
+    client = AIAgentClient()
+    results = []
+    
+    for i, constraint_text in enumerate(batch_constraints, 1):
+        print(f"\n[{i}/{len(batch_constraints)}] Traitement: {constraint_text}")
+        result = client.parse_natural_text(constraint_text)
+        results.append({
+            'original': constraint_text,
+            'parsed': result,
+            'status': 'ready' if result.get('confidence', 0) > 0.7 else 'needs_review'
+        })
+    
+    # Résumé
+    print("\n📊 Résumé du traitement:")
+    ready = sum(1 for r in results if r['status'] == 'ready')
+    print(f"  - Prêtes à appliquer: {ready}")
+    print(f"  - Nécessitent révision: {len(results) - ready}")
+
+async def example_6_async_operations():
+    """Exemple 6: Opérations asynchrones"""
+    print("\n=== EXEMPLE 6: Opérations Asynchrones ===")
+    
+    # Simuler plusieurs requêtes parallèles
+    async def apply_constraint_async(constraint_text: str):
+        # En production, utiliser aiohttp au lieu de requests
+        client = AIAgentClient()
+        result = client.parse_natural_text(constraint_text)
+        return result
+    
+    constraints = [
+        "Le professeur A ne peut pas le lundi",
+        "Le professeur B ne peut pas le mardi",
+        "Le professeur C ne peut pas le mercredi"
+    ]
+    
+    # Traiter en parallèle
+    tasks = [apply_constraint_async(c) for c in constraints]
+    results = await asyncio.gather(*tasks)
+    
+    print(f"✅ {len(results)} contraintes traitées en parallèle")
+
+def example_7_monitoring():
+    """Exemple 7: Monitoring et métriques"""
+    print("\n=== EXEMPLE 7: Monitoring ===")
+    
+    # Vérifier la santé du système
+    try:
+        # Agent IA
+        ai_health = requests.get(f"{API_BASE}/health").json()
+        print(f"✅ Agent IA: {ai_health.get('status', 'unknown')}")
+        
+        # Solver principal
+        solver_health = requests.get(f"{SOLVER_API}/").json()
+        print(f"✅ Solver: Actif - {solver_health.get('message', '')}")
+        
+        # Statistiques
+        history = requests.get(f"{API_BASE}/api/ai/history?limit=10").json()
+        print(f"📊 Dernières actions: {history.get('total', 0)} entrées")
+        
+    except Exception as e:
+        print(f"❌ Erreur de monitoring: {e}")
+
+def interactive_demo():
+    """Démo interactive"""
+    print("\n🎮 DÉMO INTERACTIVE DE L'AGENT IA")
+    print("=" * 50)
+    
+    client = AIAgentClient()
+    client.connect()
+    
+    print("\n💡 Exemples de commandes:")
+    print("  - 'Le professeur X ne peut pas le vendredi'")
+    print("  - 'Les cours de math doivent être le matin'")
+    print("  - 'Expliquer le conflit #123'")
+    print("  - 'quit' pour quitter")
+    
+    while True:
+        try:
+            user_input = input("\n👤 Vous: ").strip()
+            
+            if user_input.lower() in ['quit', 'exit', 'q']:
+                break
+            
+            if user_input.startswith("Expliquer"):
+                # Extraction de l'ID du conflit
+                conflict_id = user_input.split("#")[-1].strip()
+                result = client.explain_conflict(conflict_id)
+                print(f"🤖 Explication: {json.dumps(result, indent=2, ensure_ascii=False)}")
+            else:
+                # Envoyer comme contrainte potentielle
+                client.send_message(user_input, "constraint")
+                # Attendre la réponse
+                import time
+                time.sleep(2)
+                
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            print(f"❌ Erreur: {e}")
+    
+    client.disconnect()
+    print("\n👋 Au revoir!")
+
+if __name__ == "__main__":
+    print("🚀 Exemples d'utilisation de l'Agent IA School Scheduler")
+    print("=" * 60)
+    
+    examples = {
+        "1": ("Contrainte simple", example_1_simple_constraint),
+        "2": ("Chat WebSocket", example_2_websocket_chat),
+        "3": ("Analyse complexe", example_3_complex_analysis),
+        "4": ("Résolution de conflits", example_4_conflict_resolution),
+        "5": ("Traitement en lot", example_5_batch_processing),
+        "6": ("Opérations asynchrones", lambda: asyncio.run(example_6_async_operations())),
+        "7": ("Monitoring", example_7_monitoring),
+        "8": ("Démo interactive", interactive_demo)
+    }
+    
+    print("\nExemples disponibles:")
+    for key, (name, _) in examples.items():
+        print(f"  {key}. {name}")
+    
+    choice = input("\nChoisissez un exemple (1-8) ou 'all' pour tout exécuter: ").strip()
+    
+    if choice == 'all':
+        for key, (name, func) in examples.items():
+            if key != "8":  # Skip interactive demo in 'all'
+                print(f"\n{'='*60}")
+                func()
+    elif choice in examples:
+        examples[choice][1]()
+    else:
+        print("❌ Choix invalide")
+    
+    print("\n✅ Terminé!")
