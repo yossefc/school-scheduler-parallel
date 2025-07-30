@@ -69,44 +69,33 @@ class ScheduleAIAgent:
         self._load_institutional_constraints()
     
     def _load_institutional_constraints(self):
-        """Charge les contraintes institutionnelles par défaut"""
-        self.institutional_constraints = [
-            {
-                "id": "inst_1",
-                "name": "Horaires d'ouverture",
-                "type": "school_hours",
-                "priority": ConstraintPriority.HARD.value,
-                "data": {"start": "08:00", "end": "18:00"}
-            },
-            {
-                "id": "inst_2", 
-                "name": "Vendredi écourté",
-                "type": "friday_early_end",
-                "priority": ConstraintPriority.HARD.value,
-                "data": {"last_period": 6, "end_time": "13:00"}
-            },
-            {
-                "id": "inst_3",
-                "name": "Tefila quotidienne",
-                "type": "morning_prayer",
-                "priority": ConstraintPriority.HARD.value,
-                "data": {"start": "08:00", "end": "08:30", "days": [0, 1, 2, 3, 4]}
-            },
-            {
-                "id": "inst_4",
-                "name": "Pause déjeuner commune",
-                "type": "lunch_break",
-                "priority": ConstraintPriority.HARD.value,
-                "data": {"start": "12:15", "end": "12:45"}
-            },
-            {
-                "id": "inst_5",
-                "name": "Réunion pédagogique",
-                "type": "teacher_meeting",
-                "priority": ConstraintPriority.VERY_STRONG.value,
-                "data": {"day": 3, "start": "14:00", "end": "15:00"}
-            }
-        ]
+        """Charge les contraintes institutionnelles depuis la BD"""
+        conn = psycopg2.connect(**self.db_config)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        try:
+            cur.execute("""
+                SELECT * FROM v_active_institutional_constraints
+                ORDER BY priority ASC
+            """)
+            
+            self.institutional_constraints = []
+            for row in cur.fetchall():
+                constraint = {
+                    "id": f"inst_{row['id']}",
+                    "name": row['name'],
+                    "type": row['type'],
+                    "priority": row['priority'],
+                    "data": row['data'],
+                    "entities": row['entities']
+                }
+                self.institutional_constraints.append(constraint)
+                
+            logger.info(f"Loaded {len(self.institutional_constraints)} institutional constraints")
+            
+        finally:
+            cur.close()
+            conn.close()
     
     async def apply_constraint(self, constraint_json: Dict) -> Dict[str, Any]:
         """

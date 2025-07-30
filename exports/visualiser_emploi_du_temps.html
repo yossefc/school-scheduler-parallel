@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מערכת שעות בית ספרית</title>
+    <title>מערכת שעות בית ספרית - עם עוזר AI</title>
+    <!-- Socket.IO pour l'agent IA -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
+        /* Styles existants */
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
@@ -152,8 +155,147 @@
             margin: 20px 0;
             text-align: center;
         }
+        
+        /* Nouveaux styles pour l'agent IA */
+        .ai-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            height: 500px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        
+        .ai-panel.collapsed {
+            height: 60px;
+        }
+        
+        .ai-header {
+            background: #2196F3;
+            color: white;
+            padding: 15px;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .ai-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .ai-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: #f5f5f5;
+        }
+        
+        .ai-message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            animation: fadeIn 0.3s;
+        }
+        
+        .ai-message.user {
+            background: #e3f2fd;
+            margin-left: 30px;
+            text-align: left;
+        }
+        
+        .ai-message.ai {
+            background: white;
+            margin-right: 30px;
+            border: 1px solid #ddd;
+        }
+        
+        .ai-input {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #ddd;
+            background: white;
+            border-radius: 0 0 10px 10px;
+        }
+        
+        .ai-input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        
+        .ai-input button {
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+        
+        .ai-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+        
+        .ai-status.connected {
+            background: #4CAF50;
+        }
+        
+        .ai-status.disconnected {
+            background: #f44336;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .ai-suggestions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .ai-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: #2196F3;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+            font-size: 24px;
+            z-index: 999;
+        }
+        
+        .ai-toggle:hover {
+            background: #1976d2;
+            transform: scale(1.1);
+        }
+        
         @media print {
-            .controls, .stats, button {
+            .controls, .stats, .ai-panel, .ai-toggle, button {
                 display: none;
             }
             body {
@@ -196,15 +338,47 @@
         </div>
     </div>
 
+    <!-- Bouton AI Toggle -->
+    <div class="ai-toggle" onclick="toggleAIPanel()">🤖</div>
+
+    <!-- Panel AI -->
+    <div class="ai-panel collapsed" id="aiPanel" style="display:none;">
+        <div class="ai-header" onclick="toggleAIPanel()">
+            <span>עוזר AI לתכנון</span>
+            <span class="ai-status disconnected" id="aiStatus"></span>
+        </div>
+        <div class="ai-body">
+            <div class="ai-messages" id="aiMessages">
+                <div class="ai-message ai">
+                    שלום! אני העוזר החכם שלכם לתכנון מערכת שעות. 
+                    אני יכול לעזור לכם עם:
+                    <ul style="text-align: right; margin: 10px 0;">
+                        <li>הוספת אילוצים חדשים</li>
+                        <li>הבנת קונפליקטים</li>
+                        <li>הצעות לשיפור המערכת</li>
+                    </ul>
+                    נסו לכתוב משהו כמו "המורה כהן לא יכול ללמד ביום שישי"
+                </div>
+            </div>
+            <div class="ai-input">
+                <input type="text" id="aiInput" placeholder="הקלד הודעה..." onkeypress="handleAIKeyPress(event)">
+                <button onclick="sendAIMessage()">שלח</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Configuration
+        // Configuration existante
         const API_URL = 'http://localhost:8000/api';
+        const AI_URL = 'http://localhost:5001';
         const DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
         const PERIODS = 10;
         
         let currentSchedule = [];
         let allClasses = [];
         let allTeachers = [];
+        let socket = null;
+        let aiPanelVisible = false;
         
         // Heures des périodes
         const PERIOD_TIMES = {
@@ -220,51 +394,222 @@
             10: '14:55-15:40'
         };
         
+        // ===== FONCTIONS EXISTANTES =====
+        
         // Charger les données initiales
         async function init() {
-            showMessage('Chargement des données...', 'loading');
-            
             try {
                 // Charger les statistiques
                 const statsResponse = await fetch(`${API_URL}/stats`);
                 if (statsResponse.ok) {
-                    const data = await statsResponse.json();
-                    const stats = data.general || {};
+                    const stats = await statsResponse.json();
                     document.getElementById('statsContainer').innerHTML = `
-                        <span>כיתות: ${stats.total_classes || 0}</span>
-                        <span>מורים: ${stats.total_teachers || 0}</span>
-                        <span>שיעורים: ${stats.total_lessons || 0}</span>
-                        <span>מקצועות: ${stats.total_subjects || 0}</span>
+                        <span>כיתות: ${stats.general.total_classes}</span>
+                        <span>מורים: ${stats.general.total_teachers}</span>
+                        <span>שיעורים: ${stats.general.total_lessons}</span>
+                        <span>מקצועות: ${stats.general.total_subjects}</span>
                     `;
                 }
                 
-                // Charger les classes
-                const classResponse = await fetch(`${API_URL}/classes`);
-                if (classResponse.ok) {
-                    const data = await classResponse.json();
-                    allClasses = data.classes || [];
-                    console.log('Classes loaded:', allClasses);
-                } else {
-                    throw new Error('Impossible de charger les classes');
+                // Charger les listes
+                const classesResponse = await fetch(`${API_URL}/classes`);
+                if (classesResponse.ok) {
+                    const data = await classesResponse.json();
+                    allClasses = data.classes;
                 }
                 
-                // Charger les professeurs
-                const teacherResponse = await fetch(`${API_URL}/teachers`);
-                if (teacherResponse.ok) {
-                    const data = await teacherResponse.json();
-                    allTeachers = data.teachers || [];
-                    console.log('Teachers loaded:', allTeachers);
-                } else {
-                    throw new Error('Impossible de charger les professeurs');
+                const teachersResponse = await fetch(`${API_URL}/teachers`);
+                if (teachersResponse.ok) {
+                    const data = await teachersResponse.json();
+                    allTeachers = data.teachers;
                 }
                 
                 updateOptions();
-                showMessage('Données chargées avec succès', 'success');
+                
+                // Initialiser l'agent IA
+                initAI();
                 
             } catch (error) {
                 console.error('Erreur lors du chargement:', error);
                 showMessage('Erreur de connexion au serveur. Assurez-vous que le serveur est lancé.', 'error');
             }
+        }
+        
+        // ===== NOUVELLES FONCTIONS AGENT IA =====
+        
+        function initAI() {
+            // Connexion WebSocket à l'agent IA
+            socket = io(AI_URL, {
+                transports: ['websocket'],
+                reconnection: true
+            });
+            
+            socket.on('connect', () => {
+                console.log('Connecté à l\'agent IA');
+                document.getElementById('aiStatus').classList.remove('disconnected');
+                document.getElementById('aiStatus').classList.add('connected');
+                
+                // Envoyer le contexte
+                socket.emit('context', {
+                    scheduleId: 'current',
+                    language: 'he'
+                });
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('Déconnecté de l\'agent IA');
+                document.getElementById('aiStatus').classList.remove('connected');
+                document.getElementById('aiStatus').classList.add('disconnected');
+            });
+            
+            socket.on('ai_response', (response) => {
+                handleAIResponse(response);
+            });
+            
+            socket.on('error', (error) => {
+                addAIMessage('Erreur: ' + error.message, 'ai');
+            });
+        }
+        
+        function toggleAIPanel() {
+            const panel = document.getElementById('aiPanel');
+            const toggle = document.querySelector('.ai-toggle');
+            
+            if (!aiPanelVisible) {
+                panel.style.display = 'flex';
+                panel.classList.remove('collapsed');
+                toggle.style.display = 'none';
+                aiPanelVisible = true;
+            } else {
+                panel.classList.add('collapsed');
+                setTimeout(() => {
+                    panel.style.display = 'none';
+                    toggle.style.display = 'flex';
+                }, 300);
+                aiPanelVisible = false;
+            }
+        }
+        
+        function sendAIMessage() {
+            const input = document.getElementById('aiInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Ajouter le message utilisateur
+            addAIMessage(message, 'user');
+            
+            // Envoyer au serveur
+            if (socket && socket.connected) {
+                socket.emit('message', {
+                    text: message,
+                    type: 'constraint',
+                    context: {
+                        viewType: document.getElementById('viewType').value,
+                        currentSelection: document.getElementById('nameSelect').value
+                    }
+                });
+            } else {
+                addAIMessage('Pas de connexion à l\'agent IA', 'ai');
+            }
+            
+            // Vider l'input
+            input.value = '';
+        }
+        
+        function handleAIKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendAIMessage();
+            }
+        }
+        
+        function addAIMessage(content, sender) {
+            const messagesDiv = document.getElementById('aiMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `ai-message ${sender}`;
+            
+            if (typeof content === 'object') {
+                messageDiv.innerHTML = formatAIContent(content);
+            } else {
+                messageDiv.textContent = content;
+            }
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function handleAIResponse(response) {
+            const { type, message, thoughts, plan, ask_user, details } = response;
+            
+            let content = '';
+            
+            switch (type) {
+                case 'plan':
+                    content = `<strong>Plan suggéré:</strong><br>`;
+                    if (thoughts) content += `💭 ${thoughts}<br><br>`;
+                    if (plan && plan.length > 0) {
+                        content += '<ol>';
+                        plan.forEach(step => {
+                            content += `<li>${step.action}</li>`;
+                        });
+                        content += '</ol>';
+                    }
+                    if (ask_user) {
+                        content += `<div class="ai-suggestions">${ask_user}</div>`;
+                    }
+                    break;
+                    
+                case 'clarification':
+                    content = message;
+                    break;
+                    
+                case 'success':
+                    content = `✅ ${message}`;
+                    if (details) {
+                        content += `<br><small>${JSON.stringify(details, null, 2)}</small>`;
+                    }
+                    // Recharger l'emploi du temps si nécessaire
+                    if (currentSchedule.length > 0) {
+                        loadSchedule();
+                    }
+                    break;
+                    
+                case 'error':
+                    content = `❌ ${message}`;
+                    break;
+                    
+                default:
+                    content = message || JSON.stringify(response);
+            }
+            
+            addAIMessage(content, 'ai');
+        }
+        
+        function formatAIContent(content) {
+            if (content.thoughts) {
+                return `<div>💭 ${content.thoughts}</div>`;
+            }
+            return JSON.stringify(content, null, 2);
+        }
+        
+        // ===== FONCTIONS UTILITAIRES POUR L'IA =====
+        
+        async function parseNaturalConstraint(text) {
+            try {
+                const response = await fetch(`${AI_URL}/api/ai/constraints/natural`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, language: 'he' })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    return result;
+                }
+            } catch (error) {
+                console.error('Erreur parsing:', error);
+            }
+            return null;
         }
         
         // Mettre à jour les options du select

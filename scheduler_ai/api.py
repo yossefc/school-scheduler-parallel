@@ -1,5 +1,7 @@
-﻿"""
-scheduler_ai/api.py - API Flask et WebSocket pour l'agent IA
+﻿# scheduler_ai/api.py - Version corrigée avec Pydantic
+
+"""
+API Flask et WebSocket pour l'agent IA avec validation Pydantic
 """
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -11,6 +13,11 @@ import logging
 import os
 from datetime import datetime
 
+# IMPORTANT : Importer Pydantic et les modèles
+from pydantic import ValidationError
+from models import ConstraintRequest, ConstraintResponse
+
+# Importer l'agent et le router
 from agent import ScheduleAIAgent, ConstraintPriority
 from llm_router import LLMRouter
 
@@ -23,7 +30,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Configuration
 db_config = {
-    "host": os.environ.get("DB_HOST", "postgres"),
+    "host": os.environ.get("DB_HOST", "localhost"),  # Changé de "postgres" à "localhost"
     "database": os.environ.get("DB_NAME", "school_scheduler"),
     "user": os.environ.get("DB_USER", "admin"),
     "password": os.environ.get("DB_PASSWORD", "school123")
@@ -36,38 +43,44 @@ llm_router = LLMRouter()
 # Sessions actives
 active_sessions = {}
 
+@app.route('/health')
+def health():
+    """Check de santé de l'API"""
+    return jsonify({
+        "status": "ok",
+        "service": "scheduler-ai",
+        "version": "2.0",
+        "timestamp": datetime.now().isoformat()
+    })
+
 @app.route('/api/ai/constraint', methods=['POST'])
 def apply_constraint():
     """
-    Applique une nouvelle contrainte via l'agent IA
-    
-    Body: {
-        "constraint": {
-            "type": str,
-            "entity": str,
-            "data": dict,
-            "priority": int
-        }
-    }
+    Applique une nouvelle contrainte via l'agent IA avec validation Pydantic
     """
     try:
-        data = request.json
-        constraint = data.get('constraint')
+        # NOUVEAU : Validation automatique avec Pydantic
+        constraint_request = ConstraintRequest(**request.json)
         
-        if not constraint:
-            return jsonify({"error": "Contrainte manquante"}), 400
+        logger.info(f"Constraint validated: {constraint_request.type} for {constraint_request.entity}")
         
-        # Validation basique
-        if not all(k in constraint for k in ['type', 'entity', 'data']):
-            return jsonify({"error": "Contrainte incomplète"}), 400
+        # Convertir en dict pour l'agent
+        constraint_dict = constraint_request.dict()
         
         # Appliquer via l'agent
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(agent.apply_constraint(constraint))
+        result = loop.run_until_complete(agent.apply_constraint(constraint_dict))
         
         return jsonify(result)
         
+    except ValidationError as e:
+        # NOUVEAU : Retourner les erreurs de validation détaillées
+        logger.warning(f"Validation failed: {e.errors()}")
+        return jsonify({
+            "error": "Validation failed",
+            "details": e.errors()
+        }), 400
     except Exception as e:
         logger.error(f"Erreur apply_constraint: {str(e)}")
         return jsonify({"error": str(e)}), 500
@@ -86,11 +99,6 @@ def explain_conflict(conflict_id):
 def parse_natural_constraint():
     """
     Parse une contrainte en langage naturel
-    
-    Body: {
-        "text": str,
-        "language": "fr" | "he"
-    }
     """
     try:
         data = request.json
@@ -162,38 +170,22 @@ def handle_disconnect():
 
 @socketio.on('message')
 def handle_message(data):
-    """
-    Gère les messages du chat
-    
-    Data: {
-        "text": str,
-        "type": "question" | "constraint" | "feedback",
-        "context": dict
-    }
-    """
+    """Gère les messages du chat"""
     session_id = request.sid
     
     try:
-        message_type = data.get('type', 'question')
         text = data.get('text', '')
+        message_type = data.get('type', 'question')
         context = data.get('context', {})
         
-        # Mettre à jour le contexte de session
-        if session_id in active_sessions:
-            active_sessions[session_id]['context'].update(context)
+        logger.info(f"Message reçu de {session_id}: {text[:50]}...")
         
-        # Router selon le type
+        # Router selon le type de message
         if message_type == 'constraint':
-            # Parser et appliquer la contrainte
             response = handle_constraint_message(text, context)
-        elif message_type == 'feedback':
-            # Traiter le feedback
-            response = handle_feedback_message(text, context)
         else:
-            # Question générale
             response = handle_question_message(text, context)
         
-        # Émettre la réponse
         emit('ai_response', response)
         
     except Exception as e:
@@ -201,65 +193,26 @@ def handle_message(data):
         emit('error', {"message": str(e)})
 
 def handle_constraint_message(text: str, context: Dict) -> Dict[str, Any]:
-    """Traite un message contenant une contrainte"""
-    # Parser la contrainte
-    parsed = llm_router.parse_natural_language(text, context.get('language', 'fr'))
+    """Traite un message de type contrainte"""
+    parsed = llm_router.parse_natural_language(text)
     
-    if parsed.get('confidence', 0) < 0.7:
-        # Demander clarification
+    if parsed.get('confidence', 0) > 0.7:
+        return {
+            "type": "plan",
+            "message": f"J'ai compris : {parsed['summary']}",
+            "constraint": parsed['constraint'],
+            "thoughts": "Je vais analyser l'impact de cette contrainte sur l'emploi du temps.",
+            "plan": [
+                {"action": "Analyser la contrainte", "step": "action/analyze"},
+                {"action": "Vérifier les conflits", "step": "action/check_conflicts"},
+                {"action": "Proposer une solution", "step": "action/propose"}
+            ],
+            "ask_user": "Voulez-vous que j'applique cette contrainte ?"
+        }
+    else:
         return {
             "type": "clarification",
-            "message": "Je ne suis pas sûr d'avoir bien compris. Voulez-vous dire :",
-            "suggestions": parsed.get('alternatives', []),
-            "original_parse": parsed
-        }
-    
-    # Créer le plan
-    constraint = parsed['constraint']
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    analysis = loop.run_until_complete(agent._analyze_constraint(constraint))
-    
-    plan = agent._create_modification_plan(constraint, analysis)
-    
-    return {
-        "type": "plan",
-        "thoughts": f"J'ai compris que vous voulez {parsed['summary']}",
-        "plan": plan,
-        "ask_user": "Souhaitez-vous appliquer ce plan ? (Répondre 'OK' ou préciser des ajustements)"
-    }
-
-def handle_feedback_message(text: str, context: Dict) -> Dict[str, Any]:
-    """Traite un message de feedback"""
-    if text.upper() == 'OK' and context.get('pending_plan'):
-        # Appliquer le plan en attente
-        plan = context['pending_plan']
-        constraint = plan['constraint']
-        
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(agent.apply_constraint(constraint))
-        
-        if result['status'] == 'success':
-            return {
-                "type": "success",
-                "message": "✅ Plan appliqué avec succès !",
-                "details": {
-                    "score_delta": result['score_delta'],
-                    "changes": result['solution_diff']
-                }
-            }
-        else:
-            return {
-                "type": "error",
-                "message": "❌ Impossible d'appliquer le plan",
-                "details": result
-            }
-    else:
-        # Traiter comme ajustement
-        return {
-            "type": "adjustment",
-            "message": "Je comprends vos ajustements. Que souhaitez-vous modifier ?"
+            "message": "Je ne suis pas sûr de comprendre. Pouvez-vous reformuler ?\n\nExemples valides :\n- Le professeur X ne peut pas le vendredi\n- Les cours de math doivent être le matin"
         }
 
 def handle_question_message(text: str, context: Dict) -> Dict[str, Any]:
@@ -305,40 +258,37 @@ def handle_join_schedule_view():
     join_room('schedule_viewers')
     emit('joined_room', {"room": "schedule_viewers"})
 
-# ===== HELPERS =====
-
-def format_response_for_ui(response: Dict) -> Dict:
-    """Formate la réponse pour l'UI"""
-    if response['type'] == 'plan':
-        # Ajouter des métadonnées visuelles
-        for step in response['plan']:
-            step['icon'] = get_icon_for_action(step['step'])
-            step['color'] = get_color_for_priority(step.get('priority', 3))
-    
-    return response
-
-def get_icon_for_action(action: str) -> str:
-    """Retourne l'icône appropriée pour une action"""
-    icons = {
-        "action/add_constraint": "➕",
-        "action/modify_constraint": "✏️",
-        "action/solve": "🔄",
-        "action/report": "📊",
-        "action/relax_constraint": "🔧"
-    }
-    return icons.get(action, "▶️")
-
-def get_color_for_priority(priority: int) -> str:
-    """Retourne la couleur pour un niveau de priorité"""
-    colors = {
-        0: "red",      # HARD
-        1: "orange",   # VERY_STRONG  
-        2: "yellow",   # MEDIUM
-        3: "blue",     # NORMAL
-        4: "green",    # LOW
-        5: "gray"      # MINIMAL
-    }
-    return colors.get(priority, "blue")
-
 if __name__ == '__main__':
-    socketio.run(app, debug=True, port=5001)
+    print("""
+    🤖 Agent IA School Scheduler
+    ============================
+    
+    ✅ Validation Pydantic activée
+    📊 Base de données : localhost:5432
+    🌐 WebSocket : http://localhost:5001
+    
+    Routes disponibles :
+    - GET  /health
+    - POST /api/ai/constraint (avec validation)
+    - POST /api/ai/constraints/natural
+    - GET  /api/ai/suggestions
+    
+    """)
+    
+    # Configuration serveur selon l'environnement
+    is_development = os.getenv('FLASK_ENV') == 'development'
+    
+    if is_development:
+        # Mode développement : permet Werkzeug avec allow_unsafe_werkzeug
+        socketio.run(app, host="0.0.0.0", port=5001,
+             debug=True, allow_unsafe_werkzeug=True)
+
+    else:
+        # Mode production : utilise eventlet pour la performance
+        try:
+            import eventlet
+            socketio.run(app, debug=False, port=5001, host='0.0.0.0')
+        except ImportError:
+            logger.warning("eventlet non installé, utilisation de Werkzeug en mode unsafe")
+            socketio.run(app, debug=False, port=5001, host='0.0.0.0', 
+                        allow_unsafe_werkzeug=True)

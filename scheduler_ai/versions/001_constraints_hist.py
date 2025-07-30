@@ -1,6 +1,6 @@
 """add constraints history table
 
-Revision ID: add_constraints_history_001
+Revision ID: 001_constraints_hist
 Revises: 
 Create Date: 2024-01-15 10:00:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'add_constraints_history_001'
+revision = '001_constraints_hist'
 down_revision = None
 branch_labels = None
 depends_on = None

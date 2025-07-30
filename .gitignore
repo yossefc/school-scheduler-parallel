@@ -112,4 +112,12 @@ verification_report_*.json
 # *.ps1
 # *.sh
 # *.bat
-# *.cmd 
+# *.cmd
+
+# Alembic duplicate configurations (keep only scheduler_ai/alembic.ini)
+/alembic.ini
+/migrations/
+
+# Migration cache and temporary files
+**/versions/__pycache__/
+**/migrations/__pycache__/ 

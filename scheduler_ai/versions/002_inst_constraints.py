@@ -1,0 +1,291 @@
+"""
+Alembic migration for institutional constraints
+
+Revision ID: 002_inst_constraints
+Revises: 001_constraints_hist
+Create Date: 2024-01-15 10:00:00.000000
+"""
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+import json
+from datetime import datetime
+
+# revision identifiers
+revision = '002_inst_constraints'
+down_revision = '001_constraints_hist'
+branch_labels = None
+depends_on = None
+
+def upgrade():
+    """
+    Créer la table institutional_constraints et y insérer les contraintes par défaut
+    """
+    
+    # Créer la table institutional_constraints
+    op.create_table('institutional_constraints',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('name', sa.String(length=200), nullable=False),
+        sa.Column('type', sa.String(length=50), nullable=False),
+        sa.Column('priority', sa.Integer(), nullable=False, default=0),
+        sa.Column('entity', sa.String(length=100), nullable=False, default='all'),
+        sa.Column('data', postgresql.JSON(astext_type=sa.Text()), nullable=False),
+        sa.Column('description', sa.Text(), nullable=True),
+        sa.Column('is_active', sa.Boolean(), nullable=False, default=True),
+        sa.Column('applicable_days', postgresql.ARRAY(sa.Integer()), nullable=True),
+        sa.Column('start_date', sa.Date(), nullable=True),
+        sa.Column('end_date', sa.Date(), nullable=True),
+        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
+        sa.Column('updated_at', sa.DateTime(), nullable=True),
+        sa.Column('created_by', sa.String(length=100), nullable=False, default='system'),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('name')
+    )
+    
+    # Créer les index
+    op.create_index('idx_institutional_constraints_type', 'institutional_constraints', ['type'])
+    op.create_index('idx_institutional_constraints_active', 'institutional_constraints', ['is_active'])
+    op.create_index('idx_institutional_constraints_priority', 'institutional_constraints', ['priority'])
+    
+    # Créer la table de liaison pour les entités concernées
+    op.create_table('institutional_constraint_entities',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('constraint_id', sa.Integer(), nullable=False),
+        sa.Column('entity_type', sa.String(length=50), nullable=False),
+        sa.Column('entity_name', sa.String(length=100), nullable=False),
+        sa.Column('exception_type', sa.String(length=20), nullable=True),  # 'include' ou 'exclude'
+        sa.ForeignKeyConstraint(['constraint_id'], ['institutional_constraints.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id')
+    )
+    
+    op.create_index(
+        'idx_inst_constraint_entities', 
+        'institutional_constraint_entities', 
+        ['constraint_id', 'entity_type']
+    )
+    
+    # Insérer les contraintes institutionnelles par défaut
+    op.execute("""
+        INSERT INTO institutional_constraints 
+        (name, type, priority, entity, data, description, is_active, applicable_days) 
+        VALUES 
+        (
+            'Horaires d''ouverture de l''établissement',
+            'school_hours',
+            0,
+            'school',
+            '{"start": "08:00", "end": "18:00", "strict": true}',
+            'L''école est ouverte de 8h00 à 18h00. Aucun cours ne peut être planifié en dehors de ces horaires.',
+            true,
+            ARRAY[0,1,2,3,4,5]
+        ),
+        (
+            'Vendredi écourté',
+            'friday_early_end',
+            0,
+            'all',
+            '{"last_period": 6, "end_time": "13:00", "reason": "Shabbat"}',
+            'Les cours du vendredi se terminent à 13h00 pour permettre la préparation du Shabbat.',
+            true,
+            ARRAY[5]
+        ),
+        (
+            'Prière quotidienne - Tefila',
+            'morning_prayer',
+            0,
+            'all',
+            '{"start": "08:00", "end": "08:30", "location": "synagogue", "mandatory": true}',
+            'Prière obligatoire chaque matin de 8h00 à 8h30 pour tous les élèves et enseignants.',
+            true,
+            ARRAY[0,1,2,3,4]
+        ),
+        (
+            'Pause déjeuner commune',
+            'lunch_break',
+            0,
+            'all',
+            '{"start": "12:15", "end": "12:45", "min_duration": 30}',
+            'Pause déjeuner obligatoire pour tous entre 12h15 et 12h45.',
+            true,
+            ARRAY[0,1,2,3,4,5]
+        ),
+        (
+            'Réunion pédagogique hebdomadaire',
+            'teacher_meeting',
+            1,
+            'teachers',
+            '{"day": 3, "start": "14:00", "end": "15:00", "frequency": "weekly", "mandatory": true}',
+            'Réunion pédagogique obligatoire pour tous les enseignants le mercredi de 14h à 15h.',
+            true,
+            ARRAY[3]
+        ),
+        (
+            'Cours de soutien',
+            'support_classes',
+            2,
+            'selected_students',
+            '{"periods": [8, 9], "days": [1, 3], "max_students": 15}',
+            'Créneaux réservés pour les cours de soutien les lundis et mercredis en fin de journée.',
+            true,
+            ARRAY[1,3]
+        ),
+        (
+            'Activités parascolaires',
+            'extracurricular',
+            3,
+            'all',
+            '{"start_period": 9, "days": [2, 4], "optional": true}',
+            'Activités optionnelles les mardis et jeudis après les cours réguliers.',
+            true,
+            ARRAY[2,4]
+        ),
+        (
+            'Récréation matinale',
+            'morning_break',
+            0,
+            'all',
+            '{"period": 3, "duration": 15, "mandatory": true}',
+            'Pause obligatoire de 15 minutes en milieu de matinée.',
+            true,
+            ARRAY[0,1,2,3,4,5]
+        )
+    """)
+    
+    # Ajouter des exceptions spécifiques
+    op.execute("""
+        INSERT INTO institutional_constraint_entities
+        (constraint_id, entity_type, entity_name, exception_type)
+        VALUES
+        (
+            (SELECT id FROM institutional_constraints WHERE name = 'Prière quotidienne - Tefila'),
+            'teacher',
+            'Prof. Martin',
+            'exclude'
+        ),
+        (
+            (SELECT id FROM institutional_constraints WHERE name = 'Cours de soutien'),
+            'class',
+            '9A',
+            'include'
+        ),
+        (
+            (SELECT id FROM institutional_constraints WHERE name = 'Cours de soutien'),
+            'class',
+            '9B',
+            'include'
+        )
+    """)
+    
+    # Créer une vue pour faciliter l'accès aux contraintes actives
+    op.execute("""
+        CREATE OR REPLACE VIEW v_active_institutional_constraints AS
+        SELECT 
+            ic.*,
+            COALESCE(
+                json_agg(
+                    DISTINCT jsonb_build_object(
+                        'entity_type', ice.entity_type,
+                        'entity_name', ice.entity_name,
+                        'exception_type', ice.exception_type
+                    )
+                ) FILTER (WHERE ice.id IS NOT NULL),
+                '[]'::json
+            ) as entities
+        FROM institutional_constraints ic
+        LEFT JOIN institutional_constraint_entities ice ON ic.id = ice.constraint_id
+        WHERE ic.is_active = true
+            AND (ic.start_date IS NULL OR ic.start_date <= CURRENT_DATE)
+            AND (ic.end_date IS NULL OR ic.end_date >= CURRENT_DATE)
+        GROUP BY ic.id
+        ORDER BY ic.priority ASC, ic.id ASC
+    """)
+    
+    # Créer une fonction pour vérifier si une contrainte s'applique
+    op.execute("""
+        CREATE OR REPLACE FUNCTION check_institutional_constraint_applies(
+            p_constraint_id INTEGER,
+            p_entity_type VARCHAR,
+            p_entity_name VARCHAR,
+            p_day_of_week INTEGER DEFAULT NULL
+        ) RETURNS BOOLEAN AS $$
+        DECLARE
+            v_applies BOOLEAN := TRUE;
+            v_entity_rule RECORD;
+            v_constraint RECORD;
+        BEGIN
+            -- Récupérer la contrainte
+            SELECT * INTO v_constraint
+            FROM institutional_constraints
+            WHERE id = p_constraint_id AND is_active = true;
+            
+            IF NOT FOUND THEN
+                RETURN FALSE;
+            END IF;
+            
+            -- Vérifier le jour si spécifié
+            IF p_day_of_week IS NOT NULL AND v_constraint.applicable_days IS NOT NULL THEN
+                IF NOT (p_day_of_week = ANY(v_constraint.applicable_days)) THEN
+                    RETURN FALSE;
+                END IF;
+            END IF;
+            
+            -- Vérifier les règles d'entité
+            IF v_constraint.entity = 'all' THEN
+                -- S'applique à tous, vérifier les exclusions
+                SELECT * INTO v_entity_rule
+                FROM institutional_constraint_entities
+                WHERE constraint_id = p_constraint_id
+                    AND entity_type = p_entity_type
+                    AND entity_name = p_entity_name
+                    AND exception_type = 'exclude';
+                
+                IF FOUND THEN
+                    RETURN FALSE;
+                END IF;
+            ELSE
+                -- S'applique à des entités spécifiques
+                SELECT * INTO v_entity_rule
+                FROM institutional_constraint_entities
+                WHERE constraint_id = p_constraint_id
+                    AND entity_type = p_entity_type
+                    AND entity_name = p_entity_name
+                    AND exception_type = 'include';
+                
+                IF NOT FOUND THEN
+                    RETURN FALSE;
+                END IF;
+            END IF;
+            
+            RETURN TRUE;
+        END;
+        $$ LANGUAGE plpgsql;
+    """)
+    
+    # Ajouter une colonne de référence dans la table constraints
+    op.add_column('constraints', 
+        sa.Column('institutional_constraint_id', sa.Integer(), nullable=True)
+    )
+    
+    op.create_foreign_key(
+        'fk_constraints_institutional',
+        'constraints', 
+        'institutional_constraints',
+        ['institutional_constraint_id'], 
+        ['id']
+    )
+
+def downgrade():
+    """
+    Supprimer les modifications
+    """
+    # Supprimer la foreign key et la colonne
+    op.drop_constraint('fk_constraints_institutional', 'constraints', type_='foreignkey')
+    op.drop_column('constraints', 'institutional_constraint_id')
+    
+    # Supprimer la fonction et la vue
+    op.execute("DROP FUNCTION IF EXISTS check_institutional_constraint_applies")
+    op.execute("DROP VIEW IF EXISTS v_active_institutional_constraints")
+    
+    # Supprimer les tables
+    op.drop_table('institutional_constraint_entities')
+    op.drop_table('institutional_constraints')

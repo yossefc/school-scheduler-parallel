@@ -1,4 +1,4 @@
-"""
+﻿"""
 scheduler_ai/llm_router.py - Routeur intelligent pour choisir entre GPT-4o et Claude Opus
 """
 import os
@@ -12,6 +12,7 @@ import re
 
 import openai
 import anthropic
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +36,45 @@ class LLMRouter:
     """Routeur intelligent pour sélectionner le bon modèle LLM"""
     
     def __init__(self):
-        # Configuration des clients
-        self.openai_client = openai.OpenAI(
-            api_key=os.environ.get("OPENAI_API_KEY")
-        )
-        self.anthropic_client = anthropic.Anthropic(
-            api_key=os.environ.get("ANTHROPIC_API_KEY")
-        )
+        # Configuration des clients avec support proxy via httpx
+        
+        # Configuration du proxy via httpx si nécessaire
+        proxy_url = os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
+        http_client = httpx.Client(proxies=proxy_url) if proxy_url else None
+        
+        try:
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if api_key and api_key != "sk-...":
+                self.openai_client = openai.OpenAI(
+                    api_key=api_key,
+                    http_client=http_client
+                )
+            else:
+                self.openai_client = None
+                logger.warning("OpenAI API key not configured")
+        except Exception as e:
+            logger.error(f"Failed to initialize OpenAI client: {e}")
+            self.openai_client = None
+            
+        try:
+            api_key = os.environ.get("ANTHROPIC_API_KEY") 
+            if api_key and api_key != "claude-...":
+                self.anthropic_client = anthropic.Anthropic(
+                    api_key=api_key,
+                    http_client=http_client
+                )
+            else:
+                self.anthropic_client = None
+                logger.warning("Anthropic API key not configured")
+        except Exception as e:
+            logger.error(f"Failed to initialize Anthropic client: {e}")
+            self.anthropic_client = None
         
         # Tokenizer pour compter les tokens
-        self.encoding = tiktoken.encoding_for_model("gpt-4")
+        try:
+            self.encoding = tiktoken.encoding_for_model("gpt-4")
+        except:
+            self.encoding = tiktoken.get_encoding("cl100k_base")
         
         # Cache des patterns de contraintes
         self.constraint_patterns = self._load_constraint_patterns()
@@ -80,22 +110,25 @@ class LLMRouter:
         }
     
     def choose_model(self, task_type: str, tokens: int, complexity: Optional[TaskComplexity] = None) -> str:
-        """
-        Choisit le modèle approprié selon la tâche
+        """Choisit le modèle approprié selon la tâche"""
+        # Si aucun client n'est configuré, retourner une erreur
+        if not self.openai_client and not self.anthropic_client:
+            return "none"
         
-        Règles:
-        - < 8k tokens + complexité faible → GPT-4o
-        - 8-30k tokens + complexité moyenne → GPT-4o  
-        - 30-100k tokens + complexité élevée → GPT-4o puis Claude pour raisonnement
-        - > 100k tokens ou complexité très élevée → Claude Opus
-        """
         if not complexity:
             complexity = self._estimate_complexity(task_type, tokens)
         
+        # Logique simplifiée si un seul client est disponible
+        if self.openai_client and not self.anthropic_client:
+            return "openai/gpt-4o"
+        elif self.anthropic_client and not self.openai_client:
+            return "anthropic/claude-4-opus"
+        
+        # Logique normale si les deux sont disponibles
         if tokens > 100_000 or complexity == TaskComplexity.VERY_HIGH:
             return "anthropic/claude-4-opus"
         elif tokens > 30_000 and complexity == TaskComplexity.HIGH:
-            return "hybrid"  # GPT-4o + Claude
+            return "hybrid"
         else:
             return "openai/gpt-4o"
     
@@ -111,17 +144,11 @@ class LLMRouter:
             return TaskComplexity.LOW
     
     def parse_natural_language(self, text: str, language: Literal["fr", "he"] = "fr") -> Dict[str, Any]:
-        """
-        Parse une contrainte en langage naturel
+        """Parse une contrainte en langage naturel"""
+        # Si aucun LLM n'est disponible, faire un parsing basique
+        if not self.openai_client and not self.anthropic_client:
+            return self._basic_parse(text)
         
-        Returns:
-            {
-                "constraint": {...},
-                "confidence": float,
-                "summary": str,
-                "alternatives": [...]
-            }
-        """
         # Compter les tokens
         tokens = len(self.encoding.encode(text))
         
@@ -134,20 +161,55 @@ class LLMRouter:
         # Choisir le modèle
         model = self.choose_model("constraint_parsing", tokens, complexity)
         
+        if model == "none":
+            return self._basic_parse(text)
+        
         # Construire le prompt
         prompt = self._build_parsing_prompt(text, language, constraint_type)
         
         # Appeler le LLM
-        if model.startswith("openai"):
-            response = self._call_openai(prompt, model="gpt-4o")
-        else:
-            response = self._call_anthropic(prompt, model="claude-4-opus-20240514")
+        try:
+            if model.startswith("openai") and self.openai_client:
+                response = self._call_openai(prompt, model="gpt-4o")
+            elif self.anthropic_client:
+                response = self._call_anthropic(prompt, model="claude-4-opus-20240514")
+            else:
+                return self._basic_parse(text)
+            
+            # Parser la réponse
+            parsed = self._parse_llm_response(response.content)
+            parsed["confidence"] = self._calculate_confidence(parsed, text)
+            
+            return parsed
+        except Exception as e:
+            logger.error(f"Error in parse_natural_language: {e}")
+            return self._basic_parse(text)
+    
+    def _basic_parse(self, text: str) -> Dict[str, Any]:
+        """Parsing basique sans LLM"""
+        constraint_type = self._detect_constraint_type(text)
         
-        # Parser la réponse
-        parsed = self._parse_llm_response(response.content)
-        parsed["confidence"] = self._calculate_confidence(parsed, text)
+        # Extraire des entités basiques
+        words = text.split()
+        entity = "unknown"
         
-        return parsed
+        # Chercher des noms propres (mots avec majuscule)
+        for word in words:
+            if word and word[0].isupper() and word not in ["Le", "La", "Les"]:
+                entity = word
+                break
+        
+        return {
+            "constraint": {
+                "type": constraint_type if constraint_type != "unknown" else "custom",
+                "entity": entity,
+                "data": {"text": text},
+                "priority": 3
+            },
+            "confidence": 0.3,
+            "summary": f"Contrainte détectée: {text[:50]}...",
+            "alternatives": []
+        }
     
     def _detect_constraint_type(self, text: str) -> str:
         """Détecte le type de contrainte depuis le texte"""
@@ -191,12 +253,27 @@ Contexte : système scolaire israélien, semaine dimanche-vendredi."""
     
     def answer_question(self, question: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """Répond à une question générale sur l'emploi du temps"""
+        # Si pas de LLM, réponse basique
+        if not self.openai_client and not self.anthropic_client:
+            return {
+                "answer": "Désolé, je ne peux pas répondre sans connexion à un service IA.",
+                "model_used": "none",
+                "references": []
+            }
+        
         # Enrichir le contexte
         enriched_context = self._enrich_context(context)
         tokens = len(self.encoding.encode(json.dumps(enriched_context)))
         
         # Choisir le modèle
         model = self.choose_model("question_answering", tokens)
+        
+        if model == "none":
+            return {
+                "answer": "Service IA non disponible.",
+                "model_used": "none",
+                "references": []
+            }
         
         # Construire le prompt
         prompt = f"""Tu es l'assistant IA du système de planification scolaire.
@@ -209,19 +286,36 @@ Question : {question}
 Réponds de manière claire et pédagogique. Si la question concerne des modifications, propose des actions concrètes."""
         
         # Appeler le LLM approprié
-        if model.startswith("openai"):
-            response = self._call_openai(prompt)
-        else:
-            response = self._call_anthropic(prompt)
-        
-        return {
-            "answer": response.content,
-            "model_used": response.model_used,
-            "references": self._extract_references(response.content)
-        }
+        try:
+            if model.startswith("openai") and self.openai_client:
+                response = self._call_openai(prompt)
+            elif self.anthropic_client:
+                response = self._call_anthropic(prompt)
+            else:
+                return {
+                    "answer": "Service IA temporairement indisponible.",
+                    "model_used": "none",
+                    "references": []
+                }
+            
+            return {
+                "answer": response.content,
+                "model_used": response.model_used,
+                "references": self._extract_references(response.content)
+            }
+        except Exception as e:
+            logger.error(f"Error in answer_question: {e}")
+            return {
+                "answer": f"Erreur: {str(e)}",
+                "model_used": "error",
+                "references": []
+            }
     
     def _call_openai(self, prompt: str, model: str = "gpt-4o", **kwargs) -> LLMResponse:
         """Appelle l'API OpenAI"""
+        if not self.openai_client:
+            raise Exception("OpenAI client not initialized")
+            
         try:
             response = self.openai_client.chat.completions.create(
                 model=model,
@@ -247,6 +341,9 @@ Réponds de manière claire et pédagogique. Si la question concerne des modific
     
     def _call_anthropic(self, prompt: str, model: str = "claude-4-opus-20240514", **kwargs) -> LLMResponse:
         """Appelle l'API Anthropic"""
+        if not self.anthropic_client:
+            raise Exception("Anthropic client not initialized")
+            
         try:
             response = self.anthropic_client.messages.create(
                 model=model,

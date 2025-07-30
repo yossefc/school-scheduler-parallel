@@ -3,6 +3,11 @@ flask==3.0.0
 flask-socketio==5.3.5
 flask-cors==4.0.0
 python-socketio==5.10.0
+
+# Server performance & proxy support
+eventlet==0.33.3
+httpx==0.25.2
+
 # Ajouter après les autres dépendances
 ortools==9.7.2996
 # Database

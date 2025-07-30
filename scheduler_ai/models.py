@@ -1,6 +1,6 @@
 # models.py
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Literal
 from datetime import time
 
 class Teacher(BaseModel):
@@ -65,6 +65,17 @@ class ConstraintRequest(BaseModel):
     entity: str
     data: Dict[str, Any]
     priority: int = 2
+
+class ConstraintResponse(BaseModel):
+    """Réponse après application d'une contrainte"""
+    status: Literal["success", "conflict", "error"]
+    constraint_id: Optional[int] = None
+    plan: Optional[List[Dict[str, Any]]] = None
+    solution_diff: Optional[Dict[str, Any]] = None
+    score_delta: Optional[int] = None
+    conflicts: List[Dict[str, Any]] = Field(default=[])
+    suggestions: List[str] = Field(default=[])
+    processing_time_ms: Optional[int] = None
 
 class NaturalLanguageRequest(BaseModel):
     text: str
