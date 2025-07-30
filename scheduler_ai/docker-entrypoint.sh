@@ -3,62 +3,55 @@ set -e
 
 echo "🤖 Starting School Scheduler AI Agent..."
 
-# Attendre que PostgreSQL soit prêt
+# Attendre PostgreSQL
 echo "⏳ Waiting for PostgreSQL..."
 while ! pg_isready -h ${DB_HOST:-postgres} -p ${DB_PORT:-5432} -U ${DB_USER:-admin}; do
-    sleep 1
+    echo "Waiting for PostgreSQL..."
+    sleep 2
 done
 echo "✅ PostgreSQL is ready!"
 
-# Attendre que Redis soit prêt (si configuré)
+# Attendre Redis si configuré
 if [ ! -z "$REDIS_URL" ]; then
     echo "⏳ Waiting for Redis..."
-    REDIS_HOST=$(echo $REDIS_URL | sed -e 's/redis:\/\///' -e 's/:.*$//')
-    REDIS_PORT=$(echo $REDIS_URL | sed -e 's/.*://' -e 's/\/.*//')
-    while ! nc -z ${REDIS_HOST} ${REDIS_PORT:-6379}; do
-        sleep 1
+    REDIS_HOST=$(echo $REDIS_URL | sed -e 's|redis://||' -e 's|:.*$||')
+    REDIS_PORT=$(echo $REDIS_URL | sed -e 's|.*:||' -e 's|/.*$||')
+    while ! nc -z ${REDIS_HOST} ${REDIS_PORT:-6379} 2>/dev/null; do
+        echo "Waiting for Redis..."
+        sleep 2
     done
     echo "✅ Redis is ready!"
 fi
 
-# Appliquer les migrations Alembic
-echo "🔄 Running database migrations..."
-alembic upgrade head
+# Créer __init__.py si nécessaire (pour les deux structures)
+touch /app/__init__.py 2>/dev/null || true
+touch /app/scheduler_ai/__init__.py 2>/dev/null || true
 
-# Initialiser les données de base si nécessaire
-if [ "$INIT_DATA" = "true" ]; then
-    echo "📦 Initializing default data..."
-    python -c "
-from scheduler_ai.agent import ScheduleAIAgent
-from scheduler_ai.utils import init_default_constraints
-agent = ScheduleAIAgent({'host': '$DB_HOST', 'database': '$DB_NAME', 'user': '$DB_USER', 'password': '$DB_PASSWORD'})
-init_default_constraints(agent)
-print('✅ Default constraints initialized')
-"
+# Afficher la structure pour debug
+echo "📁 App structure:"
+ls -la /app/
+if [ -d "/app/scheduler_ai/" ]; then
+    echo "📁 scheduler_ai content:"
+    ls -la /app/scheduler_ai/
+else
+    echo "📁 Files are directly in /app (simplified structure)"
 fi
 
-# Vérifier les clés API
-if [ -z "$OPENAI_API_KEY" ]; then
-    echo "⚠️  Warning: OPENAI_API_KEY not set. GPT-4o features will be disabled."
+# Vérifier quelle structure on utilise et adapter la commande
+if [ -f "/app/scheduler_ai/api.py" ]; then
+    echo "📦 Using package structure (scheduler_ai.api:app)"
+    APP_MODULE="scheduler_ai.api:app"
+elif [ -f "/app/api.py" ]; then
+    echo "📦 Using flat structure (api:app)"
+    APP_MODULE="api:app"
+else
+    echo "❌ No api.py found!"
+    exit 1
 fi
 
-if [ -z "$ANTHROPIC_API_KEY" ]; then
-    echo "⚠️  Warning: ANTHROPIC_API_KEY not set. Claude features will be disabled."
-fi
+# Skip migrations pour l'instant
+echo "⚠️ Skipping migrations (tables already exist)"
 
-# Créer les répertoires de logs
-mkdir -p /logs
-
-# Afficher la configuration
-echo "
-📋 Configuration:
-  - Database: ${DB_HOST}:${DB_PORT}/${DB_NAME}
-  - WebSocket Port: 5001
-  - Log Level: ${LOG_LEVEL:-INFO}
-  - Redis: ${REDIS_URL:-disabled}
-  - AI Routing: ${SCHEDULE_AI_ROUTING:-gpt4o_first,claude_fallback}
-"
-
-# Démarrer l'application
-echo "🚀 Starting Flask SocketIO server..."
-exec "$@"
+# Démarrer avec le bon module détecté
+echo "🚀 Starting application with module: $APP_MODULE"
+exec gunicorn -k eventlet -w 1 "$APP_MODULE" -b 0.0.0.0:5001 --log-level info

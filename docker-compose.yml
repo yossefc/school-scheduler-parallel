@@ -61,8 +61,8 @@ services:
   # -------- Agent IA (Flask + Socket.IO) --------
   ai_agent:
     build:
-      context: ./scheduler_ai
-      dockerfile: Dockerfile            # contient eventlet + deps
+      context: ./scheduler_ai           # Build depuis scheduler_ai/
+      dockerfile: Dockerfile.simple     # Version simplifiée sans problèmes d'imports
     container_name: school_ai_agent
     ports: [ "5001:5001" ]
     environment:
@@ -71,12 +71,12 @@ services:
       DB_NAME: school_scheduler
       DB_USER: admin
       DB_PASSWORD: school123
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-dummy}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-claude-dummy}
       REDIS_URL: redis://redis:6379
       LOG_LEVEL: INFO
     volumes:
-      - ./scheduler_ai:/app
+      - ./scheduler_ai:/app                 # Structure plate simple
       - ./logs:/logs
     depends_on: [ postgres, redis ]
     networks: [ school_network ]

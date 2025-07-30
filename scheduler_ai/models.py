@@ -1,7 +1,8 @@
 # models.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field,ConfigDict
 from typing import List, Dict, Optional, Any, Literal
 from datetime import time
+from enum import Enum
 
 class Teacher(BaseModel):
     teacher_id: Optional[int] = None
@@ -10,6 +11,21 @@ class Teacher(BaseModel):
     work_days: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+
+
+class ConstraintType(str, Enum):
+    """Types de contraintes supportés"""
+    TEACHER_AVAILABILITY = "teacher_availability"
+    TIME_PREFERENCE = "time_preference"
+    CONSECUTIVE_HOURS_LIMIT = "consecutive_hours_limit"
+    PARALLEL_TEACHING = "parallel_teaching"
+    SCHOOL_HOURS = "school_hours"
+    FRIDAY_EARLY_END = "friday_early_end"
+    MORNING_PRAYER = "morning_prayer"
+    LUNCH_BREAK = "lunch_break"
+    TEACHER_MEETING = "teacher_meeting"
+    ROOM_AVAILABILITY = "room_availability"
+    CLASS_PREFERENCE = "class_preference"
 
 class Subject(BaseModel):
     subject_id: Optional[int] = None
@@ -61,6 +77,11 @@ class ScheduleRequest(BaseModel):
     optimize_for: str = "balance"  # balance, minimal_gaps, teacher_preference
 
 class ConstraintRequest(BaseModel):
+    """Modèle de requête pour une contrainte avec validation complète"""
+    model_config = ConfigDict(
+        use_enum_values=True,
+        arbitrary_types_allowed=True  # Ajouter cette ligne
+    )
     type: str
     entity: str
     data: Dict[str, Any]

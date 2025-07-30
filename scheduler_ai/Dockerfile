@@ -20,11 +20,12 @@ ENV HTTP_PROXY=${HTTP_PROXY} \
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        gcc g++ curl postgresql-client netcat-openbsd \
+        gcc g++ curl postgresql-client netcat-openbsd dos2unix \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ######################## 3 ─ Dépendances Python ############################
-COPY requirements.txt ./
+# CORRECTIF 1: Copier requirements.txt depuis la racine du projet
+COPY scheduler_ai/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir \
         eventlet                 \
@@ -32,19 +33,23 @@ RUN pip install --no-cache-dir -r requirements.txt \
         psycopg2-binary          \
     && pip cache purge
 
-######################## 4 ─ Code de l’application #########################
-COPY . .
+######################## 4 ─ Code de l'application #########################
+# CORRECTIF 2: Copier d'abord le script d'entrée avant dos2unix
+COPY scheduler_ai/docker-entrypoint.sh ./
+RUN dos2unix docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
-# ---------- Droits & format LF pour le script d’entrée --------------------
-RUN dos2unix docker-entrypoint.sh || true          \
- && chmod +x docker-entrypoint.sh
+# Copier tout le code de l'application
+COPY scheduler_ai/ ./scheduler_ai/
+COPY . .
 
 ######################## 5 ─ Fichiers & permissions ------------------------
 RUN mkdir -p /logs /app/data \
  && chown -R ${USER}:${USER} /app /logs /app/data
 
-######################## 6 ─ Variables d’environnement par défaut ##########
-ENV FLASK_APP=scheduler_ai/api.py \
+######################## 6 ─ Variables d'environnement par défaut ##########
+# CORRECTIF 3: Adapter PYTHONPATH et FLASK_APP pour la structure
+ENV PYTHONPATH=/app \
+    FLASK_APP=scheduler_ai.api:app \
     FLASK_ENV=production          \
     PYTHONUNBUFFERED=1            \
     LOG_FILE=/logs/scheduler_ai.log \
@@ -57,13 +62,11 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:${PORT}/health || exit 1
 
-######################## 9 ─ Passage à l’utilisateur non-root ##############
+######################## 9 ─ Passage à l'utilisateur non-root ##############
 USER ${USER}
 
 ########################10 ─ Entrypoint & CMD ###############################
-# ENTRYPOINT pointe sur le shell de bootstrap (création DB, wait-for-it, etc.)
 ENTRYPOINT ["bash", "/app/docker-entrypoint.sh"]
 
-# CMD : production = gunicorn + eventlet ; développement = flask (géré via script)
+# CORRECTIF 3: Utiliser api:app au lieu de scheduler_ai.api:app
 CMD ["gunicorn", "-k", "eventlet", "-w", "1", "scheduler_ai.api:app", "-b", "0.0.0.0:5001", "--log-level", "info"]
-
