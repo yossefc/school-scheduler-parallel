@@ -1,134 +1,129 @@
-# scheduler_ai/models.py - Version corrigée pour Pydantic v2
-"""
-Modèles Pydantic corrigés pour la validation des contraintes et données
-Compatible avec Pydantic v2+ et validation stricte
-"""
+"""Modèles Pydantic pour validation des contraintes"""
+from typing import Dict, Any, Optional, List, Union, Literal
+from datetime import datetime
+from pydantic import BaseModel, Field, field_validator, model_validator
+from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Dict, List, Optional, Any, Literal, Union
-from datetime import time, datetime
-from enum import Enum, IntEnum
-
-# ========== ENUMS CORRIGÉS ==========
-
-class ConstraintPriority(IntEnum):
-    """Niveaux de priorité des contraintes"""
-    HARD = 0          # Incontournable (חובה)
-    VERY_STRONG = 1   # Quasi-incompressible (חזק מאוד)
-    MEDIUM = 2        # Améliore la qualité (בינוני)
-    NORMAL = 3        # Standard (רגיל)
-    LOW = 4           # Confort (נמוך)
-    MINIMAL = 5       # Préférence mineure (מינימלי)
 
 class ConstraintType(str, Enum):
-    """Types de contraintes supportés - Système éducatif israélien"""
     TEACHER_AVAILABILITY = "teacher_availability"
-    TIME_PREFERENCE = "time_preference"
-    CONSECUTIVE_HOURS_LIMIT = "consecutive_hours_limit" 
-    PARALLEL_TEACHING = "parallel_teaching"
-    SCHOOL_HOURS = "school_hours"
-    FRIDAY_EARLY_END = "friday_early_end"
-    MORNING_PRAYER = "morning_prayer"
-    LUNCH_BREAK = "lunch_break"
-    TEACHER_MEETING = "teacher_meeting"
-    ROOM_AVAILABILITY = "room_availability"
     CLASS_PREFERENCE = "class_preference"
-    GENDER_SEPARATION = "gender_separation"
-    HEBREW_FRENCH_BILINGUAL = "hebrew_french_bilingual"
-    RELIGIOUS_STUDIES = "religious_studies"
+    SUBJECT_LIMIT = "subject_limit"
+    CONSECUTIVE_HOURS_LIMIT = "consecutive_hours_limit"
+    TIME_PREFERENCE = "time_preference"
+    PARALLEL_TEACHING = "parallel_teaching"
+    ROOM_CONSTRAINT = "room_constraint"
+    CUSTOM = "custom"
 
-# ========== MODÈLES DE DONNÉES CORRIGÉS ==========
 
-class TeacherAvailabilityData(BaseModel):
-    """Données pour la disponibilité d'un enseignant"""
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        use_enum_values=True
-    )
-    
-    unavailable_days: List[int] = Field(
-        ..., 
-        min_length=1, 
-        max_length=6,
-        description="Jours indisponibles (0=Dimanche, 5=Vendredi)"
-    )
-    unavailable_periods: Optional[List[int]] = Field(
-        default_factory=list, 
-        max_length=12,
-        description="Périodes indisponibles (1-12)"
-    )
-    reason: Optional[str] = Field(
-        default=None, 
-        max_length=200,
-        description="Raison de l'indisponibilité"
-    )
-    
-    @field_validator('unavailable_days')
-    @classmethod
-    def validate_days(cls, v):
-        """Valide que les jours sont dans la plage correcte"""
-        for day in v:
-            if not 0 <= day <= 5:  # Dimanche à Vendredi seulement
-                raise ValueError(f'Jour invalide: {day}. Doit être entre 0 (dimanche) et 5 (vendredi)')
-        return sorted(list(set(v)))  # Éliminer doublons et trier
-    
-    @field_validator('unavailable_periods')
-    @classmethod
-    def validate_periods(cls, v):
-        """Valide les périodes"""
-        if v:
-            for period in v:
-                if not 1 <= period <= 12:
-                    raise ValueError(f'Période invalide: {period}. Doit être entre 1 et 12')
-        return sorted(list(set(v))) if v else []
+class ConstraintPriority(int, Enum):
+    HARD = 0
+    VERY_HIGH = 1
+    HIGH = 2
+    MEDIUM = 3
+    LOW = 4
+    SOFT = 5
 
-class ConstraintRequest(BaseModel):
-    """Modèle de requête pour une contrainte avec validation complète"""
-    model_config = ConfigDict(
-        use_enum_values=True,
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        arbitrary_types_allowed=True
-    )
+
+class ConstraintInput(BaseModel):
+    """Modèle d'entrée pour une contrainte avec validation avancée"""
+    type: ConstraintType
+    entity: str = Field(..., min_length=1, max_length=100)
+    data: Dict[str, Any]
+    priority: ConstraintPriority = ConstraintPriority.MEDIUM
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
     
-    type: ConstraintType = Field(..., description="Type de contrainte")
-    entity: str = Field(
-        ..., 
-        min_length=1, 
-        max_length=100,
-        description="Entité concernée (professeur, classe, etc.)"
-    )
-    data: Dict[str, Any] = Field(
-        ...,
-        description="Données spécifiques à la contrainte"
-    )
-    priority: ConstraintPriority = Field(
-        default=ConstraintPriority.NORMAL,
-        description="Priorité de la contrainte"
-    )
-    metadata: Optional[Dict[str, Any]] = Field(
-        default_factory=dict,
-        description="Métadonnées additionnelles"
-    )
+    # Champs calculés/enrichis
+    parsed_at: Optional[datetime] = None
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    original_text: Optional[str] = None
+    requires_clarification: bool = False
+    clarification_questions: List[str] = Field(default_factory=list)
+    
+    @field_validator('entity')
+    def validate_entity(cls, v: str, info) -> str:
+        """Valide et normalise l'entité"""
+        v = v.strip()
+        
+        # Normalisation basique
+        if info.data.get('type') == ConstraintType.TEACHER_AVAILABILITY:
+            # Capitaliser les noms de professeurs
+            v = v.title()
+        elif info.data.get('type') == ConstraintType.CLASS_PREFERENCE:
+            # Format classes : "9A", "10B", etc
+            v = v.upper()
+            
+        return v
+    
+    @model_validator(mode='after')
+    def validate_constraint_data(self) -> 'ConstraintInput':
+        """Validation croisée type/data + détection des clarifications nécessaires"""
+        
+        if self.type == ConstraintType.TEACHER_AVAILABILITY:
+            if 'unavailable_days' not in self.data and 'available_days' not in self.data:
+                self.requires_clarification = True
+                self.clarification_questions.append(
+                    f"Quels jours {self.entity} n'est-il pas disponible ?"
+                )
+                
+        elif self.type == ConstraintType.SUBJECT_LIMIT:
+            # Validation pour "pas plus de X heures de Y"
+            if 'subject' not in self.data:
+                self.requires_clarification = True
+                self.clarification_questions.append("Quelle matière est concernée ?")
+            
+            if 'max_hours_per_day' not in self.data and 'max_consecutive_hours' not in self.data:
+                self.requires_clarification = True
+                self.clarification_questions.append(
+                    "S'agit-il d'une limite par jour ou d'heures consécutives ?"
+                )
+                
+            # Validation des valeurs numériques
+            for key in ['max_hours_per_day', 'max_consecutive_hours']:
+                if key in self.data:
+                    try:
+                        val = int(self.data[key])
+                        if val < 1 or val > 8:
+                            self.requires_clarification = True
+                            self.clarification_questions.append(
+                                f"La valeur {val} semble inhabituelle. Confirmez-vous ?"
+                            )
+                    except (ValueError, TypeError):
+                        self.requires_clarification = True
+                        self.clarification_questions.append(
+                            f"La limite doit être un nombre entier"
+                        )
+                        
+        elif self.type == ConstraintType.CONSECUTIVE_HOURS_LIMIT:
+            if 'max_consecutive' not in self.data:
+                self.requires_clarification = True
+                self.clarification_questions.append(
+                    "Combien d'heures consécutives maximum ?"
+                )
+                
+        elif self.type == ConstraintType.TIME_PREFERENCE:
+            if 'time_slots' not in self.data and 'preferred_periods' not in self.data:
+                self.requires_clarification = True
+                self.clarification_questions.append(
+                    "À quels moments cette contrainte s'applique-t-elle ?"
+                )
+        
+        # Enrichissement automatique
+        if not self.parsed_at:
+            self.parsed_at = datetime.now()
+            
+        return self
+
 
 class ConstraintResponse(BaseModel):
-    """Réponse après application d'une contrainte"""
-    model_config = ConfigDict(use_enum_values=True)
-    
-    status: Literal["success", "conflict", "error", "pending"]
+    """Réponse après traitement d'une contrainte"""
+    status: Literal["success", "clarification_needed", "conflict", "error"]
     constraint_id: Optional[int] = None
-    plan: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
-    solution_diff: Optional[Dict[str, Any]] = None
-    score_delta: Optional[int] = None
+    constraint: Optional[ConstraintInput] = None
+    message: str
+    clarification_questions: List[str] = Field(default_factory=list)
     conflicts: List[Dict[str, Any]] = Field(default_factory=list)
     suggestions: List[str] = Field(default_factory=list)
     processing_time_ms: Optional[int] = None
-    hebrew_explanation: Optional[str] = None
-
-# Export des classes principales
-__all__ = [
-    'ConstraintRequest', 'ConstraintResponse', 
-    'ConstraintType', 'ConstraintPriority',
-    'TeacherAvailabilityData'
-]
+    applied_automatically: bool = False
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)

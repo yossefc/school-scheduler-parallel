@@ -407,3 +407,214 @@ class ScheduleAIAgent:
         finally:
             cur.close()
             conn.close()
+    
+    def _check_constraint_conflict(self, constraint: Dict, existing: Dict) -> Optional[Dict]:
+        """Vérifie s'il y a un conflit entre une nouvelle contrainte et une existante"""
+        try:
+            # Extraire les types de contraintes
+            new_type = constraint.get("type", "")
+            existing_type = existing.get("constraint_type", "")
+            
+            # Extraire les entités concernées
+            new_entity = constraint.get("entity", "")
+            existing_entity = existing.get("entity_name", "") or existing.get("entity_type", "")
+            
+            # Vérifier les conflits selon le type
+            if new_type == existing_type and new_entity == existing_entity:
+                # Même type et même entité : conflit potentiel
+                conflict_details = {
+                    "type": "direct_conflict",
+                    "message": f"Contrainte {new_type} déjà existante pour {new_entity}",
+                    "existing_constraint_id": existing.get("constraint_id"),
+                    "existing_priority": existing.get("priority"),
+                    "new_constraint": constraint
+                }
+                return conflict_details
+            
+            # Conflits spécifiques selon le type
+            if new_type == "teacher_availability" and existing_type == "teacher_availability":
+                # Vérifier les conflits d'horaires pour le même enseignant
+                if new_entity == existing_entity:
+                    return {
+                        "type": "schedule_conflict",
+                        "message": f"Conflit d'horaire pour l'enseignant {new_entity}",
+                        "existing_constraint_id": existing.get("constraint_id")
+                    }
+            
+            elif new_type == "parallel_teaching" and existing_type == "parallel_teaching":
+                # Vérifier les conflits d'enseignement parallèle
+                new_data = constraint.get("data", {})
+                existing_data = existing.get("constraint_data", {})
+                if (new_data.get("subject") == existing_data.get("subject") and 
+                    new_data.get("grade") == existing_data.get("grade")):
+                    return {
+                        "type": "parallel_conflict",
+                        "message": f"Enseignement parallèle déjà configuré pour {new_data.get('subject')}",
+                        "existing_constraint_id": existing.get("constraint_id")
+                    }
+            
+            # Aucun conflit détecté
+            return None
+            
+        except Exception as e:
+            # En cas d'erreur, on considère qu'il n'y a pas de conflit
+            logging.warning(f"Erreur lors de la vérification de conflit: {e}")
+            return None
+    
+    def _check_feasibility(self, constraint: Dict, current_schedule: Dict) -> Dict:
+        """Vérifie la faisabilité d'application d'une contrainte"""
+        try:
+            constraint_type = constraint.get("type", "")
+            constraint_data = constraint.get("data", {})
+            entity = constraint.get("entity", "")
+            
+            feasibility_result = {
+                "is_feasible": True,
+                "feasibility_score": 1.0,
+                "issues": [],
+                "recommendations": []
+            }
+            
+            # Vérifications selon le type de contrainte
+            if constraint_type == "teacher_availability":
+                # Vérifier la disponibilité de l'enseignant
+                teacher_schedule = current_schedule.get("teachers", {}).get(entity, {})
+                requested_slots = constraint_data.get("unavailable_slots", [])
+                
+                for slot in requested_slots:
+                    if slot in teacher_schedule.get("assigned_slots", []):
+                        feasibility_result["issues"].append(
+                            f"L'enseignant {entity} a déjà des cours programmés pendant {slot}"
+                        )
+                        feasibility_result["feasibility_score"] *= 0.7
+                        
+            elif constraint_type == "parallel_teaching":
+                # Vérifier les ressources pour l'enseignement parallèle
+                subject = constraint_data.get("subject", "")
+                grade = constraint_data.get("grade", "")
+                required_teachers = constraint_data.get("teacher_count", 2)
+                
+                available_teachers = self._count_available_teachers(subject, current_schedule)
+                if available_teachers < required_teachers:
+                    feasibility_result["issues"].append(
+                        f"Seulement {available_teachers} enseignants disponibles pour {subject}, {required_teachers} requis"
+                    )
+                    feasibility_result["feasibility_score"] *= 0.5
+                    feasibility_result["recommendations"].append(
+                        "Considérer recruter ou former des enseignants supplémentaires"
+                    )
+                    
+            elif constraint_type == "room_constraint":
+                # Vérifier la disponibilité des salles
+                room_type = constraint_data.get("room_type", "")
+                required_capacity = constraint_data.get("capacity", 0)
+                
+                available_rooms = self._count_available_rooms(room_type, required_capacity, current_schedule)
+                if available_rooms == 0:
+                    feasibility_result["issues"].append(
+                        f"Aucune salle de type {room_type} avec capacité {required_capacity} disponible"
+                    )
+                    feasibility_result["feasibility_score"] *= 0.3
+                    
+            # Déterminer la faisabilité globale
+            if feasibility_result["feasibility_score"] < 0.5:
+                feasibility_result["is_feasible"] = False
+            elif feasibility_result["issues"]:
+                feasibility_result["is_feasible"] = True  # Faisable avec ajustements
+                feasibility_result["recommendations"].append("Des ajustements seront nécessaires")
+                
+            return feasibility_result
+            
+        except Exception as e:
+            logging.warning(f"Erreur lors de la vérification de faisabilité: {e}")
+            return {
+                "is_feasible": True,  # Par défaut, on assume que c'est faisable
+                "feasibility_score": 0.8,
+                "issues": ["Impossible de vérifier complètement la faisabilité"],
+                "recommendations": []
+            }
+    
+    def _get_affected_entities(self, constraint: Dict) -> List[str]:
+        """Retourne la liste des entités affectées par une contrainte"""
+        try:
+            affected = []
+            constraint_type = constraint.get("type", "")
+            constraint_data = constraint.get("data", {})
+            entity = constraint.get("entity", "")
+            
+            # L'entité principale est toujours affectée
+            if entity:
+                affected.append(entity)
+            
+            # Ajouter d'autres entités selon le type
+            if constraint_type == "parallel_teaching":
+                # Ajouter les classes concernées
+                classes = constraint_data.get("class_lists", [])
+                affected.extend(classes)
+                
+                # Ajouter les enseignants supplémentaires si spécifiés
+                additional_teachers = constraint_data.get("additional_teachers", [])
+                affected.extend(additional_teachers)
+                
+            elif constraint_type == "class_preference":
+                # Ajouter l'enseignant associé si spécifié
+                teacher = constraint_data.get("teacher", "")
+                if teacher and teacher not in affected:
+                    affected.append(teacher)
+                    
+            elif constraint_type == "room_constraint":
+                # Ajouter les salles concernées
+                rooms = constraint_data.get("rooms", [])
+                affected.extend(rooms)
+            
+            # Nettoyer et dédupliquer
+            affected = [item for item in affected if item and item.strip()]
+            return list(set(affected))  # Supprimer les doublons
+            
+        except Exception as e:
+            logging.warning(f"Erreur lors de l'identification des entités affectées: {e}")
+            return [constraint.get("entity", "")]
+    
+    def _count_available_teachers(self, subject: str, current_schedule: Dict) -> int:
+        """Compte le nombre d'enseignants disponibles pour une matière"""
+        try:
+            # Logique simplifiée - à adapter selon votre modèle de données
+            teachers = current_schedule.get("teachers", {})
+            available_count = 0
+            
+            for teacher_name, teacher_data in teachers.items():
+                teacher_subjects = teacher_data.get("subjects", [])
+                if subject in teacher_subjects:
+                    # Vérifier la charge de travail
+                    current_load = len(teacher_data.get("assigned_slots", []))
+                    max_load = teacher_data.get("max_hours_per_week", 25)
+                    
+                    if current_load < max_load:
+                        available_count += 1
+                        
+            return available_count
+        except Exception as e:
+            logging.warning(f"Erreur lors du comptage des enseignants: {e}")
+            return 1  # Valeur par défaut optimiste
+    
+    def _count_available_rooms(self, room_type: str, capacity: int, current_schedule: Dict) -> int:
+        """Compte le nombre de salles disponibles d'un type et capacité donnés"""
+        try:
+            # Logique simplifiée - à adapter selon votre modèle de données
+            rooms = current_schedule.get("rooms", {})
+            available_count = 0
+            
+            for room_name, room_data in rooms.items():
+                if (room_data.get("type", "") == room_type and 
+                    room_data.get("capacity", 0) >= capacity):
+                    # Vérifier si la salle n'est pas entièrement occupée
+                    occupied_slots = len(room_data.get("assigned_slots", []))
+                    total_slots = room_data.get("total_weekly_slots", 35)  # 7 jours × 5 créneaux par jour
+                    
+                    if occupied_slots < total_slots:
+                        available_count += 1
+                        
+            return available_count
+        except Exception as e:
+            logging.warning(f"Erreur lors du comptage des salles: {e}")
+            return 1  # Valeur par défaut optimiste

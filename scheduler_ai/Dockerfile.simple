@@ -25,13 +25,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # ---------- Dépendances Python ------------------------------------------
-COPY scheduler_ai/requirements.txt ./requirements.txt
+COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir eventlet gunicorn psycopg2-binary
 
 # ---------- Code de l'application ---------------------------------------
-# CORRECTIF: Copier le contenu de scheduler_ai/ directement dans /app
-COPY scheduler_ai/ ./
+# CORRECTIF: Copier le contenu courant directement dans /app
+COPY . ./
 # S'assurer que __init__.py existe pour faire de /app un package Python
 RUN touch __init__.py
 

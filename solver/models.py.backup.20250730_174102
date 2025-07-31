@@ -147,7 +147,7 @@ class ConstraintResponse(BaseModel):
 """
 # Dans scheduler_ai/api.py, modifier la route apply_constraint :
 
-from scheduler_ai.models import ConstraintRequest, ConstraintResponse
+from models import ConstraintRequest, ConstraintResponse
 
 @app.route('/api/ai/constraint', methods=['POST'])
 def apply_constraint():
