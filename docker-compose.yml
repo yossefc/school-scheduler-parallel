@@ -98,7 +98,10 @@ services:
     container_name: school_ai_frontend
     ports: [ "3001:3000" ]
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
+      WDS_SOCKET_HOST: localhost
+      WDS_SOCKET_PORT: 3001
+      WDS_SOCKET_PATH: /ws
     volumes:
       - ./frontend:/app
       - /app/node_modules

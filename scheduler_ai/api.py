@@ -48,8 +48,8 @@ def health():
     })
 
 
-@app.route('/api/ai/constraint', methods=['POST'])
-async def apply_constraint():
+@app.route('/api/ai/constraints', methods=['POST'])
+def apply_constraint():
     """Applique une contrainte avec validation Pydantic"""
     try:
         # Validation avec Pydantic
@@ -65,7 +65,7 @@ async def apply_constraint():
             ).model_dump())
         
         # Appliquer la contrainte
-        result = await agent.apply_constraint(constraint_input.model_dump())
+        result = asyncio.run(agent.apply_constraint(constraint_input.model_dump()))
         
         # Persister si succès
         if result.get("status") == "success":

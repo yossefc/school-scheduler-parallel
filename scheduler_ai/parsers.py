@@ -54,109 +54,109 @@ class NaturalLanguageParser:
             match = re.search(pattern, text)
             if match:
                 groups = match.groups()
-                max_hours = int(groups[0])
-                subject = self._normalize_subject(groups[-1])
-                
-                # Détection si c'est consécutif ou par jour
-                is_consecutive = any(word in text for word in 
-                    ["consécutive", "consecutive", "suite", "d'affilée"])
-                
-                constraint_data = {
-                    "type": ConstraintType.SUBJECT_LIMIT,
-                    "entity": "all_classes",  # Par défaut
-                    "data": {
-                        "subject": subject,
-                        "max_consecutive_hours" if is_consecutive else "max_hours_per_day": max_hours
+                subject = groups[-1]  # Le dernier groupe est toujours la matière
+                hours = int(groups[0])
+                return ConstraintInput(
+                    type="hour_limit",
+                    entity=subject,
+                    data={
+                        "max_hours": hours,
+                        "period": "day"
                     },
-                    "confidence": 0.85
-                }
-                break
+                    priority=4,
+                    metadata={"detected_by": "limit_pattern"},
+                    original_text=original_text,
+                    confidence=0.85
+                )
         
-        # 2. Disponibilité professeur
-        if not constraint_data:
-            availability_patterns = [
-                r"(?:le\s+)?(?:professeur|prof\.?)\s+(\w+)\s+(?:ne\s+peut\s+pas|n'est\s+pas\s+disponible).*?(lundi|mardi|mercredi|jeudi|vendredi|dimanche)",
-                r"(\w+)\s+(?:ne\s+peut\s+pas|unavailable|absent).*?(lundi|mardi|mercredi|jeudi|vendredi|dimanche)",
-            ]
-            
-            for pattern in availability_patterns:
-                match = re.search(pattern, text)
-                if match:
-                    teacher = match.group(1).capitalize()
-                    day_str = match.group(2)
-                    day_num = self.days_map.get(day_str, -1)
-                    
-                    if day_num >= 0:
-                        constraint_data = {
-                            "type": ConstraintType.TEACHER_AVAILABILITY,
-                            "entity": teacher,
-                            "data": {"unavailable_days": [day_num]},
-                            "confidence": 0.9
-                        }
-                        break
+        # 2. Contraintes de disponibilité professeur
+        teacher_patterns = [
+            r"(?:le professeur|prof|enseignant)\s+(\w+)\s+(?:ne peut pas|peut pas|pas disponible)",
+            r"(\w+)\s+(?:prof|professeur)\s+(?:ne peut pas|peut pas|pas disponible)",
+            r"(?:prof|professeur)\s+(?:de\s+)?(\w+)\s+(?:ne peut pas|peut pas|pas disponible)",
+        ]
         
-        # 3. Préférences horaires
-        if not constraint_data:
-            time_patterns = [
-                r"(?:les?\s+)?(?:cours?\s+de\s+)?(\w+)\s+(?:doivent\s+être|uniquement|seulement)\s+(?:le\s+)?(\w+)",
-                r"(\w+)\s+(?:le\s+)?(\w+)\s+(?:uniquement|seulement)",
-            ]
-            
-            for pattern in time_patterns:
-                match = re.search(pattern, text)
-                if match:
-                    subject = self._normalize_subject(match.group(1))
-                    time_pref = match.group(2)
-                    
-                    time_slots = self._parse_time_preference(time_pref)
-                    if time_slots:
-                        constraint_data = {
-                            "type": ConstraintType.TIME_PREFERENCE,
-                            "entity": subject,
-                            "data": {"time_slots": time_slots},
-                            "confidence": 0.75
-                        }
-                        break
-        
-        # 4. Si aucun pattern ne match, créer une contrainte custom
-        if not constraint_data:
-            constraint_data = {
-                "type": ConstraintType.CUSTOM,
-                "entity": "unknown",
-                "data": {"text": original_text},
-                "confidence": 0.3,
-                "requires_clarification": True
-            }
-        
-        # Créer et valider le ConstraintInput
-        # Éviter le conflit de paramètres en préparant les données
-        final_data = constraint_data.copy()
-        final_data["original_text"] = original_text
-        # confidence est déjà dans constraint_data, ne pas le redéfinir
-        
-        constraint = ConstraintInput(**final_data)
-        
-        return constraint
-    
-    def _normalize_subject(self, subject_str: str) -> str:
-        """Normalise le nom de la matière"""
-        subject_str = subject_str.lower().strip()
-        
-        for canonical, variants in self.subjects_map.items():
-            if any(variant in subject_str for variant in variants):
-                return canonical
+        for pattern in teacher_patterns:
+            match = re.search(pattern, text)
+            if match:
+                teacher = match.group(1)
+                # Détecter le jour si présent
+                day = self._detect_day(text)
+                day_num = self.days_map.get(day, None) if day else None
                 
-        return subject_str
-    
-    def _parse_time_preference(self, time_str: str) -> Optional[List[str]]:
-        """Parse une préférence temporelle"""
-        time_str = time_str.lower()
+                return ConstraintInput(
+                    type="teacher_availability",
+                    entity=teacher,
+                    data={
+                        "available": False,
+                        "day": day_num,
+                        "day_name": day
+                    },
+                    priority=5,
+                    metadata={"detected_by": "teacher_pattern"},
+                    original_text=original_text,
+                    confidence=0.9
+                )
         
-        if "matin" in time_str:
-            return ["morning"]  # periods 1-4
-        elif "après-midi" in time_str or "apres-midi" in time_str:
-            return ["afternoon"]  # periods 5-8
-        elif "début" in time_str:
+        # 3. Contraintes de salle
+        room_patterns = [
+            r"(?:salle|classe)\s+(\w+)\s+(?:pas disponible|occupée|réservée)",
+            r"(?:pas de|sans)\s+(?:salle|classe)\s+(\w+)"
+        ]
+        
+        for pattern in room_patterns:
+            match = re.search(pattern, text)
+            if match:
+                room = match.group(1)
+                return ConstraintInput(
+                    type="room_constraint",
+                    entity=room,
+                    data={"available": False},
+                    priority=4,
+                    metadata={"detected_by": "room_pattern"},
+                    original_text=original_text,
+                    confidence=0.8
+                )
+        
+        # Si aucune pattern reconnue, retourner une contrainte générique
+        return ConstraintInput(
+            type="custom",
+            entity="unknown",
+            data={"raw_text": text},
+            priority=3,
+            metadata={"detected_by": "fallback"},
+            original_text=original_text,
+            confidence=0.3,
+            requires_clarification=True,
+            clarification_questions=[
+                "Quel est le type de contrainte que vous souhaitez ajouter ?",
+                "À qui ou à quoi s'applique cette contrainte ?",
+                "Quand cette contrainte doit-elle s'appliquer ?"
+            ]
+        )
+    
+    def _detect_day(self, text: str) -> Optional[str]:
+        """Détecte le jour mentionné dans le texte"""
+        for day_name, _ in self.days_map.items():
+            if day_name in text:
+                return day_name
+        return None
+    
+    def _extract_time_constraints(self, text: str) -> Optional[List[str]]:
+        """Extrait les contraintes temporelles"""
+        time_patterns = [
+            r"(?:le\s+)?matin",
+            r"(?:l')?après-midi", 
+            r"(?:en\s+)?début",
+            r"(?:en\s+)?fin"
+        ]
+        
+        found_times = []
+        for pattern in time_patterns:
+            if re.search(pattern, text):
+                found_times.append(pattern.replace(r"(?:le\s+)?", "").replace(r"(?:l')?", "").replace(r"(?:en\s+)?", ""))
+        
+        if "matin" in text or "début" in text:
             return ["early"]  # periods 1-2
         elif "fin" in time_str:
             return ["late"]  # periods 7-8
@@ -165,6 +165,27 @@ class NaturalLanguageParser:
 
 
 def extract_constraint(msg: str, language: str = "fr") -> ConstraintInput:
-    """Fonction principale d'extraction de contrainte"""
-    parser = NaturalLanguageParser()
-    return parser.parse(msg, language)
+    """Fonction principale d'extraction de contrainte avec LLM"""
+    try:
+        from llm_router import LLMRouter
+        router = LLMRouter()
+        
+        # Parser avec LLM
+        parsed_data = router.parse_natural_language(msg, language)
+        constraint_data = parsed_data.get('constraint', {})
+        
+        return ConstraintInput(
+            type=constraint_data.get('type', 'custom'),
+            entity=constraint_data.get('entity', 'unknown'), 
+            data=constraint_data.get('data', {'raw_text': msg}),
+            priority=constraint_data.get('priority', 3),
+            metadata=parsed_data.get('metadata', {}),
+            original_text=msg,
+            confidence=parsed_data.get('confidence', 0.5),
+            requires_clarification=(parsed_data.get('confidence', 0.5) < 0.7)
+        )
+    except Exception as e:
+        logger.error(f'Erreur LLM parser: {e}')
+        # Fallback vers parser basique
+        parser = NaturalLanguageParser()
+        return parser.parse(msg, language)

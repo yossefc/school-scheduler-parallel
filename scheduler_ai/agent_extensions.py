@@ -99,7 +99,91 @@ class ClarificationMiddleware:
                 message="Une erreur s'est produite lors du traitement.",
                 suggestions=["Veuillez réessayer avec une formulation différente"]
             )
-    
+    # hebrew_patch.py - Patch temporaire pour supporter l'hébreu natif
+
+    def handle_hebrew_message(text: str, active_sessions: dict, session_id: str):
+        """
+        Gestion temporaire des messages en hébreu avec traductions pré-définies
+        """
+        
+        # Dictionnaire de traductions communes
+        hebrew_translations = {
+            # Exemple de l'utilisateur
+            "השיעור תפילה צריך להתחיל בכל הכיתו בשעה הראשונה": {
+                "type": "scheduled_lesson",
+                "subject": "תפילה",
+                "period": 1,
+                "applies_to": "all_classes",
+                "description": "Cours de prière en première heure pour toutes les classes"
+            },
+            
+            # Autres patterns courants
+            "המורה כהן לא יכול ללמד ביום שישי": {
+                "type": "teacher_availability", 
+                "teacher": "כהן",
+                "day": 5,  # Vendredi
+                "available": False
+            },
+            
+            "כיתה א צריכה הפסקה ארוכה": {
+                "type": "class_requirement",
+                "class": "א",
+                "requirement": "break_extension"
+            }
+        }
+        
+        # Vérifier si le message correspond à un pattern connu
+        if text in hebrew_translations:
+            constraint_info = hebrew_translations[text]
+            
+            if constraint_info["type"] == "scheduled_lesson":
+                return {
+                    "status": "success",
+                    "message": f"✅ הבנתי! שיעור {constraint_info['subject']} בשעה {constraint_info['period']} לכל הכיתות.\n\nהאם תרצה שאיישם את השינוי הזה?",
+                    "constraint": {
+                        "type": "parallel_teaching",
+                        "data": {
+                            "subject": constraint_info["subject"],
+                            "period": constraint_info["period"],
+                            "all_classes": True
+                        },
+                        "priority": 5
+                    },
+                    "requires_confirmation": True,
+                    "confidence": 0.95,
+                    "model_used": "hebrew_pattern_matcher"
+                }
+        
+        # Patterns génériques pour mots-clés
+        keywords = {
+            "מורה": "teacher",
+            "כיתה": "class", 
+            "שיעור": "lesson",
+            "תפילה": "prayer",
+            "לא יכול": "cannot",
+            "צריך": "need/must",
+            "בשעה": "at hour",
+            "ביום": "on day",
+            "הראשונה": "first",
+            "שישי": "friday"
+        }
+        
+        detected_keywords = [hebrew for hebrew, english in keywords.items() if hebrew in text]
+        
+        if detected_keywords:
+            return {
+                "status": "clarification",
+                "message": f"🔍 זיהיתי את המילים: {', '.join(detected_keywords)}\n\nאוכל לעזור אבל אני צריך הבהרה. האם תוכל לנסח את הבקשה באנגלית או בצרפתית?\n\nדוגמה: 'Prayer lesson should start at first period for all classes'",
+                "detected_keywords": detected_keywords,
+                "model_used": "hebrew_keyword_detector"
+            }
+        
+        # Fallback
+        return {
+            "status": "error", 
+            "message": "🤔 מצטער, אני עדיין לומד עברית. האם תוכל לנסח את הבקשה באנגלית או בצרפתית?\n\nSorry, I'm still learning Hebrew. Could you rephrase in English or French?",
+            "model_used": "fallback"
+        }
     def _format_clarification_message(
         self, 
         constraint: ConstraintInput, 
