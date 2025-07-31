@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Diagnostic Agent IA - School Scheduler</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 1.2em;
+            margin-bottom: 30px;
+        }
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .step h3 {
+            color: #007bff;
+            margin-top: 0;
+            font-size: 1.3em;
+        }
+        .test-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .test-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        .test-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .code {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 10px 0;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-ok { background: #28a745; }
+        .status-error { background: #dc3545; }
+        .status-warning { background: #ffc107; }
+        .status-unknown { background: #6c757d; }
+        
+        .websocket-test {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .command-list {
+            background: #f1f3f4;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        
+        .command-list code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #28a745);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Diagnostic Agent IA</h1>
+        <p class="subtitle">Guide de dépannage pour l'agent School Scheduler</p>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressBar"></div>
+        </div>
+        
+        <!-- Étape 1: Vérification Services -->
+        <div class="step">
+            <h3>🔍 Étape 1: Vérification des Services</h3>
+            <p>Vérifions si tous les services nécessaires sont en cours d'exécution.</p>
+            
+            <button class="test-btn" onclick="checkServices()">Vérifier les Services</button>
+            <button class="test-btn" onclick="checkPorts()">Tester les Ports</button>
+            
+            <div id="servicesResult"></div>
+            
+            <div class="command-list">
+                <strong>Commandes utiles :</strong><br>
+                <code>docker ps</code> - Voir les conteneurs actifs<br>
+                <code>docker-compose ps</code> - Statut des services<br>
+                <code>docker logs school_ai_agent</code> - Logs de l'agent IA
+            </div>
+        </div>
+
+        <!-- Étape 2: Test API REST -->
+        <div class="step">
+            <h3>🌐 Étape 2: Test de l'API REST</h3>
+            <p>Testons l'API REST de l'agent IA pour vérifier qu'elle répond.</p>
+            
+            <button class="test-btn" onclick="testAPIHealth()">Test /health</button>
+            <button class="test-btn" onclick="testAPIConstraint()">Test contrainte simple</button>
+            
+            <div id="apiResult"></div>
+        </div>
+
+        <!-- Étape 3: Test WebSocket -->
+        <div class="step">
+            <h3>🔗 Étape 3: Test Connexion WebSocket</h3>
+            <p>L'agent IA utilise WebSocket pour la communication en temps réel.</p>
+            
+            <div class="websocket-test">
+                <button class="test-btn" onclick="testWebSocket()">Connecter WebSocket</button>
+                <button class="test-btn" onclick="sendTestMessage()" id="sendMsgBtn" disabled>Envoyer Message Test</button>
+                <button class="test-btn" onclick="disconnectWebSocket()" id="disconnectBtn" disabled>Déconnecter</button>
+                
+                <div>Status: <span id="wsStatus">Déconnecté</span></div>
+                <div id="wsMessages"></div>
+            </div>
+        </div>
+
+        <!-- Étape 4: Configuration -->
+        <div class="step">
+            <h3>⚙️ Étape 4: Vérification Configuration</h3>
+            <p>Vérifions la configuration de l'agent IA.</p>
+            
+            <button class="test-btn" onclick="checkConfiguration()">Vérifier Config</button>
+            <button class="test-btn" onclick="checkDatabase()">Test Base de Données</button>
+            
+            <div id="configResult"></div>
+            
+            <div class="info" style="margin-top: 15px;">
+                <strong>Variables importantes :</strong><br>
+                • OPENAI_API_KEY (pour GPT)<br>
+                • ANTHROPIC_API_KEY (pour Claude)<br>
+                • DB_HOST, DB_USER, DB_PASSWORD<br>
+                • REDIS_URL (pour le cache)
+            </div>
+        </div>
+
+        <!-- Étape 5: Logs et Debug -->
+        <div class="step">
+            <h3>📋 Étape 5: Analyse des Logs</h3>
+            <p>Analysons les logs pour identifier les erreurs.</p>
+            
+            <button class="test-btn" onclick="checkLogs()">Récupérer Logs</button>
+            <button class="test-btn" onclick="testNaturalLanguage()">Test Parsing NL</button>
+            
+            <div id="logsResult"></div>
+        </div>
+
+        <!-- Solutions courantes -->
+        <div class="step">
+            <h3>🔧 Solutions Courantes</h3>
+            <div id="solutions">
+                <div class="warning">
+                    <strong>Si l'agent ne répond pas, essayez dans l'ordre :</strong><br><br>
+                    1. <strong>Redémarrer l'agent :</strong><br>
+                    <code>docker-compose restart ai_agent</code><br><br>
+                    
+                    2. <strong>Vérifier les logs :</strong><br>
+                    <code>docker logs school_ai_agent -f</code><br><br>
+                    
+                    3. <strong>Rebuild si nécessaire :</strong><br>
+                    <code>docker-compose up --build ai_agent</code><br><br>
+                    
+                    4. <strong>Vérifier les clés API :</strong><br>
+                    Fichier <code>.env</code> avec OPENAI_API_KEY et ANTHROPIC_API_KEY<br><br>
+                    
+                    5. <strong>Test en mode debug :</strong><br>
+                    <code>docker run -it --rm -p 5001:5001 scheduler-ai:latest bash</code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Socket.IO pour les tests WebSocket -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <script>
+        let socket = null;
+        let testStep = 0;
+        const totalSteps = 5;
+        
+        function updateProgress() {
+            testStep++;
+            const progress = (testStep / totalSteps) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+        }
+
+        // Étape 1: Vérification des services
+        async function checkServices() {
+            const result = document.getElementById('servicesResult');
+            result.innerHTML = '<div class="info">Vérification des services...</div>';
+            
+            const services = [
+                { name: 'Agent IA', url: 'http://localhost:5001/health' },
+                { name: 'Solver API', url: 'http://localhost:8000/' },
+                { name: 'PostgreSQL', url: 'http://localhost:5432', note: 'Database (pas HTTP)' }
+            ];
+            
+            let html = '<div class="result info">Résultats des tests de services :\n\n';
+            
+            for (const service of services) {
+                try {
+                    if (service.url.includes('5432')) {
+                        html += `<span class="status-indicator status-warning"></span>${service.name}: ${service.note}\n`;
+                        continue;
+                    }
+                    
+                    const response = await fetch(service.url);
+                    if (response.ok) {
+                        html += `<span class="status-indicator status-ok"></span>${service.name}: ✅ Accessible\n`;
+                    } else {
+                        html += `<span class="status-indicator status-error"></span>${service.name}: ❌ Erreur ${response.status}\n`;
+                    }
+                } catch (error) {
+                    html += `<span class="status-indicator status-error"></span>${service.name}: ❌ Non accessible (${error.message})\n`;
+                }
+            }
+            
+            html += '</div>';
+            result.innerHTML = html;
+            updateProgress();
+        }
+
+        async function checkPorts() {
+            const result = document.getElementById('servicesResult');
+            result.innerHTML += '<div class="info">Test des ports en cours...</div>';
+            
+            const ports = [
+                { port: 5001, service: 'Agent IA (Flask + WebSocket)' },
+                { port: 8000, service: 'Solver API (FastAPI)' },
+                { port: 5432, service: 'PostgreSQL' },
+                { port: 6379, service: 'Redis (optionnel)' }
+            ];
+            
+            let html = '<div class="result info">État des ports :\n\n';
+            
+            for (const {port, service} of ports) {
+                try {
+                    const response = await fetch(`http://localhost:${port}/`);
+                    html += `<span class="status-indicator status-ok"></span>Port ${port} (${service}): ✅ Ouvert\n`;
+                } catch (error) {
+                    html += `<span class="status-indicator status-error"></span>Port ${port} (${service}): ❌ Fermé ou inaccessible\n`;
+                }
+            }
+            
+            html += '</div>';
+            result.innerHTML += html;
+        }
+
+        // Étape 2: Test API REST
+        async function testAPIHealth() {
+            const result = document.getElementById('apiResult');
+            result.innerHTML = '<div class="info">Test de l\'endpoint /health...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:5001/health');
+                const data = await response.json();
+                
+                result.innerHTML = `<div class="result success">✅ API Health OK:
+${JSON.stringify(data, null, 2)}</div>`;
+            } catch (error) {
+                result.innerHTML = `<div class="result error">❌ Erreur API Health:
+${error.message}
+
+Solutions possibles:
+• Vérifier que l'agent IA est démarré
+• docker-compose up ai_agent
+• Vérifier les logs: docker logs school_ai_agent</div>`;
+            }
+            updateProgress();
+        }
+
+        async function testAPIConstraint() {
+            const result = document.getElementById('apiResult');
+            
+            const testConstraint = {
+                type: "teacher_availability",
+                entity: "Test_Prof",
+                data: {
+                    unavailable_days: [5],
+                    reason: "Test de diagnostic"
+                },
+                priority: 2
+            };
+            
+            try {
+                const response = await fetch('http://localhost:5001/api/ai/constraint', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testConstraint)
+                });
+                
+                const data = await response.json();
+                
+                result.innerHTML += `<div class="result ${response.ok ? 'success' : 'error'}">
+${response.ok ? '✅' : '❌'} Test contrainte (${response.status}):
+${JSON.stringify(data, null, 2)}</div>`;
+                
+            } catch (error) {
+                result.innerHTML += `<div class="result error">❌ Erreur test contrainte:
+${error.message}</div>`;
+            }
+        }
+
+        // Étape 3: Test WebSocket
+        function testWebSocket() {
+            const wsStatus = document.getElementById('wsStatus');
+            const wsMessages = document.getElementById('wsMessages');
+            
+            wsStatus.textContent = 'Connexion...';
+            wsMessages.innerHTML = '<div class="info">Tentative de connexion WebSocket...</div>';
+            
+            try {
+                socket = io('http://localhost:5001', {
+                    transports: ['websocket'],
+                    reconnection: true
+                });
+                
+                socket.on('connect', () => {
+                    wsStatus.textContent = '✅ Connecté';
+                    wsMessages.innerHTML += '<div class="result success">✅ WebSocket connecté avec succès!</div>';
+                    document.getElementById('sendMsgBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = false;
+                });
+                
+                socket.on('disconnect', () => {
+                    wsStatus.textContent = '❌ Déconnecté';
+                    wsMessages.innerHTML += '<div class="result warning">⚠️ WebSocket déconnecté</div>';
+                    document.getElementById('sendMsgBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = true;
+                });
+                
+                socket.on('ai_response', (response) => {
+                    wsMessages.innerHTML += `<div class="result success">📨 Réponse IA reçue:
+${JSON.stringify(response, null, 2)}</div>`;
+                });
+                
+                socket.on('error', (error) => {
+                    wsMessages.innerHTML += `<div class="result error">❌ Erreur WebSocket:
+${JSON.stringify(error, null, 2)}</div>`;
+                });
+                
+            } catch (error) {
+                wsMessages.innerHTML += `<div class="result error">❌ Erreur de connexion:
+${error.message}</div>`;
+            }
+            
+            updateProgress();
+        }
+
+        function sendTestMessage() {
+            if (socket && socket.connected) {
+                const testMessage = {
+                    text: "Test de diagnostic - Le professeur Cohen ne peut pas enseigner le vendredi",
+                    type: "constraint",
+                    context: { test: true }
+                };
+                
+                socket.emit('message', testMessage);
+                
+                document.getElementById('wsMessages').innerHTML += 
+                    '<div class="result info">📤 Message test envoyé...</div>';
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        // Étape 4: Configuration
+        async function checkConfiguration() {
+            const result = document.getElementById('configResult');
+            result.innerHTML = '<div class="info">Vérification de la configuration...</div>';
+            
+            // Test de la base de données via l'API
+            try {
+                const dbResponse = await fetch('http://localhost:5001/api/ai/suggestions');
+                
+                if (dbResponse.ok) {
+                    result.innerHTML += '<div class="result success">✅ Base de données accessible via API</div>';
+                } else {
+                    result.innerHTML += '<div class="result error">❌ Problème d\'accès à la base de données</div>';
+                }
+            } catch (error) {
+                result.innerHTML += `<div class="result error">❌ Erreur configuration:
+${error.message}</div>`;
+            }
+            
+            updateProgress();
+        }
+
+        async function checkDatabase() {
+            const result = document.getElementById('configResult');
+            
+            try {
+                // Test via l'API du solver
+                const response = await fetch('http://localhost:8000/api/stats');
+                const data = await response.json();
+                
+                result.innerHTML += `<div class="result success">✅ Base de données OK via Solver:
+${JSON.stringify(data, null, 2)}</div>`;
+                
+            } catch (error) {
+                result.innerHTML += `<div class="result error">❌ Erreur base de données:
+${error.message}
+
+Vérifiez:
+• docker-compose up postgres
+• Variables DB_HOST, DB_USER, DB_PASSWORD</div>`;
+            }
+        }
+
+        // Étape 5: Logs et parsing
+        async function checkLogs() {
+            const result = document.getElementById('logsResult');
+            result.innerHTML = `<div class="result info">Pour voir les logs en temps réel:
+
+docker logs school_ai_agent -f
+
+Ou dans Docker Desktop:
+1. Allez dans "Containers"
+2. Cliquez sur "school_ai_agent"
+3. Onglet "Logs"
+
+Erreurs courantes à chercher:
+• ModuleNotFoundError
+• Connection refused
+• API key missing
+• Port already in use</div>`;
+            
+            updateProgress();
+        }
+
+        async function testNaturalLanguage() {
+            const result = document.getElementById('logsResult');
+            
+            const testText = "Le professeur Martin ne peut pas enseigner le vendredi après-midi";
+            
+            try {
+                const response = await fetch('http://localhost:5001/api/ai/constraints/natural', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        text: testText, 
+                        language: 'fr' 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                result.innerHTML += `<div class="result ${response.ok ? 'success' : 'error'}">
+${response.ok ? '✅' : '❌'} Test parsing langage naturel:
+Texte: "${testText}"
+Résultat: ${JSON.stringify(data, null, 2)}</div>`;
+                
+            } catch (error) {
+                result.innerHTML += `<div class="result error">❌ Erreur parsing NL:
+${error.message}
+
+Cela peut indiquer:
+• Clés API manquantes (OPENAI_API_KEY, ANTHROPIC_API_KEY)
+• Problème de modules Python
+• Erreur dans le routeur LLM</div>`;
+            }
+        }
+
+        // Auto-start du diagnostic
+        window.onload = function() {
+            console.log('🤖 Diagnostic Agent IA - Prêt!');
+        };
+    </script>
+</body>
+</html>

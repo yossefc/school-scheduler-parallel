@@ -1,4 +1,4 @@
-﻿# scheduler_ai/models.py - Ajout de la validation Pydantic pour les contraintes
+# scheduler_ai/models.py - Ajout de la validation Pydantic pour les contraintes
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Dict, Any, Optional, List, Literal

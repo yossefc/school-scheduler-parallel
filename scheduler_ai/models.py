@@ -1,23 +1,30 @@
-# models.py
-from pydantic import BaseModel, Field,ConfigDict
-from typing import List, Dict, Optional, Any, Literal
-from datetime import time
-from enum import Enum
+# scheduler_ai/models.py - Version corrigée pour Pydantic v2
+"""
+Modèles Pydantic corrigés pour la validation des contraintes et données
+Compatible avec Pydantic v2+ et validation stricte
+"""
 
-class Teacher(BaseModel):
-    teacher_id: Optional[int] = None
-    teacher_name: str
-    total_hours: Optional[int] = None
-    work_days: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Dict, List, Optional, Any, Literal, Union
+from datetime import time, datetime
+from enum import Enum, IntEnum
 
+# ========== ENUMS CORRIGÉS ==========
+
+class ConstraintPriority(IntEnum):
+    """Niveaux de priorité des contraintes"""
+    HARD = 0          # Incontournable (חובה)
+    VERY_STRONG = 1   # Quasi-incompressible (חזק מאוד)
+    MEDIUM = 2        # Améliore la qualité (בינוני)
+    NORMAL = 3        # Standard (רגיל)
+    LOW = 4           # Confort (נמוך)
+    MINIMAL = 5       # Préférence mineure (מינימלי)
 
 class ConstraintType(str, Enum):
-    """Types de contraintes supportés"""
+    """Types de contraintes supportés - Système éducatif israélien"""
     TEACHER_AVAILABILITY = "teacher_availability"
     TIME_PREFERENCE = "time_preference"
-    CONSECUTIVE_HOURS_LIMIT = "consecutive_hours_limit"
+    CONSECUTIVE_HOURS_LIMIT = "consecutive_hours_limit" 
     PARALLEL_TEACHING = "parallel_teaching"
     SCHOOL_HOURS = "school_hours"
     FRIDAY_EARLY_END = "friday_early_end"
@@ -26,148 +33,102 @@ class ConstraintType(str, Enum):
     TEACHER_MEETING = "teacher_meeting"
     ROOM_AVAILABILITY = "room_availability"
     CLASS_PREFERENCE = "class_preference"
+    GENDER_SEPARATION = "gender_separation"
+    HEBREW_FRENCH_BILINGUAL = "hebrew_french_bilingual"
+    RELIGIOUS_STUDIES = "religious_studies"
 
-class Subject(BaseModel):
-    subject_id: Optional[int] = None
-    subject_name: str
-    subject_code: Optional[str] = None
-    category: Optional[str] = None
-    difficulty_level: int = 3
+# ========== MODÈLES DE DONNÉES CORRIGÉS ==========
 
-class Class(BaseModel):
-    class_id: Optional[int] = None
-    grade: int
-    section: str
-    class_name: str
-    student_count: Optional[int] = None
-
-class TimeSlot(BaseModel):
-    slot_id: Optional[int] = None
-    day_of_week: int  # 0=Sunday, 5=Friday
-    period_number: int
-    start_time: time
-    end_time: time
-    is_break: bool = False
-
-class TeacherLoad(BaseModel):
-    teacher_name: str
-    subject: str
-    grade: str
-    class_list: str
-    hours: int
-    work_days: Optional[str] = None
-
-class ParallelGroup(BaseModel):
-    subject: str
-    grade: str
-    teachers: str
-    class_lists: str
-
-class Constraint(BaseModel):
-    constraint_type: str
-    priority: int = 1
-    entity_type: Optional[str] = None
-    entity_name: Optional[str] = None
-    constraint_data: Dict[str, Any]
-    is_active: bool = True
-
-class ScheduleRequest(BaseModel):
-    constraints: List[Dict[str, Any]] = []
-    time_limit: int = 60
-    optimize_for: str = "balance"  # balance, minimal_gaps, teacher_preference
+class TeacherAvailabilityData(BaseModel):
+    """Données pour la disponibilité d'un enseignant"""
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        validate_assignment=True,
+        use_enum_values=True
+    )
+    
+    unavailable_days: List[int] = Field(
+        ..., 
+        min_length=1, 
+        max_length=6,
+        description="Jours indisponibles (0=Dimanche, 5=Vendredi)"
+    )
+    unavailable_periods: Optional[List[int]] = Field(
+        default_factory=list, 
+        max_length=12,
+        description="Périodes indisponibles (1-12)"
+    )
+    reason: Optional[str] = Field(
+        default=None, 
+        max_length=200,
+        description="Raison de l'indisponibilité"
+    )
+    
+    @field_validator('unavailable_days')
+    @classmethod
+    def validate_days(cls, v):
+        """Valide que les jours sont dans la plage correcte"""
+        for day in v:
+            if not 0 <= day <= 5:  # Dimanche à Vendredi seulement
+                raise ValueError(f'Jour invalide: {day}. Doit être entre 0 (dimanche) et 5 (vendredi)')
+        return sorted(list(set(v)))  # Éliminer doublons et trier
+    
+    @field_validator('unavailable_periods')
+    @classmethod
+    def validate_periods(cls, v):
+        """Valide les périodes"""
+        if v:
+            for period in v:
+                if not 1 <= period <= 12:
+                    raise ValueError(f'Période invalide: {period}. Doit être entre 1 et 12')
+        return sorted(list(set(v))) if v else []
 
 class ConstraintRequest(BaseModel):
     """Modèle de requête pour une contrainte avec validation complète"""
     model_config = ConfigDict(
         use_enum_values=True,
-        arbitrary_types_allowed=True  # Ajouter cette ligne
+        str_strip_whitespace=True,
+        validate_assignment=True,
+        arbitrary_types_allowed=True
     )
-    type: str
-    entity: str
-    data: Dict[str, Any]
-    priority: int = 2
+    
+    type: ConstraintType = Field(..., description="Type de contrainte")
+    entity: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=100,
+        description="Entité concernée (professeur, classe, etc.)"
+    )
+    data: Dict[str, Any] = Field(
+        ...,
+        description="Données spécifiques à la contrainte"
+    )
+    priority: ConstraintPriority = Field(
+        default=ConstraintPriority.NORMAL,
+        description="Priorité de la contrainte"
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Métadonnées additionnelles"
+    )
 
 class ConstraintResponse(BaseModel):
     """Réponse après application d'une contrainte"""
-    status: Literal["success", "conflict", "error"]
+    model_config = ConfigDict(use_enum_values=True)
+    
+    status: Literal["success", "conflict", "error", "pending"]
     constraint_id: Optional[int] = None
-    plan: Optional[List[Dict[str, Any]]] = None
+    plan: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     solution_diff: Optional[Dict[str, Any]] = None
     score_delta: Optional[int] = None
-    conflicts: List[Dict[str, Any]] = Field(default=[])
-    suggestions: List[str] = Field(default=[])
+    conflicts: List[Dict[str, Any]] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
     processing_time_ms: Optional[int] = None
+    hebrew_explanation: Optional[str] = None
 
-class NaturalLanguageRequest(BaseModel):
-    text: str
-    context: Optional[Dict[str, Any]] = None
-
-class ScheduleEntry(BaseModel):
-    teacher_name: str
-    class_name: str
-    subject_name: str
-    day_of_week: int
-    period_number: int
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-
-class ScheduleResponse(BaseModel):
-    schedule_id: int
-    entries: List[ScheduleEntry]
-    summary: Dict[str, Any]
-    conflicts: List[Dict[str, Any]] = []
-
-class ValidationResult(BaseModel):
-    is_valid: bool
-    errors: List[str] = []
-    warnings: List[str] = []
-    suggestions: List[str] = []
-
-# Types de contraintes supportés
-CONSTRAINT_TYPES = {
-    "teacher_availability": {
-        "description": "Disponibilité d'un professeur",
-        "required_fields": ["unavailable_days", "unavailable_periods"],
-        "entity_type": "teacher"
-    },
-    "subject_time_preference": {
-        "description": "Préférence horaire pour une matière",
-        "required_fields": ["preferred_periods"],
-        "entity_type": "subject"
-    },
-    "consecutive_hours_limit": {
-        "description": "Limite d'heures consécutives",
-        "required_fields": ["max_consecutive"],
-        "entity_type": "teacher"
-    },
-    "class_time_restriction": {
-        "description": "Restriction horaire pour une classe",
-        "required_fields": ["restricted_periods"],
-        "entity_type": "class"
-    },
-    "parallel_teaching": {
-        "description": "Enseignement en parallèle",
-        "required_fields": ["groups", "simultaneous"],
-        "entity_type": "subject"
-    },
-    "friday_early_end": {
-        "description": "Fin anticipée le vendredi",
-        "required_fields": ["last_period"],
-        "entity_type": "school"
-    },
-    "morning_prayer": {
-        "description": "Prière du matin",
-        "required_fields": ["duration", "start_time"],
-        "entity_type": "school"
-    }
-}
-
-# Mapping des jours
-DAYS_MAPPING = {
-    "dimanche": 0, "sunday": 0, "ראשון": 0,
-    "lundi": 1, "monday": 1, "שני": 1,
-    "mardi": 2, "tuesday": 2, "שלישי": 2,
-    "mercredi": 3, "wednesday": 3, "רביעי": 3,
-    "jeudi": 4, "thursday": 4, "חמישי": 4,
-    "vendredi": 5, "friday": 5, "שישי": 5
-}
+# Export des classes principales
+__all__ = [
+    'ConstraintRequest', 'ConstraintResponse', 
+    'ConstraintType', 'ConstraintPriority',
+    'TeacherAvailabilityData'
+]

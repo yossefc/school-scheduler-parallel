@@ -438,18 +438,39 @@
         // ===== NOUVELLES FONCTIONS AGENT IA =====
         
         function initAI() {
-    // WebSocket désactivé - on utilise REST API
-    console.log('Agent IA en mode REST');
-    
-    // Simuler le statut connecté
-    document.getElementById('aiStatus').classList.remove('disconnected');
-    document.getElementById('aiStatus').classList.add('connected');
-    
-    // Message de bienvenue
-    setTimeout(() => {
-        addAIMessage('Agent IA connecté en mode REST ✅\n\nEssayez : "Le professeur Cohen ne peut pas le vendredi"', 'ai');
-    }, 1000);
-}
+            // Connexion WebSocket à l'agent IA
+            socket = io(AI_URL, {
+                transports: ['polling'],  // ← Change ça !
+                reconnection: true,
+                timeout: 10000
+            });
+            
+            socket.on('connect', () => {
+                console.log('Connecté à l\'agent IA');
+                document.getElementById('aiStatus').classList.remove('disconnected');
+                document.getElementById('aiStatus').classList.add('connected');
+                
+                // Envoyer le contexte
+                socket.emit('context', {
+                    scheduleId: 'current',
+                    language: 'he'
+                });
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('Déconnecté de l\'agent IA');
+                document.getElementById('aiStatus').classList.remove('connected');
+                document.getElementById('aiStatus').classList.add('disconnected');
+            });
+            
+            socket.on('ai_response', (response) => {
+                handleAIResponse(response);
+            });
+            
+            socket.on('error', (error) => {
+                addAIMessage('Erreur: ' + error.message, 'ai');
+            });
+        }
         
         function toggleAIPanel() {
             const panel = document.getElementById('aiPanel');
@@ -470,30 +491,32 @@
             }
         }
         
-        async function sendAIMessage() {
-    const input = document.getElementById('aiInput');
-    const message = input.value.trim();
-    
-    if (!message) return;
-    
-    addAIMessage(message, 'user');
-    
-    try {
-        const response = await fetch('http://localhost:5001/api/ai/constraints/natural', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({text: message, language: 'fr'})
-        });
-        
-        const data = await response.json();
-        addAIMessage(`🤖 J'ai compris : ${data.summary}\n\nContrainte détectée :\n- Professeur : ${data.parsed_constraint.entity}\n- Type : ${data.parsed_constraint.type}\n- Confiance : ${data.confidence}`, 'ai');
-        
-    } catch (error) {
-        addAIMessage('Erreur: ' + error.message, 'ai');
-    }
-    
-    input.value = '';
-}
+        function sendAIMessage() {
+            const input = document.getElementById('aiInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Ajouter le message utilisateur
+            addAIMessage(message, 'user');
+            
+            // Envoyer au serveur
+            if (socket && socket.connected) {
+                socket.emit('message', {
+                    text: message,
+                    type: 'constraint',
+                    context: {
+                        viewType: document.getElementById('viewType').value,
+                        currentSelection: document.getElementById('nameSelect').value
+                    }
+                });
+            } else {
+                addAIMessage('Pas de connexion à l\'agent IA', 'ai');
+            }
+            
+            // Vider l'input
+            input.value = '';
+        }
         
         function handleAIKeyPress(event) {
             if (event.key === 'Enter') {
