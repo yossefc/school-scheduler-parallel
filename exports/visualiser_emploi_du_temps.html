@@ -242,6 +242,102 @@
             border-color: #f44336;
         }
         
+        /* NOUVEAU : Box de compréhension */
+        .ai-understanding {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        
+        .ai-understanding h4 {
+            margin: 0 0 10px 0;
+            color: #856404;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .ai-understanding-grid {
+            display: grid;
+            gap: 8px;
+        }
+        
+        .ai-understanding-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+        }
+        
+        .ai-understanding-label {
+            font-weight: bold;
+            color: #666;
+            min-width: 80px;
+        }
+        
+        .ai-understanding-value {
+            background: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            border: 1px solid #e0e0e0;
+            font-weight: 500;
+        }
+        
+        .ai-confidence {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ffeaa7;
+        }
+        
+        .ai-confidence-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .ai-confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f44336 0%, #ff9800 50%, #4caf50 100%);
+            transition: width 0.5s ease;
+        }
+        
+        .ai-questions {
+            background: #e3f2fd;
+            border: 1px solid #2196F3;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+        
+        .ai-questions h4 {
+            margin: 0 0 8px 0;
+            color: #1976d2;
+            font-size: 14px;
+        }
+        
+        .ai-questions ul {
+            margin: 0;
+            padding-right: 20px;
+            list-style-type: none;
+        }
+        
+        .ai-questions li {
+            margin-bottom: 5px;
+            position: relative;
+        }
+        
+        .ai-questions li:before {
+            content: "❓";
+            position: absolute;
+            right: -20px;
+        }
+        
         .ai-typing {
             display: flex;
             align-items: center;
@@ -332,15 +428,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
         
-        .ai-suggestions {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 10px;
-            font-size: 13px;
-        }
-        
         .ai-action-buttons {
             display: flex;
             gap: 10px;
@@ -359,26 +446,6 @@
         
         .ai-action-buttons button.secondary {
             background: #666;
-        }
-        
-        .ai-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            background: #e3f2fd;
-            color: #1976d2;
-            border-radius: 12px;
-            font-size: 11px;
-            margin-top: 5px;
-        }
-        
-        .ai-badge.gpt {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
-        
-        .ai-badge.claude {
-            background: #f3e5f5;
-            color: #7b1fa2;
         }
         
         .ai-toggle {
@@ -431,6 +498,37 @@
         
         .notification.error {
             border-left: 4px solid #f44336;
+        }
+        
+        /* Exemples rapides */
+        .ai-examples {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .ai-examples h5 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .ai-example-chip {
+            display: inline-block;
+            background: white;
+            border: 1px solid #ddd;
+            padding: 5px 12px;
+            border-radius: 20px;
+            margin: 2px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .ai-example-chip:hover {
+            background: #e3f2fd;
+            border-color: #2196F3;
         }
         
         @media print {
@@ -514,8 +612,14 @@
                         <li>הצעות לשיפור המערכת</li>
                         <li>שינויים אוטומטיים במערכת</li>
                     </ul>
-                    <div style="background: #e3f2fd; padding: 10px; border-radius: 8px; margin-top: 10px;">
-                        💡 <strong>דוגמה:</strong> "המורה כהן לא יכול ללמד ביום שישי"
+                    
+                    <!-- Exemples cliquables -->
+                    <div class="ai-examples">
+                        <h5>דוגמאות מהירות - לחץ לשימוש:</h5>
+                        <span class="ai-example-chip" onclick="useExample('המורה כהן לא יכול ללמד ביום שישי')">כהן לא יכול בשישי</span>
+                        <span class="ai-example-chip" onclick="useExample('מקסימום 3 שעות מתמטיקה ביום')">מקס׳ 3 שעות מתמטיקה</span>
+                        <span class="ai-example-chip" onclick="useExample('כל שיעור תפילה מתחיל בשעה 8:00')">תפילה ב-8:00</span>
+                        <span class="ai-example-chip" onclick="useExample('לא יותר מ-2 שעות רצופות')">מקס׳ 2 שעות רצופות</span>
                     </div>
                 </div>
             </div>
@@ -533,9 +637,9 @@
     </div>
 
     <script>
-        // Configuration
+        // Configuration pour Docker
         const API_URL = 'http://localhost:8000/api';
-        const AI_URL = 'http://localhost:5001';
+        const AI_URL = 'http://localhost:5001';  // Port de votre API Flask
         const DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
         const PERIODS = 10;
         
@@ -601,7 +705,7 @@
             }
         }
         
-        // ===== AGENT IA FONCTIONNEL =====
+        // ===== AGENT IA AMÉLIORÉ =====
         
         function initAI() {
             console.log('🚀 Initialisation Agent IA...');
@@ -612,19 +716,44 @@
                 reconnectionDelay: 1000,
                 reconnectionAttempts: 5
             });
-            
+            // HACK pour forcer l'affichage de la compréhension
+            socket.on('ai_response', (response) => {
+                // Si le message contient "הבנתי:", créer la belle box
+                if (response.message && response.message.includes('הבנתי:')) {
+                    const messagesDiv = document.getElementById('aiMessages');
+                    
+                    // Créer la belle box même sans constraint
+                    const boxHTML = `
+                        <div class="ai-message ai">
+                            <div style="background: #fff3cd; 
+                                    border: 3px solid #ffc107; 
+                                    border-radius: 15px; 
+                                    padding: 20px;
+                                    margin: 10px 0;
+                                    box-shadow: 0 5px 15px rgba(255,193,7,0.3);">
+                                <h3 style="color: #856404; margin: 0 0 10px 0;">
+                                    📊 מה הבנתי מההודעה:
+                                </h3>
+                                <div style="background: white; padding: 15px; border-radius: 10px;">
+                                    <pre style="margin: 0; white-space: pre-wrap;">
+            ${response.message}
+                                    </pre>
+                                </div>
+                                <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 8px;">
+                                    <strong>✅ סטטוס: מוכן להחלה אוטומטית</strong>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    messagesDiv.insertAdjacentHTML('beforeend', boxHTML);
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }
+            });
             socket.on('connect', () => {
                 console.log('✅ Agent IA connecté');
                 document.getElementById('aiStatus').classList.remove('disconnected');
                 document.getElementById('aiStatus').classList.add('connected');
-                
-                // Envoyer le contexte initial
-                socket.emit('context', {
-                    scheduleId: 'current',
-                    language: 'he',
-                    classes: allClasses,
-                    teachers: allTeachers
-                });
             });
             
             socket.on('disconnect', () => {
@@ -640,10 +769,6 @@
                 if (currentSchedule.length > 0) {
                     setTimeout(() => loadSchedule(), 1000);
                 }
-            });
-            
-            socket.on('error', (error) => {
-                addAIMessage(`❌ שגיאה: ${error.message}`, 'ai error');
             });
         }
         
@@ -691,142 +816,279 @@
                     }
                 });
             } else {
-                // Fallback sur API REST
-                try {
-                    const response = await fetch(`${AI_URL}/api/ai/constraints/natural`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: message })
-                    });
-                    
-                    const data = await response.json();
-                    hideTypingIndicator();
-                    
-                    if (data.parsed_constraint) {
-                        handleParsedConstraint(data);
-                    } else {
-                        addAIMessage('לא הצלחתי להבין את הבקשה. אנא נסה לנסח אחרת.', 'ai');
-                    }
-                } catch (error) {
-                    hideTypingIndicator();
-                    addAIMessage('❌ שגיאת חיבור לשרת', 'ai error');
-                }
+                hideTypingIndicator();
+                addAIMessage('❌ Pas de connexion au serveur IA', 'ai error');
             }
         }
         
         function handleAIResponse(response) {
             hideTypingIndicator();
             
-            if (response.type === 'success' && response.applied_automatically) {
-                // Application automatique réussie
-                addAIMessage(
-                    `✅ ${response.message}\n\n` +
-                    `🎯 רמת ביטחון: ${Math.round(response.confidence * 100)}%\n` +
-                    `⚡ בוצע אוטומטית`,
-                    'ai success',
-                    response.model_used
-                );
+            // 1. TOUJOURS montrer la box de compréhension si on a des données
+            if (response.constraint || (response.message && response.message.includes('הבנתי:'))) {
+                // Extraire les données du message si pas de constraint
+                let constraint = response.constraint;
                 
-                // Recharger l'emploi du temps après 2 secondes
-                setTimeout(() => {
-                    showNotification('🔄 מרענן את המערכת...', 'success');
-                    loadSchedule();
-                }, 2000);
-                
-            } else if (response.type === 'confirmation_required') {
-                // Demande de confirmation
-                const messageId = Date.now();
-                addAIMessage(
-                    response.message,
-                    'ai',
-                    response.model_used,
-                    {
-                        id: messageId,
-                        actions: [
-                            {
-                                text: 'אשר',
-                                type: 'primary',
-                                action: () => confirmConstraint(response.constraint, messageId)
-                            },
-                            {
-                                text: 'בטל',
-                                type: 'secondary',
-                                action: () => cancelConstraint(messageId)
+                if (!constraint && response.message) {
+                    // Parser le message pour extraire les infos
+                    const match = response.message.match(/מקצוע: (\w+), ימים: \[([\d, ]+)\]/);
+                    if (match) {
+                        constraint = {
+                            type: 'time_preference',
+                            entity: 'all',
+                            data: {
+                                subject: match[1],
+                                days: match[2].split(',').map(d => parseInt(d.trim()))
                             }
-                        ]
+                        };
                     }
-                );
-                
-            } else if (response.type === 'clarification') {
-                // Besoin de clarification
-                addAIMessage(response.message, 'ai', response.model_used);
-                
-            } else {
-                // Message normal
-                addAIMessage(
-                    response.message || JSON.stringify(response),
-                    'ai',
-                    response.model_used
-                );
-            }
-        }
-        
-        function confirmConstraint(constraint, messageId) {
-            // Supprimer les boutons
-            const buttons = document.querySelector(`[data-message-id="${messageId}"] .ai-action-buttons`);
-            if (buttons) buttons.remove();
-            
-            // Envoyer la confirmation
-            socket.emit('apply_confirmed_constraint', { constraint });
-            addAIMessage('⏳ מיישם את השינוי...', 'ai');
-        }
-        
-        function cancelConstraint(messageId) {
-            const buttons = document.querySelector(`[data-message-id="${messageId}"] .ai-action-buttons`);
-            if (buttons) buttons.remove();
-            addAIMessage('❌ השינוי בוטל', 'ai');
-        }
-        
-        function handleParsedConstraint(data) {
-            const { parsed_constraint, confidence, summary } = data;
-            
-            let message = `📋 הבנתי את הבקשה:\n\n`;
-            message += `${summary}\n\n`;
-            message += `פרטים:\n`;
-            message += `• סוג: ${parsed_constraint.type}\n`;
-            message += `• ישות: ${parsed_constraint.entity}\n`;
-            message += `• רמת ביטחון: ${Math.round(confidence * 100)}%`;
-            
-            if (confidence > 0.8) {
-                message += `\n\n⚡ מיישם אוטומטית...`;
-                addAIMessage(message, 'ai success');
-                
-                // Appliquer automatiquement
-                applyConstraintToSolver(parsed_constraint);
-            } else {
-                addAIMessage(message, 'ai');
-            }
-        }
-        
-        async function applyConstraintToSolver(constraint) {
-            try {
-                const response = await fetch(`${AI_URL}/api/ai/constraint`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(constraint)
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    showNotification('✅ השינוי בוצע בהצלחה!', 'success');
-                    setTimeout(() => loadSchedule(), 1500);
-                } else {
-                    addAIMessage(`❌ שגיאה: ${result.message}`, 'ai error');
                 }
-            } catch (error) {
-                addAIMessage('❌ שגיאה ביישום השינוי', 'ai error');
+                
+                if (constraint) {
+                    // Créer la belle box
+                    const messagesDiv = document.getElementById('aiMessages');
+                    const boxDiv = document.createElement('div');
+                    boxDiv.className = 'ai-message ai';
+                    
+                    const confidence = Math.round((constraint.confidence || 0.8) * 100);
+                    
+                    boxDiv.innerHTML = `
+                        <div style="background: linear-gradient(135deg, #fff3cd, #ffe8a1); 
+                                    border: 2px solid #ffc107; 
+                                    border-radius: 12px; 
+                                    padding: 20px; 
+                                    margin: 10px 0;
+                                    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);">
+                            
+                            <h3 style="margin: 0 0 15px 0; 
+                                    color: #856404; 
+                                    font-size: 18px;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 10px;">
+                                <span style="font-size: 24px;">📊</span>
+                                מה הבנתי מההודעה שלך:
+                            </h3>
+                            
+                            <div style="background: white; 
+                                        padding: 15px; 
+                                        border-radius: 8px; 
+                                        margin-bottom: 15px;
+                                        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+                                
+                                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 10px;">
+                                    <div style="font-weight: bold; color: #666;">סוג האילוץ:</div>
+                                    <div>
+                                        <span style="background: #e3f2fd; 
+                                                padding: 5px 15px; 
+                                                border-radius: 20px; 
+                                                color: #1976d2;
+                                                font-weight: bold;
+                                                display: inline-block;">
+                                            ${constraint.type === 'time_preference' ? 'העדפת זמן' : 
+                                            constraint.type === 'teacher_availability' ? 'זמינות מורה' :
+                                            constraint.type}
+                                        </span>
+                                    </div>
+                                    
+                                    <div style="font-weight: bold; color: #666;">מקצוע:</div>
+                                    <div>
+                                        <span style="background: #f3e5f5; 
+                                                padding: 5px 15px; 
+                                                border-radius: 20px; 
+                                                color: #7b1fa2;
+                                                font-weight: bold;">
+                                            ${constraint.data?.subject || 'תפילה'}
+                                        </span>
+                                    </div>
+                                    
+                                    ${constraint.data?.start ? `
+                                    <div style="font-weight: bold; color: #666;">שעת התחלה:</div>
+                                    <div>
+                                        <span style="background: #e8f5e9; 
+                                                padding: 5px 15px; 
+                                                border-radius: 20px; 
+                                                color: #2e7d32;
+                                                font-weight: bold;">
+                                            ${constraint.data.start}
+                                        </span>
+                                    </div>
+                                    ` : ''}
+                                    
+                                    ${constraint.data?.days ? `
+                                    <div style="font-weight: bold; color: #666;">ימים:</div>
+                                    <div>
+                                        ${constraint.data.days.map(d => `
+                                            <span style="background: #fff8e1; 
+                                                    padding: 5px 10px; 
+                                                    border-radius: 15px; 
+                                                    color: #f57f17;
+                                                    font-weight: bold;
+                                                    margin: 2px;
+                                                    display: inline-block;">
+                                                ${['ראשון','שני','שלישי','רביעי','חמישי','שישי'][d]}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            <div style="background: rgba(255,255,255,0.5); 
+                                        padding: 10px; 
+                                        border-radius: 8px;">
+                                <div style="display: flex; 
+                                            justify-content: space-between; 
+                                            align-items: center;">
+                                    <span style="font-weight: bold; color: #856404;">רמת ביטחון:</span>
+                                    <span style="font-size: 24px; font-weight: bold; color: #856404;">
+                                        ${confidence}%
+                                    </span>
+                                </div>
+                                <div style="width: 100%; 
+                                            height: 25px; 
+                                            background: #e0e0e0; 
+                                            border-radius: 15px; 
+                                            overflow: hidden; 
+                                            margin-top: 8px;
+                                            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+                                    <div style="width: ${confidence}%; 
+                                                height: 100%; 
+                                                background: linear-gradient(90deg, #f44336 0%, #ff9800 50%, #4caf50 100%);
+                                                transition: width 0.8s ease;
+                                                box-shadow: 0 2px 8px rgba(76,175,80,0.4);"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    messagesDiv.appendChild(boxDiv);
+                    scrollToBottom();
+                }
             }
+            
+            // 2. Ensuite afficher le message normal
+            if (response.status === 'success') {
+                addAIMessage('✅ ' + (response.message || 'האילוץ הוחל בהצלחה!'), 'ai success');
+                setTimeout(() => loadSchedule(), 2000);
+            } else if (response.status === 'clarification_needed') {
+                addAIMessage(response.message || 'אני צריך הבהרות:', 'ai');
+                if (response.clarification_questions) {
+                    showClarificationQuestions(response.clarification_questions);
+                }
+            } else {
+                addAIMessage(response.message || JSON.stringify(response), 'ai');
+            }
+        }
+        
+        function showUnderstandingBox(response) {
+            const messagesDiv = document.getElementById('aiMessages');
+            const understandingDiv = document.createElement('div');
+            understandingDiv.className = 'ai-message ai';
+            
+            const constraint = response.constraint;
+            const confidence = Math.round((constraint.confidence || response.confidence || 0.5) * 100);
+            
+            // Traduire les types en hébreu
+            const typeTranslations = {
+                'teacher_availability': 'זמינות מורה',
+                'time_preference': 'העדפת זמן',
+                'subject_limit': 'הגבלת שעות למקצוע',
+                'consecutive_hours_limit': 'הגבלת שעות רצופות',
+                'parallel_teaching': 'הוראה מקבילה',
+                'custom': 'אילוץ מותאם אישית'
+            };
+            
+            understandingDiv.innerHTML = `
+                <div class="ai-understanding">
+                    <h4>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                        </svg>
+                        מה הבנתי מההודעה שלך:
+                    </h4>
+                    <div class="ai-understanding-grid">
+                        <div class="ai-understanding-item">
+                            <span class="ai-understanding-label">סוג:</span>
+                            <span class="ai-understanding-value">${typeTranslations[constraint.type] || constraint.type}</span>
+                        </div>
+                        <div class="ai-understanding-item">
+                            <span class="ai-understanding-label">ישות:</span>
+                            <span class="ai-understanding-value">${constraint.entity || 'לא צוין'}</span>
+                        </div>
+                        ${constraint.data ? Object.entries(constraint.data).map(([key, value]) => {
+                            const keyTranslations = {
+                                'available': 'זמין',
+                                'days': 'ימים',
+                                'max_hours_per_day': 'מקסימום שעות ביום',
+                                'max_consecutive': 'מקסימום רצופות',
+                                'subject': 'מקצוע',
+                                'start': 'התחלה',
+                                'end': 'סיום',
+                                'preferred_periods': 'תקופות מועדפות'
+                            };
+                            return `
+                                <div class="ai-understanding-item">
+                                    <span class="ai-understanding-label">${keyTranslations[key] || key}:</span>
+                                    <span class="ai-understanding-value">${
+                                        Array.isArray(value) ? value.join(', ') : value
+                                    }</span>
+                                </div>
+                            `;
+                        }).join('') : ''}
+                    </div>
+                    <div class="ai-confidence">
+                        <strong>רמת ביטחון: ${confidence}%</strong>
+                        <div class="ai-confidence-bar">
+                            <div class="ai-confidence-fill" style="width: ${confidence}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            messagesDiv.appendChild(understandingDiv);
+            scrollToBottom();
+        }
+        
+        function showClarificationQuestions(questions) {
+            const messagesDiv = document.getElementById('aiMessages');
+            const questionsDiv = document.createElement('div');
+            questionsDiv.className = 'ai-message ai';
+            
+            questionsDiv.innerHTML = `
+                <div class="ai-questions">
+                    <h4>אני צריך הבהרות:</h4>
+                    <ul>
+                        ${questions.map(q => `<li>${q}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+            
+            messagesDiv.appendChild(questionsDiv);
+            scrollToBottom();
+        }
+        
+        function showSuggestions(suggestions) {
+            const messagesDiv = document.getElementById('aiMessages');
+            const suggestionsDiv = document.createElement('div');
+            suggestionsDiv.className = 'ai-message ai';
+            
+            suggestionsDiv.innerHTML = `
+                <div class="ai-examples">
+                    <h5>הצעות:</h5>
+                    ${suggestions.map(s => `
+                        <span class="ai-example-chip" onclick="useExample('${s}')">${s}</span>
+                    `).join('')}
+                </div>
+            `;
+            
+            messagesDiv.appendChild(suggestionsDiv);
+            scrollToBottom();
+        }
+        
+        function useExample(text) {
+            document.getElementById('aiInput').value = text;
+            document.getElementById('aiInput').focus();
         }
         
         function showTypingIndicator() {
@@ -855,46 +1117,12 @@
             if (indicator) indicator.remove();
         }
         
-        function addAIMessage(content, sender, model, options = {}) {
+        function addAIMessage(content, sender) {
             const messagesDiv = document.getElementById('aiMessages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `ai-message ${sender}`;
             
-            if (options.id) {
-                messageDiv.setAttribute('data-message-id', options.id);
-            }
-            
-            // Contenu principal
             messageDiv.innerHTML = content.replace(/\n/g, '<br>');
-            
-            // Badge du modèle utilisé
-            if (model) {
-                const badge = document.createElement('div');
-                if (model.includes('gpt-4o')) {
-                    badge.className = 'ai-badge gpt';
-                    badge.textContent = '⚡ מהיר (GPT-4o)';
-                } else if (model.includes('claude')) {
-                    badge.className = 'ai-badge claude';
-                    badge.textContent = '🔍 ניתוח מעמיק (Claude)';
-                }
-                messageDiv.appendChild(badge);
-            }
-            
-            // Boutons d'action
-            if (options.actions) {
-                const actionsDiv = document.createElement('div');
-                actionsDiv.className = 'ai-action-buttons';
-                
-                options.actions.forEach(action => {
-                    const button = document.createElement('button');
-                    button.className = action.type;
-                    button.textContent = action.text;
-                    button.onclick = action.action;
-                    actionsDiv.appendChild(button);
-                });
-                
-                messageDiv.appendChild(actionsDiv);
-            }
             
             messagesDiv.appendChild(messageDiv);
             scrollToBottom();

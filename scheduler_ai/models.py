@@ -15,6 +15,21 @@ class ConstraintType(str, Enum):
     ROOM_CONSTRAINT = "room_constraint"
     CUSTOM = "custom"
 
+    @staticmethod
+    def from_raw(raw: str) -> "ConstraintType":
+        """Mappe des synonymes ou valeurs inconnues vers l'enum approprié"""
+        mapping = {
+            "time": "time_preference",
+            "horaire": "time_preference",
+            "hours_limit": "consecutive_hours_limit",
+        }
+        raw_l = (raw or "").lower().strip()
+        if raw_l in {v.value for v in ConstraintType}:
+            return ConstraintType(raw_l)
+        if raw_l in mapping:
+            return ConstraintType(mapping[raw_l])
+        return ConstraintType.CUSTOM
+
 
 class ConstraintPriority(int, Enum):
     HARD = 0
@@ -54,6 +69,14 @@ class ConstraintInput(BaseModel):
             v = v.upper()
             
         return v
+    
+    @field_validator('type', mode='before')
+    def map_type_aliases(cls, v):
+        if isinstance(v, str):
+            return ConstraintType.from_raw(v)
+        if isinstance(v, ConstraintType):
+            return v
+        return ConstraintType.CUSTOM
     
     @model_validator(mode='after')
     def validate_constraint_data(self) -> 'ConstraintInput':
@@ -107,6 +130,10 @@ class ConstraintInput(BaseModel):
                 self.clarification_questions.append(
                     "À quels moments cette contrainte s'applique-t-elle ?"
                 )
+        elif self.type == ConstraintType.CUSTOM:
+            self.requires_clarification = True
+            self.clarification_questions.append(
+                "Quel type de contrainte souhaitez-vous appliquer ?")
         
         # Enrichissement automatique
         if not self.parsed_at:

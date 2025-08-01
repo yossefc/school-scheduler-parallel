@@ -1,0 +1,41 @@
+﻿# docker-compose.override.yml
+# Fix pour erreur 421 sur Windows
+
+version: '3.8'
+
+services:
+  ai_agent:
+    # DNS Google pour résolution fiable
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    # Résolution forcée des hôtes
+    extra_hosts:
+      - "api.openai.com:104.18.6.192"
+      - "api.openai.com:104.18.7.192"
+      - "api.anthropic.com:172.67.18.84"
+      - "openaipublic.blob.core.windows.net:57.150.104.161"
+    # Variables réseau
+    environment:
+      HTTP_PROXY: 
+      HTTPS_PROXY: 
+      NO_PROXY: localhost,127.0.0.1,postgres,redis,solver
+      # Forcer IPv4
+      CURL_IPRESOLVE: 4
+    # Options réseau
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.forwarding=1
+
+networks:
+  school_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: school_br
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+      com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"

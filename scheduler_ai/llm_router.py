@@ -178,11 +178,63 @@ class LLMRouter:
             
             # Parser la réponse
             parsed = self._parse_llm_response(response.content)
+            # Validation du type
+            try:
+                from scheduler_ai.models import ConstraintType as AllowedType
+                allowed_values = {v.value for v in AllowedType}
+                # Fonction utilitaire
+                def _fix_type(container: dict):
+                    t = container.get("type")
+                    if t and t not in allowed_values:
+                        container["type"] = "custom"
+                        parsed["requires_clarification"] = True
+                        parsed.setdefault("clarification_questions", []).append(
+                            f"Quel type de contrainte représente « {t} » ?")
+                if "constraint" in parsed:
+                    _fix_type(parsed["constraint"])
+                else:
+                    _fix_type(parsed)
+            except Exception:
+                pass
             parsed["confidence"] = self._calculate_confidence(parsed, text)
             
             return parsed
         except Exception as e:
             logger.error(f"Error in parse_natural_language: {e}")
+            # ---------------------------------------------
+            # Nouveau : si OpenAI échoue par manque de quota, tenter Anthropic
+            if self.anthropic_client:
+                try:
+                    fallback_resp = self._call_anthropic(
+                        prompt, model="claude-4-opus-20240514")
+                    parsed = self._parse_llm_response(fallback_resp.content)
+                    # Validation du type
+                    try:
+                        from scheduler_ai.models import ConstraintType as AllowedType
+                        allowed_values = {v.value for v in AllowedType}
+                        def _fix_type2(container: dict):
+                            t = container.get("type")
+                            if t and t not in allowed_values:
+                                container["type"] = "custom"
+                                parsed["requires_clarification"] = True
+                                parsed.setdefault("clarification_questions", []).append(
+                                    f"Quel type de contrainte représente « {t} » ?")
+                        if "constraint" in parsed:
+                            _fix_type2(parsed["constraint"])
+                        else:
+                            _fix_type2(parsed)
+                        ctype = parsed.get("constraint", {}).get("type", "")
+                        if ctype not in allowed_values:
+                            parsed["constraint"]["type"] = "custom"
+                    except Exception:
+                        pass
+                    parsed["confidence"] = self._calculate_confidence(parsed, text)
+                    parsed["model_fallback"] = "anthropic"
+                    logger.info("Fallback vers Anthropic réussi")
+                    return parsed
+                except Exception as e2:
+                    logger.error(f"Fallback Anthropic échoué: {e2}")
+            # ---------------------------------------------
             return self._basic_parse(text)
     
     def _basic_parse(self, text: str) -> Dict[str, Any]:

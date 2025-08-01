@@ -1,26 +1,1302 @@
 <!DOCTYPE html>
-<html lang="fr">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="description" content="School Scheduler AI - Gestionnaire d'emplois du temps intelligent" />
-    <title>School Scheduler AI</title>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת שעות בית ספרית - עם עוזר AI</title>
+    <!-- Socket.IO pour l'agent IA -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-      body {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-          sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-      }
+        /* Styles existants */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .stats {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .stats span {
+            margin: 0 20px;
+            font-weight: bold;
+            color: #1976d2;
+        }
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        select {
+            padding: 12px;
+            font-size: 16px;
+            margin: 0 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            min-width: 200px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #2196F3;
+            color: white;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        td {
+            background-color: #fff;
+            transition: all 0.3s;
+            min-height: 60px;
+        }
+        td:hover {
+            background-color: #e1f5fe;
+            transform: scale(1.02);
+        }
+        .period-header {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        .period-time {
+            font-size: 11px;
+            color: #666;
+            display: block;
+        }
+        .subject {
+            font-weight: bold;
+            color: #1976d2;
+            font-size: 16px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .teacher {
+            font-size: 13px;
+            color: #666;
+        }
+        .class-name {
+            font-size: 13px;
+            color: #f57c00;
+            font-weight: bold;
+        }
+        .break {
+            background-color: #ffe0b2 !important;
+            color: #e65100;
+            font-style: italic;
+        }
+        .empty-slot {
+            background-color: #fafafa;
+            color: #ccc;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #666;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        /* Styles améliorés pour l'agent IA */
+        .ai-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 400px;
+            height: 600px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        
+        .ai-panel.collapsed {
+            height: 60px;
+        }
+        
+        .ai-header {
+            background: linear-gradient(135deg, #2196F3, #1976d2);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(33,150,243,0.3);
+        }
+        
+        .ai-header h3 {
+            margin: 0;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .ai-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .ai-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .ai-message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            animation: fadeIn 0.3s;
+            max-width: 80%;
+        }
+        
+        .ai-message.user {
+            background: #e3f2fd;
+            margin-left: auto;
+            text-align: left;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .ai-message.ai {
+            background: white;
+            margin-right: auto;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .ai-message.ai.success {
+            background: #e8f5e9;
+            border-color: #4caf50;
+        }
+        
+        .ai-message.ai.error {
+            background: #ffebee;
+            border-color: #f44336;
+        }
+        
+        /* NOUVEAU : Box de compréhension */
+        .ai-understanding {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        
+        .ai-understanding h4 {
+            margin: 0 0 10px 0;
+            color: #856404;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .ai-understanding-grid {
+            display: grid;
+            gap: 8px;
+        }
+        
+        .ai-understanding-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+        }
+        
+        .ai-understanding-label {
+            font-weight: bold;
+            color: #666;
+            min-width: 80px;
+        }
+        
+        .ai-understanding-value {
+            background: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            border: 1px solid #e0e0e0;
+            font-weight: 500;
+        }
+        
+        .ai-confidence {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ffeaa7;
+        }
+        
+        .ai-confidence-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .ai-confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f44336 0%, #ff9800 50%, #4caf50 100%);
+            transition: width 0.5s ease;
+        }
+        
+        .ai-questions {
+            background: #e3f2fd;
+            border: 1px solid #2196F3;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+        
+        .ai-questions h4 {
+            margin: 0 0 8px 0;
+            color: #1976d2;
+            font-size: 14px;
+        }
+        
+        .ai-questions ul {
+            margin: 0;
+            padding-right: 20px;
+            list-style-type: none;
+        }
+        
+        .ai-questions li {
+            margin-bottom: 5px;
+            position: relative;
+        }
+        
+        .ai-questions li:before {
+            content: "❓";
+            position: absolute;
+            right: -20px;
+        }
+        
+        .ai-typing {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 10px;
+            color: #666;
+        }
+        
+        .ai-typing span {
+            width: 8px;
+            height: 8px;
+            background: #666;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        
+        .ai-typing span:nth-child(2) { animation-delay: 0.2s; }
+        .ai-typing span:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+        
+        .ai-input {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #e0e0e0;
+            background: white;
+            border-radius: 0 0 15px 15px;
+            gap: 10px;
+        }
+        
+        .ai-input input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        .ai-input input:focus {
+            border-color: #2196F3;
+            box-shadow: 0 0 0 3px rgba(33,150,243,0.1);
+        }
+        
+        .ai-input button {
+            padding: 0 20px;
+            background: #2196F3;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .ai-input button:hover {
+            background: #1976d2;
+        }
+        
+        .ai-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        .ai-status.connected {
+            background: #4CAF50;
+        }
+        
+        .ai-status.disconnected {
+            background: #f44336;
+            animation: none;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76,175,80,0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(76,175,80,0); }
+            100% { box-shadow: 0 0 0 0 rgba(76,175,80,0); }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .ai-action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .ai-action-buttons button {
+            padding: 8px 16px;
+            font-size: 13px;
+            border-radius: 20px;
+        }
+        
+        .ai-action-buttons button.primary {
+            background: #4CAF50;
+        }
+        
+        .ai-action-buttons button.secondary {
+            background: #666;
+        }
+        
+        .ai-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #2196F3, #1976d2);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 3px 15px rgba(33,150,243,0.4);
+            font-size: 24px;
+            z-index: 999;
+            transition: all 0.3s;
+        }
+        
+        .ai-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 20px rgba(33,150,243,0.6);
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s;
+            z-index: 2000;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        
+        .notification.success {
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .notification.error {
+            border-left: 4px solid #f44336;
+        }
+        
+        /* Exemples rapides */
+        .ai-examples {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .ai-examples h5 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .ai-example-chip {
+            display: inline-block;
+            background: white;
+            border: 1px solid #ddd;
+            padding: 5px 12px;
+            border-radius: 20px;
+            margin: 2px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .ai-example-chip:hover {
+            background: #e3f2fd;
+            border-color: #2196F3;
+        }
+        
+        @media print {
+            .controls, .stats, .ai-panel, .ai-toggle, button, .notification {
+                display: none;
+            }
+            body {
+                margin: 0;
+                background: white;
+            }
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+        }
     </style>
-  </head>
-  <body>
-    <noscript>Vous devez activer JavaScript pour utiliser cette application.</noscript>
-    <div id="root"></div>
-  </body>
-</html> 
+</head>
+<body>
+    <div class="container">
+        <h1>מערכת שעות בית ספרית</h1>
+        
+        <div class="stats" id="statsContainer">
+            <span>טוען נתונים...</span>
+        </div>
+        
+        <div class="controls">
+            <select id="viewType" onchange="updateOptions()">
+                <option value="class">תצוגה לפי כיתה</option>
+                <option value="teacher">תצוגה לפי מורה</option>
+            </select>
+            
+            <select id="nameSelect">
+                <option value="">בחר...</option>
+            </select>
+            
+            <button onclick="loadSchedule()">הצג מערכת</button>
+            <button onclick="exportToExcel()">ייצא לאקסל</button>
+            <button onclick="window.print()">הדפס</button>
+            <button onclick="refreshData()">רענן נתונים</button>
+        </div>
+        
+        <div id="scheduleContainer">
+            <div class="loading">בחר כיתה או מורה לצפייה במערכת השעות</div>
+        </div>
+    </div>
+
+    <!-- Bouton AI Toggle -->
+    <div class="ai-toggle" onclick="toggleAIPanel()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z"></path>
+            <path d="M2 17L12 22L22 17"></path>
+            <path d="M2 12L12 17L22 12"></path>
+        </svg>
+    </div>
+
+    <!-- Panel AI -->
+    <div class="ai-panel collapsed" id="aiPanel" style="display:none;">
+        <div class="ai-header" onclick="toggleAIPanel()">
+            <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z"></path>
+                    <path d="M2 17L12 22L22 17"></path>
+                    <path d="M2 12L12 17L22 12"></path>
+                </svg>
+                עוזר AI לתכנון
+            </h3>
+            <span class="ai-status disconnected" id="aiStatus"></span>
+        </div>
+        <div class="ai-body">
+            <div class="ai-messages" id="aiMessages">
+                <div class="ai-message ai">
+                    <div style="margin-bottom: 10px;">
+                        <strong>שלום! אני העוזר החכם שלכם לתכנון מערכת שעות 🎯</strong>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        אני יכול לעזור לכם עם:
+                    </div>
+                    <ul style="text-align: right; margin: 10px 0; padding-right: 20px;">
+                        <li>הוספת אילוצים חדשים</li>
+                        <li>הבנת קונפליקטים</li>
+                        <li>הצעות לשיפור המערכת</li>
+                        <li>שינויים אוטומטיים במערכת</li>
+                    </ul>
+                    
+                    <!-- Exemples cliquables -->
+                    <div class="ai-examples">
+                        <h5>דוגמאות מהירות - לחץ לשימוש:</h5>
+                        <span class="ai-example-chip" onclick="useExample('המורה כהן לא יכול ללמד ביום שישי')">כהן לא יכול בשישי</span>
+                        <span class="ai-example-chip" onclick="useExample('מקסימום 3 שעות מתמטיקה ביום')">מקס׳ 3 שעות מתמטיקה</span>
+                        <span class="ai-example-chip" onclick="useExample('כל שיעור תפילה מתחיל בשעה 8:00')">תפילה ב-8:00</span>
+                        <span class="ai-example-chip" onclick="useExample('לא יותר מ-2 שעות רצופות')">מקס׳ 2 שעות רצופות</span>
+                    </div>
+                </div>
+            </div>
+            <div class="ai-input">
+                <input type="text" id="aiInput" placeholder="הקלד הודעה..." onkeypress="handleAIKeyPress(event)">
+                <button onclick="sendAIMessage()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13"></path>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                    </svg>
+                    שלח
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration pour Docker
+        const API_URL = 'http://localhost:8000/api';
+        const AI_URL = 'http://localhost:5001';  // Port de votre API Flask
+        const DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+        const PERIODS = 10;
+        
+        let currentSchedule = [];
+        let allClasses = [];
+        let allTeachers = [];
+        let socket = null;
+        let aiPanelVisible = false;
+        let isTyping = false;
+        
+        // Heures des périodes
+        const PERIOD_TIMES = {
+            1: '08:00-08:45',
+            2: '08:50-09:35',
+            3: '09:40-10:25',
+            4: '10:30-10:45',
+            5: '10:45-11:30',
+            6: '11:35-12:20',
+            7: '12:25-13:10',
+            8: '13:15-14:00',
+            9: '14:05-14:50',
+            10: '14:55-15:40'
+        };
+        
+        // ===== FONCTIONS EXISTANTES =====
+        
+        // Charger les données initiales
+        async function init() {
+            try {
+                // Charger les statistiques
+                const statsResponse = await fetch(`${API_URL}/stats`);
+                if (statsResponse.ok) {
+                    const stats = await statsResponse.json();
+                    document.getElementById('statsContainer').innerHTML = `
+                        <span>כיתות: ${stats.general.total_classes}</span>
+                        <span>מורים: ${stats.general.total_teachers}</span>
+                        <span>שיעורים: ${stats.general.total_lessons}</span>
+                        <span>מקצועות: ${stats.general.total_subjects}</span>
+                    `;
+                }
+                
+                // Charger les listes
+                const classesResponse = await fetch(`${API_URL}/classes`);
+                if (classesResponse.ok) {
+                    const data = await classesResponse.json();
+                    allClasses = data.classes;
+                }
+                
+                const teachersResponse = await fetch(`${API_URL}/teachers`);
+                if (teachersResponse.ok) {
+                    const data = await teachersResponse.json();
+                    allTeachers = data.teachers;
+                }
+                
+                updateOptions();
+                
+                // Initialiser l'agent IA
+                initAI();
+                
+            } catch (error) {
+                console.error('Erreur lors du chargement:', error);
+                showNotification('Erreur de connexion au serveur', 'error');
+            }
+        }
+        
+        // ===== AGENT IA AMÉLIORÉ =====
+        
+        function initAI() {
+            console.log('🚀 Initialisation Agent IA...');
+            
+            socket = io(AI_URL, {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionAttempts: 5
+            });
+            // HACK pour forcer l'affichage de la compréhension
+            socket.on('ai_response', (response) => {
+                // Si le message contient "הבנתי:", créer la belle box
+                if (response.message && response.message.includes('הבנתי:')) {
+                    const messagesDiv = document.getElementById('aiMessages');
+                    
+                    // Créer la belle box même sans constraint
+                    const boxHTML = `
+                        <div class="ai-message ai">
+                            <div style="background: #fff3cd; 
+                                    border: 3px solid #ffc107; 
+                                    border-radius: 15px; 
+                                    padding: 20px;
+                                    margin: 10px 0;
+                                    box-shadow: 0 5px 15px rgba(255,193,7,0.3);">
+                                <h3 style="color: #856404; margin: 0 0 10px 0;">
+                                    📊 מה הבנתי מההודעה:
+                                </h3>
+                                <div style="background: white; padding: 15px; border-radius: 10px;">
+                                    <pre style="margin: 0; white-space: pre-wrap;">
+            ${response.message}
+                                    </pre>
+                                </div>
+                                <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 8px;">
+                                    <strong>✅ סטטוס: מוכן להחלה אוטומטית</strong>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    messagesDiv.insertAdjacentHTML('beforeend', boxHTML);
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }
+            });
+            socket.on('connect', () => {
+                console.log('✅ Agent IA connecté');
+                document.getElementById('aiStatus').classList.remove('disconnected');
+                document.getElementById('aiStatus').classList.add('connected');
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('❌ Agent IA déconnecté');
+                document.getElementById('aiStatus').classList.remove('connected');
+                document.getElementById('aiStatus').classList.add('disconnected');
+            });
+            
+            socket.on('ai_response', handleAIResponse);
+            
+            socket.on('schedule_updated', (data) => {
+                showNotification('✅ המערכת עודכנה בהצלחה!', 'success');
+                if (currentSchedule.length > 0) {
+                    setTimeout(() => loadSchedule(), 1000);
+                }
+            });
+        }
+        
+        function toggleAIPanel() {
+            const panel = document.getElementById('aiPanel');
+            const toggle = document.querySelector('.ai-toggle');
+            
+            if (!aiPanelVisible) {
+                panel.style.display = 'flex';
+                panel.classList.remove('collapsed');
+                toggle.style.display = 'none';
+                aiPanelVisible = true;
+                document.getElementById('aiInput').focus();
+            } else {
+                panel.classList.add('collapsed');
+                setTimeout(() => {
+                    panel.style.display = 'none';
+                    toggle.style.display = 'flex';
+                }, 300);
+                aiPanelVisible = false;
+            }
+        }
+        
+        async function sendAIMessage() {
+            const input = document.getElementById('aiInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Ajouter le message utilisateur
+            addAIMessage(message, 'user');
+            input.value = '';
+            
+            // Afficher l'indicateur de frappe
+            showTypingIndicator();
+            
+            if (socket && socket.connected) {
+                // Utiliser WebSocket
+                socket.emit('message', {
+                    text: message,
+                    context: {
+                        scheduleId: 'current',
+                        currentView: document.getElementById('viewType').value,
+                        currentName: document.getElementById('nameSelect').value
+                    }
+                });
+            } else {
+                hideTypingIndicator();
+                addAIMessage('❌ Pas de connexion au serveur IA', 'ai error');
+            }
+        }
+        
+        function handleAIResponse(response) {
+            hideTypingIndicator();
+            
+            // 1. TOUJOURS montrer la box de compréhension si on a des données
+            if (response.constraint || (response.message && response.message.includes('הבנתי:'))) {
+                // Extraire les données du message si pas de constraint
+                let constraint = response.constraint;
+                
+                if (!constraint && response.message) {
+                    // Parser le message pour extraire les infos
+                    const match = response.message.match(/מקצוע: (\w+), ימים: \[([\d, ]+)\]/);
+                    if (match) {
+                        constraint = {
+                            type: 'time_preference',
+                            entity: 'all',
+                            data: {
+                                subject: match[1],
+                                days: match[2].split(',').map(d => parseInt(d.trim()))
+                            }
+                        };
+                    }
+                }
+                
+                if (constraint) {
+                    // Créer la belle box
+                    const messagesDiv = document.getElementById('aiMessages');
+                    const boxDiv = document.createElement('div');
+                    boxDiv.className = 'ai-message ai';
+                    
+                    const confidence = Math.round((constraint.confidence || 0.8) * 100);
+                    
+                    boxDiv.innerHTML = `
+                        <div style="background: linear-gradient(135deg, #fff3cd, #ffe8a1); 
+                                    border: 2px solid #ffc107; 
+                                    border-radius: 12px; 
+                                    padding: 20px; 
+                                    margin: 10px 0;
+                                    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);">
+                            
+                            <h3 style="margin: 0 0 15px 0; 
+                                    color: #856404; 
+                                    font-size: 18px;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 10px;">
+                                <span style="font-size: 24px;">📊</span>
+                                מה הבנתי מההודעה שלך:
+                            </h3>
+                            
+                            <div style="background: white; 
+                                        padding: 15px; 
+                                        border-radius: 8px; 
+                                        margin-bottom: 15px;
+                                        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+                                
+                                <div style="display: grid; grid-template-columns: 120px 1fr; gap: 10px;">
+                                    <div style="font-weight: bold; color: #666;">סוג האילוץ:</div>
+                                    <div>
+                                        <span style="background: #e3f2fd; 
+                                                padding: 5px 15px; 
+                                                border-radius: 20px; 
+                                                color: #1976d2;
+                                                font-weight: bold;
+                                                display: inline-block;">
+                                            ${constraint.type === 'time_preference' ? 'העדפת זמן' : 
+                                            constraint.type === 'teacher_availability' ? 'זמינות מורה' :
+                                            constraint.type}
+                                        </span>
+                                    </div>
+                                    
+                                    <div style="font-weight: bold; color: #666;">מקצוע:</div>
+                                    <div>
+                                        <span style="background: #f3e5f5; 
+                                                padding: 5px 15px; 
+                                                border-radius: 20px; 
+                                                color: #7b1fa2;
+                                                font-weight: bold;">
+                                            ${constraint.data?.subject || 'תפילה'}
+                                        </span>
+                                    </div>
+                                    
+                                    ${constraint.data?.start ? `
+                                    <div style="font-weight: bold; color: #666;">שעת התחלה:</div>
+                                    <div>
+                                        <span style="background: #e8f5e9; 
+                                                padding: 5px 15px; 
+                                                border-radius: 20px; 
+                                                color: #2e7d32;
+                                                font-weight: bold;">
+                                            ${constraint.data.start}
+                                        </span>
+                                    </div>
+                                    ` : ''}
+                                    
+                                    ${constraint.data?.days ? `
+                                    <div style="font-weight: bold; color: #666;">ימים:</div>
+                                    <div>
+                                        ${constraint.data.days.map(d => `
+                                            <span style="background: #fff8e1; 
+                                                    padding: 5px 10px; 
+                                                    border-radius: 15px; 
+                                                    color: #f57f17;
+                                                    font-weight: bold;
+                                                    margin: 2px;
+                                                    display: inline-block;">
+                                                ${['ראשון','שני','שלישי','רביעי','חמישי','שישי'][d]}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            <div style="background: rgba(255,255,255,0.5); 
+                                        padding: 10px; 
+                                        border-radius: 8px;">
+                                <div style="display: flex; 
+                                            justify-content: space-between; 
+                                            align-items: center;">
+                                    <span style="font-weight: bold; color: #856404;">רמת ביטחון:</span>
+                                    <span style="font-size: 24px; font-weight: bold; color: #856404;">
+                                        ${confidence}%
+                                    </span>
+                                </div>
+                                <div style="width: 100%; 
+                                            height: 25px; 
+                                            background: #e0e0e0; 
+                                            border-radius: 15px; 
+                                            overflow: hidden; 
+                                            margin-top: 8px;
+                                            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+                                    <div style="width: ${confidence}%; 
+                                                height: 100%; 
+                                                background: linear-gradient(90deg, #f44336 0%, #ff9800 50%, #4caf50 100%);
+                                                transition: width 0.8s ease;
+                                                box-shadow: 0 2px 8px rgba(76,175,80,0.4);"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    messagesDiv.appendChild(boxDiv);
+                    scrollToBottom();
+                }
+            }
+            
+            // 2. Ensuite afficher le message normal
+            if (response.status === 'success') {
+                addAIMessage('✅ ' + (response.message || 'האילוץ הוחל בהצלחה!'), 'ai success');
+                setTimeout(() => loadSchedule(), 2000);
+            } else if (response.status === 'clarification_needed') {
+                addAIMessage(response.message || 'אני צריך הבהרות:', 'ai');
+                if (response.clarification_questions) {
+                    showClarificationQuestions(response.clarification_questions);
+                }
+            } else {
+                addAIMessage(response.message || JSON.stringify(response), 'ai');
+            }
+        }
+        
+        function showUnderstandingBox(response) {
+            const messagesDiv = document.getElementById('aiMessages');
+            const understandingDiv = document.createElement('div');
+            understandingDiv.className = 'ai-message ai';
+            
+            const constraint = response.constraint;
+            const confidence = Math.round((constraint.confidence || response.confidence || 0.5) * 100);
+            
+            // Traduire les types en hébreu
+            const typeTranslations = {
+                'teacher_availability': 'זמינות מורה',
+                'time_preference': 'העדפת זמן',
+                'subject_limit': 'הגבלת שעות למקצוע',
+                'consecutive_hours_limit': 'הגבלת שעות רצופות',
+                'parallel_teaching': 'הוראה מקבילה',
+                'custom': 'אילוץ מותאם אישית'
+            };
+            
+            understandingDiv.innerHTML = `
+                <div class="ai-understanding">
+                    <h4>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                        </svg>
+                        מה הבנתי מההודעה שלך:
+                    </h4>
+                    <div class="ai-understanding-grid">
+                        <div class="ai-understanding-item">
+                            <span class="ai-understanding-label">סוג:</span>
+                            <span class="ai-understanding-value">${typeTranslations[constraint.type] || constraint.type}</span>
+                        </div>
+                        <div class="ai-understanding-item">
+                            <span class="ai-understanding-label">ישות:</span>
+                            <span class="ai-understanding-value">${constraint.entity || 'לא צוין'}</span>
+                        </div>
+                        ${constraint.data ? Object.entries(constraint.data).map(([key, value]) => {
+                            const keyTranslations = {
+                                'available': 'זמין',
+                                'days': 'ימים',
+                                'max_hours_per_day': 'מקסימום שעות ביום',
+                                'max_consecutive': 'מקסימום רצופות',
+                                'subject': 'מקצוע',
+                                'start': 'התחלה',
+                                'end': 'סיום',
+                                'preferred_periods': 'תקופות מועדפות'
+                            };
+                            return `
+                                <div class="ai-understanding-item">
+                                    <span class="ai-understanding-label">${keyTranslations[key] || key}:</span>
+                                    <span class="ai-understanding-value">${
+                                        Array.isArray(value) ? value.join(', ') : value
+                                    }</span>
+                                </div>
+                            `;
+                        }).join('') : ''}
+                    </div>
+                    <div class="ai-confidence">
+                        <strong>רמת ביטחון: ${confidence}%</strong>
+                        <div class="ai-confidence-bar">
+                            <div class="ai-confidence-fill" style="width: ${confidence}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            messagesDiv.appendChild(understandingDiv);
+            scrollToBottom();
+        }
+        
+        function showClarificationQuestions(questions) {
+            const messagesDiv = document.getElementById('aiMessages');
+            const questionsDiv = document.createElement('div');
+            questionsDiv.className = 'ai-message ai';
+            
+            questionsDiv.innerHTML = `
+                <div class="ai-questions">
+                    <h4>אני צריך הבהרות:</h4>
+                    <ul>
+                        ${questions.map(q => `<li>${q}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+            
+            messagesDiv.appendChild(questionsDiv);
+            scrollToBottom();
+        }
+        
+        function showSuggestions(suggestions) {
+            const messagesDiv = document.getElementById('aiMessages');
+            const suggestionsDiv = document.createElement('div');
+            suggestionsDiv.className = 'ai-message ai';
+            
+            suggestionsDiv.innerHTML = `
+                <div class="ai-examples">
+                    <h5>הצעות:</h5>
+                    ${suggestions.map(s => `
+                        <span class="ai-example-chip" onclick="useExample('${s}')">${s}</span>
+                    `).join('')}
+                </div>
+            `;
+            
+            messagesDiv.appendChild(suggestionsDiv);
+            scrollToBottom();
+        }
+        
+        function useExample(text) {
+            document.getElementById('aiInput').value = text;
+            document.getElementById('aiInput').focus();
+        }
+        
+        function showTypingIndicator() {
+            if (isTyping) return;
+            isTyping = true;
+            
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'ai-message ai';
+            typingDiv.id = 'typing-indicator';
+            typingDiv.innerHTML = `
+                <div class="ai-typing">
+                    העוזר מקליד
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            `;
+            
+            document.getElementById('aiMessages').appendChild(typingDiv);
+            scrollToBottom();
+        }
+        
+        function hideTypingIndicator() {
+            isTyping = false;
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+        
+        function addAIMessage(content, sender) {
+            const messagesDiv = document.getElementById('aiMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `ai-message ${sender}`;
+            
+            messageDiv.innerHTML = content.replace(/\n/g, '<br>');
+            
+            messagesDiv.appendChild(messageDiv);
+            scrollToBottom();
+        }
+        
+        function scrollToBottom() {
+            const messagesDiv = document.getElementById('aiMessages');
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function handleAIKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendAIMessage();
+            }
+        }
+        
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                ${type === 'success' ? '✅' : '❌'} ${message}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.transform = 'translateX(150%)';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        // ===== FONCTIONS EMPLOI DU TEMPS =====
+        
+        function updateOptions() {
+            const viewType = document.getElementById('viewType').value;
+            const nameSelect = document.getElementById('nameSelect');
+            
+            nameSelect.innerHTML = '<option value="">בחר...</option>';
+            
+            if (viewType === 'class') {
+                allClasses.forEach(cls => {
+                    const option = document.createElement('option');
+                    option.value = cls;
+                    option.textContent = cls;
+                    nameSelect.appendChild(option);
+                });
+            } else {
+                allTeachers.forEach(teacher => {
+                    const option = document.createElement('option');
+                    option.value = teacher;
+                    option.textContent = teacher;
+                    nameSelect.appendChild(option);
+                });
+            }
+        }
+        
+        async function loadSchedule() {
+            const viewType = document.getElementById('viewType').value;
+            const name = document.getElementById('nameSelect').value;
+            
+            if (!name) {
+                alert('אנא בחר כיתה או מורה');
+                return;
+            }
+            
+            const container = document.getElementById('scheduleContainer');
+            container.innerHTML = '<div class="loading">טוען מערכת שעות...</div>';
+            
+            try {
+                const response = await fetch(`${API_URL}/schedule/${viewType}/${encodeURIComponent(name)}`);
+                
+                if (!response.ok) {
+                    throw new Error('שגיאה בטעינת הנתונים');
+                }
+                
+                const data = await response.json();
+                currentSchedule = data.schedule || [];
+                
+                if (currentSchedule.length === 0) {
+                    container.innerHTML = '<div class="error">לא נמצאו נתונים למערכת זו</div>';
+                } else {
+                    displaySchedule(currentSchedule, viewType);
+                }
+                
+            } catch (error) {
+                container.innerHTML = `<div class="error">שגיאה: ${error.message}</div>`;
+                console.error('Error:', error);
+            }
+        }
+        
+        function displaySchedule(schedule, viewType) {
+            const container = document.getElementById('scheduleContainer');
+            const name = document.getElementById('nameSelect').value;
+            
+            let html = `<h2>מערכת שעות - ${name}</h2>`;
+            html += '<table>';
+            
+            // En-tête
+            html += '<tr><th>שעה</th>';
+            DAYS.forEach(day => {
+                html += `<th>${day}</th>`;
+            });
+            html += '</tr>';
+            
+            // Corps du tableau
+            for (let period = 1; period <= PERIODS; period++) {
+                html += '<tr>';
+                html += `<td class="period-header">
+                    <strong>${period}</strong>
+                    <span class="period-time">${PERIOD_TIMES[period] || ''}</span>
+                </td>`;
+                
+                for (let day = 0; day < 6; day++) {
+                    const lesson = schedule.find(l => 
+                        l.day_of_week === day && l.period_number === period
+                    );
+                    
+                    if (lesson) {
+                        html += '<td>';
+                        html += `<span class="subject">${lesson.subject_name}</span>`;
+                        if (viewType === 'class') {
+                            html += `<span class="teacher">${lesson.teacher_name}</span>`;
+                        } else {
+                            html += `<span class="class-name">${lesson.class_name}</span>`;
+                        }
+                        html += '</td>';
+                    } else if (period === 4) {
+                        html += '<td class="break">הפסקה</td>';
+                    } else {
+                        html += '<td class="empty-slot">-</td>';
+                    }
+                }
+                
+                html += '</tr>';
+            }
+            
+            html += '</table>';
+            container.innerHTML = html;
+        }
+        
+        function exportToExcel() {
+            if (currentSchedule.length === 0) {
+                alert('אין נתונים לייצוא');
+                return;
+            }
+            
+            const viewType = document.getElementById('viewType').value;
+            const name = document.getElementById('nameSelect').value;
+            
+            let csv = '\ufeff'; // BOM pour UTF-8
+            csv += 'יום,שעה,מקצוע,';
+            csv += viewType === 'class' ? 'מורה\n' : 'כיתה\n';
+            
+            currentSchedule.forEach(lesson => {
+                const day = DAYS[lesson.day_of_week];
+                const data = viewType === 'class' ? lesson.teacher_name : lesson.class_name;
+                csv += `${day},${lesson.period_number},${lesson.subject_name},${data}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `מערכת_${name}_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+        
+        function refreshData() {
+            showNotification('🔄 מרענן נתונים...', 'success');
+            init();
+        }
+        
+        // Initialiser au chargement
+        window.onload = init;
+    </script>
+</body>
+</html>

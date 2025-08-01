@@ -7,6 +7,8 @@ import logging
 import os
 from datetime import datetime
 from typing import Dict, Any
+from parsers import natural_language_parser
+from agent_extensions import clarification_middleware
 
 from pydantic import ValidationError
 
@@ -126,82 +128,53 @@ def handle_connect():
 
 @socketio.on('message')
 def handle_message(data):
-    """Gère les messages avec clarifications"""
+    """Traite un message de l'utilisateur"""
     session_id = request.sid
     text = data.get('text', '')
-    context = data.get('context', {})
+    
+    # DEBUG
+    print(f"🔍 Message reçu: {text}")
     
     async def process_message_async():
-        """Traitement async de la requête"""
         try:
-            # Utiliser le middleware de clarification
+            # Utiliser le middleware
             response = await clarification_middleware.process_constraint(
-                text, 
+                text,
                 session_id,
-                context
+                context=data.get('context', {})
             )
             
-            # Si succès avec auto-apply
-            if response.status == "success" and response.applied_automatically:
-                # Appliquer réellement la contrainte
-                constraint_dict = response.constraint.model_dump()
-                result = await agent.apply_constraint(constraint_dict)
-                
-                # Persister
-                if result.get("status") == "success":
-                    # Préparer les données enrichies
-                    enriched_data = response.constraint.data.copy() if response.constraint.data else {}
-                    enriched_data.update({
-                        'metadata': response.constraint.metadata if hasattr(response.constraint, 'metadata') else {},
-                        'original_text': response.constraint.original_text,
-                        'confidence': response.constraint.confidence,
-                        'created_by': f"session_{session_id}"
-                    })
-                    
-                    new_constraint = Constraint(
-                        constraint_type=response.constraint.type.value,
-                        entity_name=response.constraint.entity,
-                        constraint_data=enriched_data,
-                        priority=response.constraint.priority.value,
-                        is_active=True
-                    )
-                    session = get_db_session()
-                    try:
-                        session.add(new_constraint)
-                        session.commit()
-                        session.refresh(new_constraint)
-                        response.constraint_id = new_constraint.id
-                    except Exception as e:
-                        session.rollback()
-                        raise e
-                    finally:
-                        session.close()
-                    
-                emit('schedule_updated', {
-                    "constraint_id": response.constraint_id,
-                    "message": "Emploi du temps mis à jour"
-                }, broadcast=True)
+            # IMPORTANT: Toujours envoyer les détails complets
+            emit_data = {
+                'status': response.status,
+                'message': response.message,
+                'confidence': response.confidence
+            }
             
-            # Émettre la réponse (avec sérialisation JSON safe)
-            emit('ai_response', response.model_dump(mode='json'))
+            # AJOUTER LES DÉTAILS DE LA CONTRAINTE
+            if response.constraint:
+                emit_data['constraint'] = {
+                    'type': response.constraint.type.value if hasattr(response.constraint.type, 'value') else str(response.constraint.type),
+                    'entity': response.constraint.entity,
+                    'data': response.constraint.data,
+                    'confidence': response.constraint.confidence or 0.8
+                }
+            
+            # Si questions de clarification
+            if response.clarification_questions:
+                emit_data['clarification_questions'] = response.clarification_questions
+            
+            print(f"📤 Envoi réponse: {emit_data}")
+            emit('ai_response', emit_data)
             
         except Exception as e:
-            logger.error(f"Erreur handle_message: {e}")
+            print(f"❌ Erreur: {e}")
             emit('ai_response', {
-                "status": "error",
-                "message": "Erreur lors du traitement"
+                'status': 'error',
+                'message': f'Erreur: {str(e)}'
             })
     
-    # Exécuter la fonction async dans le contexte sync
-    try:
-        asyncio.run(process_message_async())
-    except Exception as e:
-        logger.error(f"Erreur asyncio.run: {e}")
-        emit('ai_response', {
-            "status": "error",
-            "message": "Erreur lors du traitement"
-        })
-
+    asyncio.run(process_message_async())
 
 @socketio.on('disconnect')
 def handle_disconnect():

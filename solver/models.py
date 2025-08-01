@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Dict, Any, Optional, List, Literal
 from datetime import datetime, time
 from enum import IntEnum
+from enum import Enum
 
 class ConstraintPriority(IntEnum):
     """Niveaux de priorité des contraintes"""
@@ -14,7 +15,7 @@ class ConstraintPriority(IntEnum):
     LOW = 4           # Confort
     MINIMAL = 5       # Préférence mineure
 
-class ConstraintType(str):
+class ConstraintType(Enum):
     """Types de contraintes supportés"""
     TEACHER_AVAILABILITY = "teacher_availability"
     TIME_PREFERENCE = "time_preference"
@@ -28,6 +29,58 @@ class ConstraintType(str):
     ROOM_AVAILABILITY = "room_availability"
     CLASS_PREFERENCE = "class_preference"
 
+# Mapping des jours de la semaine
+DAYS_MAPPING = {
+    "dimanche": 0,
+    "lundi": 1,
+    "mardi": 2,
+    "mercredi": 3,
+    "jeudi": 4,
+    "vendredi": 5,
+    "samedi": 6
+}
+
+# Configuration des types de contraintes
+CONSTRAINT_TYPES = {
+    "teacher_availability": {
+        "entity_type": "teacher",
+        "required_fields": ["unavailable_days"],
+        "optional_fields": ["unavailable_periods", "reason"]
+    },
+    "time_preference": {
+        "entity_type": "teacher",
+        "required_fields": ["preferred_time"],
+        "optional_fields": ["preferred_periods", "avoid_periods"]
+    },
+    "consecutive_hours_limit": {
+        "entity_type": "global",
+        "required_fields": ["max_hours"],
+        "optional_fields": ["applies_to"]
+    },
+    "parallel_teaching": {
+        "entity_type": "teacher",
+        "required_fields": ["parallel_classes"],
+        "optional_fields": ["same_subject_only"]
+    },
+    "school_hours": {
+        "entity_type": "global",
+        "required_fields": ["start_time", "end_time"],
+        "optional_fields": ["break_periods"]
+    },
+    "morning_prayer": {
+        "entity_type": "global",
+        "required_fields": ["time_slot"],
+        "optional_fields": ["mandatory_for"]
+    }
+}
+
+# Modèle principal pour les requêtes de planification
+class ScheduleRequest(BaseModel):
+    """Modèle de requête pour la génération d'emploi du temps"""
+    constraints: List[Dict[str, Any]] = Field(default=[])
+    time_limit: int = Field(default=300, ge=1, le=3600)  # 5 minutes par défaut, max 1h
+    optimization_level: int = Field(default=1, ge=0, le=3)
+    
 # Modèles de données pour chaque type de contrainte
 class TeacherAvailabilityData(BaseModel):
     """Données pour la disponibilité d'un enseignant"""

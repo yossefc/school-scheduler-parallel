@@ -5,6 +5,7 @@
 
 ARG PYTHON_VERSION=3.11-slim
 FROM python:${PYTHON_VERSION} AS base
+RUN apt-get update && apt-get install -y ca-certificates curl dnsutils iputils-ping && update-ca-certificates
 
 # ---------- Utilisateur non-root ---------------------------------------
 ENV USER=aiuser
