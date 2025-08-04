@@ -13,6 +13,8 @@ from psycopg2.extras import RealDictCursor
 from sqlalchemy import create_engine, Column, Integer, String, JSON, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from fuzzy_hebrew_matching import HebrewFuzzyMatcher
+
 
 # Import du solver existant
 from solver_engine import ScheduleSolver
@@ -68,6 +70,31 @@ class ScheduleAIAgent:
         # Chargement des contraintes institutionnelles
         self._load_institutional_constraints()
     
+    def _resolve_teacher_name(self, input_name: str) -> Dict:
+        """Résout un nom de professeur avec fuzzy matching"""
+        result = self.fuzzy_matcher.find_teacher(input_name)
+        
+        if not result:
+            return {
+                "success": False,
+                "error": f"Professeur '{input_name}' non trouvé",
+                "suggestions": self._suggest_similar_teachers(input_name)
+            }
+        
+        if result["confidence"] < 0.9:
+            # Demander confirmation pour les correspondances incertaines
+            return {
+                "success": "confirmation_needed",
+                "teacher": result["teacher"],
+                "confidence": result["confidence"],
+                "question": f"Voulez-vous dire '{result['teacher']['teacher_name']}' ? (Confiance: {result['confidence']:.0%})"
+            }
+        
+        return {
+            "success": True,
+            "teacher": result["teacher"],
+            "confidence": result["confidence"]
+        }
     def _load_institutional_constraints(self):
         """Charge les contraintes institutionnelles depuis la BD"""
         conn = psycopg2.connect(**self.db_config)
@@ -128,7 +155,14 @@ class ScheduleAIAgent:
                     "conflicts": analysis["conflicts"],
                     "suggestions": self._generate_suggestions(analysis)
                 }
-            
+            if analysis["conflicts"]:
+                return {
+                    "success": False,
+                    "error": "Contrainte impossible à appliquer",
+                    "conflicts": analysis["conflicts"],
+                    "suggestions": self._suggest_alternatives(analysis["conflicts"])
+                }
+                    
             # 2. Créer le plan de modification
             plan = self._create_modification_plan(constraint_json, analysis)
             

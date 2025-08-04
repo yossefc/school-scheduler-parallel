@@ -49,7 +49,23 @@ def health():
         "timestamp": datetime.now().isoformat()
     })
 
-
+@app.route('/api/ai/validate_teacher', methods=['POST'])
+def validate_teacher():
+    """Valide et propose des corrections pour les noms de professeurs"""
+    data = request.get_json()
+    input_name = data.get('teacher_name', '')
+    
+    result = agent._resolve_teacher_name(input_name)
+    
+    if result["success"] == "confirmation_needed":
+        return jsonify({
+            "status": "confirmation_needed",
+            "message": result["question"],
+            "suggested_teacher": result["teacher"]["teacher_name"],
+            "confidence": result["confidence"]
+        })
+    
+    return jsonify(result)
 @app.route('/api/ai/constraints', methods=['POST'])
 def apply_constraint():
     """Applique une contrainte avec validation Pydantic"""

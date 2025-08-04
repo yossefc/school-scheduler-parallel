@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Gestionnaire de Contraintes - School Scheduler</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .header h1 {
+            color: #4a5568;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(45deg, #4299e1, #3182ce);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #e53e3e, #c53030);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #38a169, #2f855a);
+            color: white;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #4299e1, #3182ce);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(45deg, #ed8936, #dd8936);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .constraints-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+
+        .constraint-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .constraint-panel h3 {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .constraint-item {
+            background: #f7fafc;
+            border-left: 4px solid #4299e1;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .constraint-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .constraint-item.inactive {
+            opacity: 0.6;
+            border-left-color: #cbd5e0;
+        }
+
+        .constraint-item.hard {
+            border-left-color: #e53e3e;
+            background: #fed7d7;
+        }
+
+        .constraint-item.strong {
+            border-left-color: #ed8936;
+            background: #feebc8;
+        }
+
+        .constraint-item.medium {
+            border-left-color: #ecc94b;
+            background: #fefcbf;
+        }
+
+        .constraint-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .constraint-name {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .priority-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .priority-0 { background: #e53e3e; }
+        .priority-1 { background: #ed8936; }
+        .priority-2 { background: #ecc94b; color: #744210; }
+        .priority-3 { background: #4299e1; }
+        .priority-4 { background: #38a169; }
+        .priority-5 { background: #805ad5; }
+
+        .constraint-description {
+            color: #718096;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .constraint-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+
+        .add-constraint-form {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+        }
+
+        .hebrew-support {
+            direction: rtl;
+            text-align: right;
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .status-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .status-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #feb2b2;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4299e1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .constraints-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Gestionnaire de Contraintes</h1>
+            <p>Visualisez, modifiez et gérez toutes les contraintes d'emploi du temps</p>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalConstraints">0</div>
+                    <div>Total Contraintes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="activeConstraints">0</div>
+                    <div>Actives</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="hardConstraints">0</div>
+                    <div>HARD (Critiques)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="userConstraints">0</div>
+                    <div>Utilisateur</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <h3>🔧 Actions Rapides</h3>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="loadConstraints()">
+                    🔄 Rafraîchir
+                </button>
+                <button class="btn btn-danger" onclick="resetAllConstraints()">
+                    🧹 Tout Nettoyer
+                </button>
+                <button class="btn btn-warning" onclick="disableAllSoft()">
+                    ⚠️ Désactiver Soft
+                </button>
+                <button class="btn btn-success" onclick="testSolver()">
+                    ⚡ Tester Solver
+                </button>
+            </div>
+            
+            <div id="statusMessage"></div>
+        </div>
+
+        <div class="constraints-section">
+            <div class="constraint-panel">
+                <h3>🏛️ Contraintes Institutionnelles</h3>
+                <div id="institutionalConstraints">
+                    <div class="loading"></div> Chargement...
+                </div>
+            </div>
+
+            <div class="constraint-panel">
+                <h3>👤 Contraintes Utilisateur</h3>
+                <div id="userConstraintsList">
+                    <div class="loading"></div> Chargement...
+                </div>
+            </div>
+        </div>
+
+        <div class="add-constraint-form">
+            <h3>➕ Ajouter une Nouvelle Contrainte</h3>
+            <form id="constraintForm">
+                <div class="form-group">
+                    <label for="constraintText">Description en langage naturel:</label>
+                    <textarea id="constraintText" rows="3" 
+                              placeholder="Ex: Le professeur Cohen n'est pas disponible le vendredi après-midi"
+                              class="hebrew-support"></textarea>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label for="constraintType">Type:</label>
+                        <select id="constraintType">
+                            <option value="teacher_availability">Disponibilité Prof</option>
+                            <option value="class_constraint">Contrainte Classe</option>
+                            <option value="subject_timing">Horaire Matière</option>
+                            <option value="room_usage">Utilisation Salle</option>
+                            <option value="custom">Personnalisé</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="entityName">Professeur/Classe:</label>
+                        <input type="text" id="entityName" 
+                               placeholder="Ex: Cohen, 9A, Salle 101"
+                               class="hebrew-support">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="priority">Priorité:</label>
+                        <select id="priority">
+                            <option value="0">🔴 HARD - Critique</option>
+                            <option value="1">🟠 Très Forte</option>
+                            <option value="2" selected>🟡 Moyenne</option>
+                            <option value="3">🔵 Normale</option>
+                            <option value="4">🟢 Faible</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-success">
+                    ✨ Ajouter & Tester
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Configuration API
+        const API_BASE = 'http://localhost:5002'; // Ajustez selon votre configuration
+        
+        // Variables globales
+        let constraints = {
+            institutional: [],
+            user: []
+        };
+
+        // Chargement initial
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConstraints();
+        });
+
+        // Fonction principale de chargement
+        async function loadConstraints() {
+            showStatus('🔄 Chargement des contraintes...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/constraints/list`);
+                const data = await response.json();
+                
+                constraints = data;
+                updateStats(data);
+                renderInstitutionalConstraints(data.institutional);
+                renderUserConstraints(data.user);
+                
+                showStatus('✅ Contraintes chargées avec succès!', 'success');
+            } catch (error) {
+                console.error('Erreur:', error);
+                showStatus('❌ Erreur lors du chargement des contraintes', 'error');
+                
+                // Données de démonstration en cas d'erreur
+                loadDemoData();
+            }
+        }
+
+        // Données de démonstration
+        function loadDemoData() {
+            const demoData = {
+                institutional: [
+                    {
+                        id: 1,
+                        name: 'Horaires d\'ouverture école',
+                        type: 'school_hours',
+                        priority: 0,
+                        is_active: true,
+                        description: 'École ouverte de 8h à 18h - NON MODIFIABLE'
+                    },
+                    {
+                        id: 2,
+                        name: 'Vendredi écourté',
+                        type: 'friday_short',
+                        priority: 0,
+                        is_active: true,
+                        description: 'Vendredi se termine à 13h - NON MODIFIABLE'
+                    }
+                ],
+                user: [],
+                total_active: 2
+            };
+            
+            constraints = demoData;
+            updateStats(demoData);
+            renderInstitutionalConstraints(demoData.institutional);
+            renderUserConstraints(demoData.user);
+        }
+
+        // Mise à jour des statistiques
+        function updateStats(data) {
+            const totalActive = data.total_active || 0;
+            const hardCount = [...(data.institutional || []), ...(data.user || [])]
+                .filter(c => c.priority === 0 && c.is_active).length;
+            
+            document.getElementById('totalConstraints').textContent = 
+                (data.institutional?.length || 0) + (data.user?.length || 0);
+            document.getElementById('activeConstraints').textContent = totalActive;
+            document.getElementById('hardConstraints').textContent = hardCount;
+            document.getElementById('userConstraints').textContent = data.user?.length || 0;
+        }
+
+        // Rendu des contraintes institutionnelles
+        function renderInstitutionalConstraints(constraints) {
+            const container = document.getElementById('institutionalConstraints');
+            
+            if (!constraints || constraints.length === 0) {
+                container.innerHTML = '<p style="color: #718096;">Aucune contrainte institutionnelle</p>';
+                return;
+            }
+            
+            container.innerHTML = constraints.map(c => `
+                <div class="constraint-item ${c.is_active ? '' : 'inactive'} ${getPriorityClass(c.priority)}">
+                    <div class="constraint-header">
+                        <span class="constraint-name">${c.name}</span>
+                        <span class="priority-badge priority-${c.priority}">${getPriorityText(c.priority)}</span>
+                    </div>
+                    <div class="constraint-description">${c.description || c.type}</div>
+                    <div class="constraint-controls">
+                        <button class="btn btn-small ${c.is_active ? 'btn-warning' : 'btn-success'}" 
+                                onclick="toggleConstraint('institutional', ${c.id}, ${!c.is_active})">
+                            ${c.is_active ? '⏸️ Désactiver' : '▶️ Activer'}
+                        </button>
+                        ${c.priority > 0 ? `
+                        <button class="btn btn-small btn-danger" 
+                                onclick="deleteConstraint('institutional', ${c.id})">
+                            🗑️ Supprimer
+                        </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Rendu des contraintes utilisateur
+        function renderUserConstraints(constraints) {
+            const container = document.getElementById('userConstraintsList');
+            
+            if (!constraints || constraints.length === 0) {
+                container.innerHTML = '<p style="color: #718096;">Aucune contrainte utilisateur</p>';
+                return;
+            }
+            
+            container.innerHTML = constraints.map(c => `
+                <div class="constraint-item ${c.is_active ? '' : 'inactive'} ${getPriorityClass(c.priority)}">
+                    <div class="constraint-header">
+                        <span class="constraint-name">${c.constraint_type} - ${c.entity_name}</span>
+                        <span class="priority-badge priority-${c.priority}">${getPriorityText(c.priority)}</span>
+                    </div>
+                    <div class="constraint-description">${JSON.stringify(c.constraint_data)}</div>
+                    <div class="constraint-controls">
+                        <button class="btn btn-small ${c.is_active ? 'btn-warning' : 'btn-success'}" 
+                                onclick="toggleConstraint('user', ${c.constraint_id}, ${!c.is_active})">
+                            ${c.is_active ? '⏸️ Désactiver' : '▶️ Activer'}
+                        </button>
+                        <button class="btn btn-small btn-danger" 
+                                onclick="deleteConstraint('user', ${c.constraint_id})">
+                            🗑️ Supprimer
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Fonctions utilitaires
+        function getPriorityClass(priority) {
+            if (priority === 0) return 'hard';
+            if (priority === 1) return 'strong';
+            if (priority <= 3) return 'medium';
+            return '';
+        }
+
+        function getPriorityText(priority) {
+            const texts = {
+                0: 'HARD',
+                1: 'FORTE',
+                2: 'MOYENNE',
+                3: 'NORMALE',
+                4: 'FAIBLE',
+                5: 'MINIMALE'
+            };
+            return texts[priority] || 'INCONNUE';
+        }
+
+        // Actions
+        async function toggleConstraint(type, id, active) {
+            showStatus(`🔄 ${active ? 'Activation' : 'Désactivation'} de la contrainte...`, 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/constraints/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: type,
+                        id: id,
+                        active: active
+                    })
+                });
+                
+                if (response.ok) {
+                    showStatus(`✅ Contrainte ${active ? 'activée' : 'désactivée'} avec succès!`, 'success');
+                    loadConstraints(); // Recharger
+                } else {
+                    throw new Error('Erreur serveur');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur lors de la modification', 'error');
+            }
+        }
+
+        async function deleteConstraint(type, id) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer cette contrainte ?')) {
+                return;
+            }
+            
+            showStatus('🗑️ Suppression de la contrainte...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/constraints/delete`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: type,
+                        id: id
+                    })
+                });
+                
+                if (response.ok) {
+                    showStatus('✅ Contrainte supprimée avec succès!', 'success');
+                    loadConstraints();
+                } else {
+                    throw new Error('Erreur serveur');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur lors de la suppression', 'error');
+            }
+        }
+
+        async function resetAllConstraints() {
+            if (!confirm('⚠️ ATTENTION: Cela va supprimer TOUTES les contraintes sauf les critiques. Continuer ?')) {
+                return;
+            }
+            
+            showStatus('🧹 Nettoyage en cours...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/constraints/reset`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    showStatus('✅ Nettoyage terminé! Seules les contraintes critiques restent.', 'success');
+                    loadConstraints();
+                } else {
+                    throw new Error('Erreur serveur');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur lors du nettoyage', 'error');
+            }
+        }
+
+        async function disableAllSoft() {
+            showStatus('⚠️ Désactivation des contraintes non-critiques...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/constraints/disable-soft`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    showStatus('✅ Contraintes non-critiques désactivées!', 'success');
+                    loadConstraints();
+                } else {
+                    throw new Error('Erreur serveur');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur lors de la désactivation', 'error');
+            }
+        }
+
+        async function testSolver() {
+            showStatus('⚡ Test du solver en cours...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/solver/test`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus(`✅ Solver OK! Solution trouvée en ${result.time}s`, 'success');
+                } else {
+                    showStatus(`❌ Solver ÉCHEC: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur lors du test du solver', 'error');
+            }
+        }
+
+        // Formulaire d'ajout
+        document.getElementById('constraintForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                text: document.getElementById('constraintText').value,
+                type: document.getElementById('constraintType').value,
+                entity: document.getElementById('entityName').value,
+                priority: parseInt(document.getElementById('priority').value)
+            };
+            
+            if (!formData.text.trim()) {
+                showStatus('❌ Veuillez saisir une description', 'error');
+                return;
+            }
+            
+            showStatus('✨ Ajout de la contrainte...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/constraints/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus('✅ Contrainte ajoutée avec succès!', 'success');
+                    document.getElementById('constraintForm').reset();
+                    loadConstraints();
+                } else {
+                    showStatus(`❌ Erreur: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur lors de l\'ajout', 'error');
+            }
+        });
+
+        // Affichage des messages de statut
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>

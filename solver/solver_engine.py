@@ -119,6 +119,26 @@ class ScheduleSolver:
             cur.close()
             conn.close()
     
+    def _explain_failure_to_user(self) -> str:
+        """Explique à l'utilisateur pourquoi la génération a échoué"""
+        explanations = []
+        
+        # Test de faisabilité basique
+        total_hours = sum(load["hours"] for load in self.teacher_loads)
+        total_slots = len(self.time_slots) * len(self.classes)
+        
+        if total_hours > total_slots * 0.8:  # Plus de 80% d'occupation
+            explanations.append("🔴 Trop d'heures à planifier par rapport aux créneaux disponibles")
+        
+        # Vérifier les professeurs sur-contraints
+        for teacher in self.teachers:
+            available_slots = self._count_available_slots(teacher)
+            required_hours = self._get_teacher_hours(teacher)
+            
+            if required_hours > available_slots:
+                explanations.append(f"🔴 {teacher['name']} : {required_hours}h requises mais seulement {available_slots} créneaux disponibles")
+        
+        return "\n".join(explanations) if explanations else "❓ Problème non identifié - vérifiez les logs détaillés"
     def create_variables(self):
         """Crֳ©e les variables pour les cours individuels et parallֳ¨les"""
         teacher_id_map = {t["teacher_name"]: t["teacher_id"] for t in self.teachers}
