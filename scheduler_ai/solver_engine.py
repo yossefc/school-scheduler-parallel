@@ -394,7 +394,7 @@ class ScheduleSolver:
                         pass
     
     def solve(self, time_limit=60):
-        """Rֳ©sout le problֳ¨me avec support des cours parallֳ¨les"""
+        """Rֳ©sout le probleme avec support des cours parallֳeles"""
         logger.info("Starting schedule generation...")
         
         self.create_variables()

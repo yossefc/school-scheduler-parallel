@@ -1,150 +1,35 @@
-"""Modèles Pydantic pour validation des contraintes"""
-from typing import Dict, Any, Optional, List, Union, Literal
+# models.py
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator, model_validator
 from enum import Enum
-
 
 class ConstraintType(str, Enum):
     TEACHER_AVAILABILITY = "teacher_availability"
-    CLASS_PREFERENCE = "class_preference"
-    SUBJECT_LIMIT = "subject_limit"
+    FRIDAY_EARLY_END = "friday_early_end" 
     CONSECUTIVE_HOURS_LIMIT = "consecutive_hours_limit"
-    TIME_PREFERENCE = "time_preference"
-    PARALLEL_TEACHING = "parallel_teaching"
-    ROOM_CONSTRAINT = "room_constraint"
     CUSTOM = "custom"
-
-    @staticmethod
-    def from_raw(raw: str) -> "ConstraintType":
-        """Mappe des synonymes ou valeurs inconnues vers l'enum approprié"""
-        mapping = {
-            "time": "time_preference",
-            "horaire": "time_preference",
-            "hours_limit": "consecutive_hours_limit",
-        }
-        raw_l = (raw or "").lower().strip()
-        if raw_l in {v.value for v in ConstraintType}:
-            return ConstraintType(raw_l)
-        if raw_l in mapping:
-            return ConstraintType(mapping[raw_l])
-        return ConstraintType.CUSTOM
-
 
 class ConstraintPriority(int, Enum):
     HARD = 0
-    VERY_HIGH = 1
-    HIGH = 2
-    MEDIUM = 3
+    HIGH = 1
+    MEDIUM = 2
+    NORMAL = 3
     LOW = 4
-    SOFT = 5
-
 
 class ConstraintInput(BaseModel):
-    """Modèle d'entrée pour une contrainte avec validation avancée"""
-    type: ConstraintType
-    entity: str = Field(..., min_length=1, max_length=100)
-    data: Dict[str, Any]
-    priority: ConstraintPriority = ConstraintPriority.MEDIUM
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    
-    # Champs calculés/enrichis
-    parsed_at: Optional[datetime] = None
-    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
-    original_text: Optional[str] = None
+    type: ConstraintType = ConstraintType.CUSTOM
+    entity: Optional[str] = None
+    priority: ConstraintPriority = ConstraintPriority.NORMAL
+    data: Dict[str, Any] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    text: Optional[str] = None
     requires_clarification: bool = False
     clarification_questions: List[str] = Field(default_factory=list)
-    
-    @field_validator('entity')
-    def validate_entity(cls, v: str, info) -> str:
-        """Valide et normalise l'entité"""
-        v = v.strip()
-        
-        # Normalisation basique
-        if info.data.get('type') == ConstraintType.TEACHER_AVAILABILITY:
-            # Capitaliser les noms de professeurs
-            v = v.title()
-        elif info.data.get('type') == ConstraintType.CLASS_PREFERENCE:
-            # Format classes : "9A", "10B", etc
-            v = v.upper()
-            
-        return v
-    
-    @field_validator('type', mode='before')
-    def map_type_aliases(cls, v):
-        if isinstance(v, str):
-            return ConstraintType.from_raw(v)
-        if isinstance(v, ConstraintType):
-            return v
-        return ConstraintType.CUSTOM
-    
-    @model_validator(mode='after')
-    def validate_constraint_data(self) -> 'ConstraintInput':
-        """Validation croisée type/data + détection des clarifications nécessaires"""
-        
-        if self.type == ConstraintType.TEACHER_AVAILABILITY:
-            if 'unavailable_days' not in self.data and 'available_days' not in self.data:
-                self.requires_clarification = True
-                self.clarification_questions.append(
-                    f"Quels jours {self.entity} n'est-il pas disponible ?"
-                )
-                
-        elif self.type == ConstraintType.SUBJECT_LIMIT:
-            # Validation pour "pas plus de X heures de Y"
-            if 'subject' not in self.data:
-                self.requires_clarification = True
-                self.clarification_questions.append("Quelle matière est concernée ?")
-            
-            if 'max_hours_per_day' not in self.data and 'max_consecutive_hours' not in self.data:
-                self.requires_clarification = True
-                self.clarification_questions.append(
-                    "S'agit-il d'une limite par jour ou d'heures consécutives ?"
-                )
-                
-            # Validation des valeurs numériques
-            for key in ['max_hours_per_day', 'max_consecutive_hours']:
-                if key in self.data:
-                    try:
-                        val = int(self.data[key])
-                        if val < 1 or val > 8:
-                            self.requires_clarification = True
-                            self.clarification_questions.append(
-                                f"La valeur {val} semble inhabituelle. Confirmez-vous ?"
-                            )
-                    except (ValueError, TypeError):
-                        self.requires_clarification = True
-                        self.clarification_questions.append(
-                            f"La limite doit être un nombre entier"
-                        )
-                        
-        elif self.type == ConstraintType.CONSECUTIVE_HOURS_LIMIT:
-            if 'max_consecutive' not in self.data:
-                self.requires_clarification = True
-                self.clarification_questions.append(
-                    "Combien d'heures consécutives maximum ?"
-                )
-                
-        elif self.type == ConstraintType.TIME_PREFERENCE:
-            if 'time_slots' not in self.data and 'preferred_periods' not in self.data:
-                self.requires_clarification = True
-                self.clarification_questions.append(
-                    "À quels moments cette contrainte s'applique-t-elle ?"
-                )
-        elif self.type == ConstraintType.CUSTOM:
-            self.requires_clarification = True
-            self.clarification_questions.append(
-                "Quel type de contrainte souhaitez-vous appliquer ?")
-        
-        # Enrichissement automatique
-        if not self.parsed_at:
-            self.parsed_at = datetime.now()
-            
-        return self
-
+    parsed_at: Optional[datetime] = None
 
 class ConstraintResponse(BaseModel):
-    """Réponse après traitement d'une contrainte"""
-    status: Literal["success", "clarification_needed", "conflict", "error"]
+    status: str
     constraint_id: Optional[int] = None
     constraint: Optional[ConstraintInput] = None
     message: str

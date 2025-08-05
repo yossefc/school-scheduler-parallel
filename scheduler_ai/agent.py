@@ -87,7 +87,7 @@ class ScheduleAIAgent:
                 "success": "confirmation_needed",
                 "teacher": result["teacher"],
                 "confidence": result["confidence"],
-                "question": f"Voulez-vous dire '{result['teacher']['teacher_name']}' ? (Confiance: {result['confidence']:.0%})"
+                "question": f"Voulez-vous dire '{result['teacher']['teacher_name']}' e (Confiance: {result['confidence']:.0%})"
             }
         
         return {

@@ -7,6 +7,7 @@ from models import ScheduleRequest, ConstraintRequest
 from constraints_handler import ConstraintsManager
 import json
 import logging
+from prometheus_fastapi_instrumentator import Instrumentator
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -15,6 +16,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="School Schedule Solver - Parallel Teaching Edition")
+# Instrumentation Prometheus (/metrics)
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 # CORS
 app.add_middleware(

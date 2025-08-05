@@ -268,21 +268,40 @@ class ConstraintsManager:
     
     def _parse_natural_language(self, constraint_data):
         """Parsing simple du langage naturel (version basique)"""
-        text = constraint_data.get("text", "").lower()
+        original_text = constraint_data.get("text", "")
+        text = original_text.lower()
         
-        # Détection du type
-        if "disponible" in text or "indisponible" in text:
+        # --- Détections spécifiques (hébreu) --------------------------------
+        # 1) Toutes les heures de Torah seulement première heure
+        if "שיעור תורה" in original_text and ("שעה ראשונה" in original_text or "בשעה ראשונה" in original_text):
+            constraint_type = "subject_timing"
+            entity_type = "subject"
+            entity_name_detected = "תורה"
+        # 2) Temps réservé pour תפילה (prière)
+        elif "תפילה" in original_text and ("שעה" in original_text or "08:" in original_text):
+            constraint_type = "morning_prayer"
+            entity_type = "all"
+            entity_name_detected = ""
+            # On force éventuellement la période 1
+            data_extra = {"duration": 1}
+        
+        # -------------------------------------------------------------------
+        elif "disponible" in text or "indisponible" in text:
             constraint_type = "teacher_availability"
             entity_type = "teacher"
+            entity_name_detected = None
         elif "classe" in text:
             constraint_type = "class_constraint"
             entity_type = "class"
+            entity_name_detected = None
         elif "matière" in text or "cours" in text:
             constraint_type = "subject_timing"  
             entity_type = "subject"
+            entity_name_detected = None
         else:
             constraint_type = constraint_data.get("type", "custom")
             entity_type = "custom"
+            entity_name_detected = None
         
         # Extraction de l'entité
         entity_name = constraint_data.get("entity", "").strip()
@@ -296,9 +315,15 @@ class ConstraintsManager:
                 elif word in ["classe"] and i + 1 < len(words):
                     entity_name = words[i + 1]
                     break
+            # Si toujours vide, utiliser la détection précédente (hébreu)
+            if not entity_name and entity_name_detected:
+                entity_name = entity_name_detected
         
         # Données spécifiques selon le type
         data = {"original_text": text}
+        # Ajouter les infos détectées spécifiques (hébreu)
+        if 'data_extra' in locals():
+            data.update(data_extra)
         
         if "vendredi" in text:
             data["day"] = 5
@@ -308,6 +333,11 @@ class ConstraintsManager:
             data["time_preference"] = "morning"
         elif "après-midi" in text:
             data["time_preference"] = "afternoon"
+        
+        # Détail spécifique : premier cours pour שיעור תורה
+        if constraint_type == "subject_timing" and (
+            "שעה ראשונה" in original_text or "בשעה ראשונה" in original_text):
+            data["preferred_period"] = 1
         
         return {
             "type": constraint_type,

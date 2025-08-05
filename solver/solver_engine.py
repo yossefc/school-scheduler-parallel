@@ -11,34 +11,32 @@ logger = logging.getLogger(__name__)
 
 
 class ScheduleSolver:
-    def __init__(self):
+    def __init__(self, db_config=None):
+        """Initialise le solver avec configuration optionnelle"""
         self.model = cp_model.CpModel()
         self.solver = cp_model.CpSolver()
         
-        # Donnֳ©es de base
+        if db_config is None:
+            db_config = {
+                "host": "localhost",
+                "database": "school_scheduler",
+                "user": "admin",
+                "password": "school123"
+            }
+        
+        self.db_config = db_config
+        self.schedule_vars = {}
+        self.parallel_vars = {}
         self.teachers = []
         self.classes = []
         self.subjects = []
+        self.rooms = []
         self.time_slots = []
-        self.teacher_loads = []
+        self.teacher_load = []
         self.constraints = []
-        
-        # Donnֳ©es spֳ©cifiques aux cours parallֳ¨les
         self.parallel_groups = []
         self.parallel_details = []
-        
-        # Variables de dֳ©cision
-        self.schedule_vars = {}
-        self.parallel_vars = {}
-        
-        # Connection DB
-        self.db_config = {
-            "host": "postgres",
-            "database": "school_scheduler",
-            "user": "admin",
-            "password": "school123"
-        }
-    
+        self.objective_terms = []
     def load_data_from_db(self):
         """Charge toutes les donnֳ©es incluant les groupes parallֳ¨les"""
         conn = psycopg2.connect(**self.db_config)
@@ -308,6 +306,8 @@ class ScheduleSolver:
             self._apply_friday_constraint(constraint)
         elif constraint["constraint_type"] == "morning_prayer":
             self._apply_morning_prayer_constraint(constraint)
+        elif constraint["constraint_type"] == "subject_timing":
+            self._apply_subject_timing_constraint(constraint)
         # Ajouter d'autres types selon les besoins
     
     def _apply_availability_constraint(self, constraint):
@@ -358,7 +358,7 @@ class ScheduleSolver:
         data = constraint["constraint_data"]
         duration = data.get("duration", 1)  # Nombre de pֳ©riodes
         
-        for day in range(5):  # Dimanche ֳ  Jeudi
+        for day in range(5):  # Dimanche ֳ  Jeudi
             for period in range(1, duration + 1):
                 slot = next((s for s in self.time_slots 
                            if s["day_of_week"] == day and s["period_number"] == period), None)
@@ -367,9 +367,31 @@ class ScheduleSolver:
                     for var_name, var in self.schedule_vars.items():
                         if (f"slot_{slot['slot_id']}" in var_name and 
                             not any(religious in var_name.lower() 
-                                   for religious in ["torah", "talmud", "priere", "׳×׳₪׳™׳׳”"])):
+                                   for religious in ["torah", "talmud", "priere", "תפילה", "tefila", "tfila", "׳×׳₪׳™׳׳”"])):
                             self.model.Add(var == 0)
-    
+
+    # ------------------------------------------------------------------
+    # Sujet : subject_timing (ex. כל שיעור תורה ... בשעה ראשונה)
+    # ------------------------------------------------------------------
+    def _apply_subject_timing_constraint(self, constraint):
+        """Force une matière à commencer uniquement à certaines périodes"""
+        data = constraint["constraint_data"]
+        subject_name = constraint.get("entity_name")  # "תורה"
+        preferred_period = data.get("preferred_period", 1)
+        
+        if not subject_name:
+            return  # Pas d'info -> ignorer
+        
+        # Parcourir tous les créneaux qui ne correspondent pas à la période souhaitée
+        for slot in self.time_slots:
+            if slot["period_number"] != preferred_period:
+                # Cherche les variables contenant le nom de la matière + slot
+                for var_name, var in self.schedule_vars.items():
+                    # Exemple de nom : _s_Torah_slot_123
+                    if f"_{subject_name}_" in var_name or subject_name.lower() in var_name.lower():
+                        if f"slot_{slot['slot_id']}" in var_name:
+                            self.model.Add(var == 0)
+            
     def add_soft_constraints(self):
         """Ajoute des contraintes souples pour optimiser la qualitֳ©"""
         
