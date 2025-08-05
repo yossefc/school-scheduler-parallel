@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration DB (ajustez selon votre config)
 DB_CONFIG = {
-    "host": "localhost",
+    "host": "postgres",   
     "database": "school_scheduler", 
     "user": "admin",
     "password": "school123"

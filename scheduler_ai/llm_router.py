@@ -15,6 +15,7 @@ import anthropic
 import httpx
 
 logger = logging.getLogger(__name__)
+session_memory: Dict[str, Dict[str, Any]] = {}
 
 class TaskComplexity(Enum):
     """Niveau de complexité de la tâche"""
@@ -143,9 +144,14 @@ class LLMRouter:
         else:
             return TaskComplexity.LOW
     
-    def parse_natural_language(self, text: str, language: Literal["fr", "he"] = "fr") -> Dict[str, Any]:
+    def parse_natural_language(self, text: str, language: Literal["fr", "he"] = "fr", session_id: Optional[str] = None) -> Dict[str, Any]:
         """Parse une contrainte en langage naturel"""
         # Si aucun LLM n'est disponible, faire un parsing basique
+        if session_id:
+            memory = session_memory.get(session_id, {})
+        else:
+            memory = {}
+
         if not self.openai_client and not self.anthropic_client:
             return self._basic_parse(text)
         

@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionnaire de contraintes - Emploi du temps scolaire</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #34495e;
+            --border: #bdc3c7;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #f5f6fa;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 15px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .status-indicator.connected {
+            background: var(--success);
+        }
+
+        .status-indicator.error {
+            background: var(--danger);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--light);
+        }
+
+        .card-header h2 {
+            color: var(--primary);
+            font-size: 20px;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.success {
+            background: var(--success);
+            color: white;
+        }
+
+        .badge.warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .badge.danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .constraint-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 14px;
+        }
+
+        .form-control {
+            padding: 10px 15px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--secondary);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--light);
+            color: var(--dark);
+        }
+
+        .constraint-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .constraint-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid var(--secondary);
+            transition: all 0.2s;
+        }
+
+        .constraint-item:hover {
+            background: #e9ecef;
+        }
+
+        .constraint-item.inactive {
+            opacity: 0.6;
+            border-left-color: var(--border);
+        }
+
+        .constraint-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+
+        .constraint-title {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .constraint-details {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .constraint-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+
+        .info-panel {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-panel h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .info-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .info-list li {
+            padding: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .schedule-preview {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .schedule-table th,
+        .schedule-table td {
+            border: 1px solid var(--border);
+            padding: 10px;
+            text-align: center;
+        }
+
+        .schedule-table th {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+
+        .schedule-table td {
+            background: white;
+        }
+
+        .schedule-table td.has-course {
+            background: #e8f5e9;
+            font-weight: 500;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--secondary);
+        }
+
+        .loading::after {
+            content: '';
+            width: 30px;
+            height: 30px;
+            margin-left: 10px;
+            border: 3px solid var(--light);
+            border-top-color: var(--secondary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--light);
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--dark);
+            cursor: pointer;
+            position: relative;
+            transition: color 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--secondary);
+        }
+
+        .tab.active {
+            color: var(--secondary);
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--secondary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--secondary);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                📅 Gestionnaire de contraintes
+                <span class="status-indicator connected" id="status">
+                    <span class="icon">●</span> Connecté
+                </span>
+            </h1>
+            <p>Système de planification d'emploi du temps scolaire israélien</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-constraints">0</div>
+                <div class="stat-label">Contraintes actives</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-teachers">0</div>
+                <div class="stat-label">Professeurs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-classes">0</div>
+                <div class="stat-label">Classes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-success">0%</div>
+                <div class="stat-label">Taux de réussite</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('constraints')">Contraintes</button>
+            <button class="tab" onclick="switchTab('schedule')">Emploi du temps</button>
+            <button class="tab" onclick="switchTab('analysis')">Analyse</button>
+        </div>
+
+        <div id="tab-constraints" class="tab-content active">
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Nouvelle contrainte</h2>
+                        <span class="badge warning">IA Assistant</span>
+                    </div>
+                    
+                    <form class="constraint-form" id="constraintForm">
+                        <div class="form-group">
+                            <label for="constraintText">Décrivez votre contrainte en langage naturel :</label>
+                            <textarea class="form-control" id="constraintText" 
+                                placeholder="Exemple : Le professeur Cohen n'est pas disponible le vendredi après-midi">Le professeur Cohen n'est pas disponible le vendredi après-midi</textarea>
+                        </div>
+                        
+                        <div class="info-panel" id="aiAnalysis" style="display: none;">
+                            <h3>🤖 Analyse IA</h3>
+                            <div id="aiContent"></div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <span class="icon">➕</span> Ajouter la contrainte
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Contraintes actives</h2>
+                        <span class="badge success" id="constraintCount">0</span>
+                    </div>
+                    
+                    <div class="constraint-list" id="constraintList">
+                        <div class="loading">Chargement des contraintes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-schedule" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Aperçu de l'emploi du temps</h2>
+                    <button class="btn btn-success" onclick="generateSchedule()">
+                        <span class="icon">🔄</span> Générer
+                    </button>
+                </div>
+                
+                <div id="schedulePreview">
+                    <p style="text-align: center; color: #666; padding: 40px;">
+                        Cliquez sur "Générer" pour créer un nouvel emploi du temps avec les contraintes actuelles
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-analysis" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Analyse des contraintes</h2>
+                </div>
+                
+                <div id="analysisContent">
+                    <div class="info-panel">
+                        <h3>📊 Informations collectées</h3>
+                        <ul class="info-list" id="collectedInfo">
+                            <li><span class="icon">✓</span> Aucune contrainte ajoutée</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-panel" style="background: #ffebee; border-color: #ffcdd2;">
+                        <h3>❗ Informations manquantes</h3>
+                        <ul class="info-list" id="missingInfo">
+                            <li><span class="icon">⚠</span> Chargez les données de base</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration API
+        const API_BASE = 'http://localhost:8000';
+        let currentConstraints = [];
+        let scheduleData = null;
+
+        // Changement d'onglet
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        // Chargement des contraintes
+        async function loadConstraints() {
+            try {
+                const response = await fetch(`${API_BASE}/constraints`);
+                if (response.ok) {
+                    currentConstraints = await response.json();
+                    displayConstraints();
+                    updateStats();
+                    updateAnalysis();
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement des contraintes:', error);
+                showAlert('Erreur de connexion au serveur', 'danger');
+            }
+        }
+
+        // Affichage des contraintes
+        function displayConstraints() {
+            const container = document.getElementById('constraintList');
+            
+            if (currentConstraints.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #666;">Aucune contrainte définie</p>';
+                return;
+            }
+            
+            container.innerHTML = currentConstraints.map(constraint => `
+                <div class="constraint-item ${constraint.is_active ? '' : 'inactive'}">
+                    <div class="constraint-header">
+                        <div>
+                            <div class="constraint-title">${constraint.entity_name || 'Global'}</div>
+                            <div class="constraint-details">
+                                Type: ${constraint.constraint_type} | 
+                                Priorité: ${getPriorityLabel(constraint.priority)}
+                            </div>
+                            <div class="constraint-details">
+                                ${formatConstraintData(constraint.constraint_data)}
+                            </div>
+                        </div>
+                        <span class="badge ${constraint.is_active ? 'success' : 'secondary'}">
+                            ${constraint.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                    </div>
+                    <div class="constraint-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="toggleConstraint(${constraint.constraint_id})">
+                            ${constraint.is_active ? '❌ Désactiver' : '✓ Activer'}
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteConstraint(${constraint.constraint_id})">
+                            🗑️ Supprimer
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('constraintCount').textContent = 
+                currentConstraints.filter(c => c.is_active).length;
+        }
+
+        // Formatage des données de contrainte
+        function formatConstraintData(data) {
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                } catch (e) {
+                    return data;
+                }
+            }
+            
+            const parts = [];
+            if (data.unavailable_days) {
+                const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+                const dayNames = data.unavailable_days.map(d => days[d]).join(', ');
+                parts.push(`Indisponible: ${dayNames}`);
+            }
+            if (data.unavailable_periods) {
+                parts.push(`Périodes bloquées: ${data.unavailable_periods.join(', ')}`);
+            }
+            if (data.max_hours) {
+                parts.push(`Max ${data.max_hours} heures consécutives`);
+            }
+            
+            return parts.join(' | ') || JSON.stringify(data);
+        }
+
+        // Labels de priorité
+        function getPriorityLabel(priority) {
+            const labels = {
+                0: 'Critique',
+                1: 'Haute',
+                2: 'Moyenne',
+                3: 'Normale',
+                4: 'Basse'
+            };
+            return labels[priority] || 'Inconnue';
+        }
+
+        // Ajout de contrainte
+        document.getElementById('constraintForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const text = document.getElementById('constraintText').value;
+            if (!text.trim()) return;
+            
+            // Analyse IA simulée
+            const aiPanel = document.getElementById('aiAnalysis');
+            const aiContent = document.getElementById('aiContent');
+            
+            aiPanel.style.display = 'block';
+            aiContent.innerHTML = '<div class="loading">Analyse en cours</div>';
+            
+            // Simulation d'analyse (en production, appel à l'API IA)
+            setTimeout(() => {
+                const analysis = analyzeConstraint(text);
+                aiContent.innerHTML = `
+                    <p><strong>Type détecté:</strong> ${analysis.type}</p>
+                    <p><strong>Entité:</strong> ${analysis.entity}</p>
+                    <p><strong>Données extraites:</strong></p>
+                    <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
+${JSON.stringify(analysis.data, null, 2)}</pre>
+                `;
+                
+                // Envoi de la contrainte
+                sendConstraint(analysis);
+            }, 1000);
+        });
+
+        // Analyse simple de contrainte (simulation)
+        function analyzeConstraint(text) {
+            const lowerText = text.toLowerCase();
+            
+            // Détection du type
+            let type = 'custom';
+            let entity = '';
+            let data = {};
+            
+            if (lowerText.includes('disponible') || lowerText.includes('absent')) {
+                type = 'teacher_availability';
+                
+                // Extraction du nom
+                const nameMatch = text.match(/(?:professeur|prof\.?)\s+(\w+)/i);
+                if (nameMatch) entity = nameMatch[1];
+                
+                // Extraction du jour
+                const days = {
+                    'dimanche': 0, 'lundi': 1, 'mardi': 2, 
+                    'mercredi': 3, 'jeudi': 4, 'vendredi': 5
+                };
+                
+                Object.entries(days).forEach(([dayName, dayNum]) => {
+                    if (lowerText.includes(dayName)) {
+                        data.unavailable_days = [dayNum];
+                    }
+                });
+                
+                // Extraction de l'heure
+                if (lowerText.includes('après-midi')) {
+                    data.unavailable_periods = [7, 8, 9, 10];
+                } else if (lowerText.includes('matin')) {
+                    data.unavailable_periods = [1, 2, 3, 4];
+                }
+            }
+            
+            return { type, entity, data };
+        }
+
+        // Envoi de contrainte à l'API
+        async function sendConstraint(constraint) {
+            try {
+                const response = await fetch(`${API_BASE}/constraints`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        constraint_type: constraint.type,
+                        entity_name: constraint.entity,
+                        constraint_data: constraint.data,
+                        priority: 2
+                    })
+                });
+                
+                if (response.ok) {
+                    showAlert('Contrainte ajoutée avec succès', 'success');
+                    document.getElementById('constraintText').value = '';
+                    document.getElementById('aiAnalysis').style.display = 'none';
+                    loadConstraints();
+                } else {
+                    showAlert('Erreur lors de l\'ajout de la contrainte', 'danger');
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                showAlert('Erreur de connexion', 'danger');
+            }
+        }
+
+        // Toggle contrainte
+        async function toggleConstraint(id) {
+            const constraint = currentConstraints.find(c => c.constraint_id === id);
+            if (!constraint) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/constraints/${id}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: !constraint.is_active })
+                });
+                
+                if (response.ok) {
+                    showAlert('Contrainte mise à jour', 'success');
+                    loadConstraints();
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                showAlert('Erreur lors de la mise à jour', 'danger');
+            }
+        }
+
+        // Suppression de contrainte
+        async function deleteConstraint(id) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer cette contrainte ?')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/constraints/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showAlert('Contrainte supprimée', 'success');
+                    loadConstraints();
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                showAlert('Erreur lors de la suppression', 'danger');
+            }
+        }
+
+        // Génération d'emploi du temps
+        async function generateSchedule() {
+            const preview = document.getElementById('schedulePreview');
+            preview.innerHTML = '<div class="loading">Génération en cours</div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/generate_schedule`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        constraints: currentConstraints.filter(c => c.is_active),
+                        time_limit: 60
+                    })
+                });
+                
+                if (response.ok) {
+                    scheduleData = await response.json();
+                    displaySchedule();
+                    showAlert('Emploi du temps généré avec succès', 'success');
+                } else {
+                    const error = await response.json();
+                    preview.innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>Erreur:</strong> ${error.detail || 'Impossible de générer l\'emploi du temps'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                preview.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Erreur de connexion:</strong> Vérifiez que le serveur est démarré
+                    </div>
+                `;
+            }
+        }
+
+        // Affichage de l'emploi du temps
+        function displaySchedule() {
+            if (!scheduleData || !scheduleData.schedule) return;
+            
+            // Debug temporaire
+            console.log("Schedule data:", scheduleData);
+            console.log("First entry:", scheduleData.schedule[0]);
+            
+            const preview = document.getElementById('schedulePreview');
+            const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven'];
+            const periods = 10;
+            
+            // Grouper par classe
+            const byClass = {};
+            scheduleData.schedule.forEach(entry => {
+                if (!byClass[entry.class_name]) {
+                    byClass[entry.class_name] = {};
+                }
+                const key = `${entry.day}_${entry.period}`;
+                byClass[entry.class_name][key] = entry;
+            });
+            
+            // Créer le tableau HTML
+            let html = '<div class="schedule-preview">';
+            
+            Object.entries(byClass).forEach(([className, schedule]) => {
+                html += `<h3 style="margin-top: 20px;">Classe: ${className}</h3>`;
+                html += '<table class="schedule-table"><thead><tr><th>Période</th>';
+                
+                days.forEach(day => {
+                    html += `<th>${day}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+                
+                for (let period = 1; period <= periods; period++) {
+                    html += `<tr><td>${period}</td>`;
+                    
+                    for (let day = 0; day < 6; day++) {
+                        const key = `${day}_${period}`;
+                        const entry = schedule[key];
+                        
+                        if (entry) {
+                            html += `<td class="has-course">
+                                <strong>${entry.subject_name || entry.subject}</strong><br>
+                                <small>${entry.teacher_name}</small>
+                            </td>`;
+                        } else {
+                            html += '<td>-</td>';
+                        }
+                    }
+                    html += '</tr>';
+                }
+                
+                html += '</tbody></table>';
+            });
+            
+            html += '</div>';
+            
+            if (scheduleData.statistics) {
+                html += `
+                    <div class="info-panel" style="margin-top: 20px;">
+                        <h3>📊 Statistiques</h3>
+                        <p>Total d'assignations: ${scheduleData.statistics.total_assignments}</p>
+                        <p>Professeurs utilisés: ${scheduleData.statistics.teachers_used.join(', ')}</p>
+                        <p>Classes couvertes: ${scheduleData.statistics.classes_covered.join(', ')}</p>
+                    </div>
+                `;
+            }
+            
+            preview.innerHTML = html;
+        }
+
+        // Mise à jour des statistiques
+        function updateStats() {
+            const activeCount = currentConstraints.filter(c => c.is_active).length;
+            document.getElementById('stat-constraints').textContent = activeCount;
+            
+            // Simulation des autres stats (en production, appel API)
+            document.getElementById('stat-teachers').textContent = '67';
+            document.getElementById('stat-classes').textContent = '22';
+            document.getElementById('stat-success').textContent = activeCount > 5 ? '85%' : '95%';
+        }
+
+        // Mise à jour de l'analyse
+        function updateAnalysis() {
+            const collected = document.getElementById('collectedInfo');
+            const missing = document.getElementById('missingInfo');
+            
+            // Informations collectées
+            const collectedItems = [];
+            const entityTypes = new Set();
+            const constraintTypes = new Set();
+            
+            currentConstraints.forEach(c => {
+                if (c.entity_name) entityTypes.add(c.entity_name);
+                constraintTypes.add(c.constraint_type);
+            });
+            
+            if (entityTypes.size > 0) {
+                collectedItems.push(`${entityTypes.size} entités configurées`);
+            }
+            if (constraintTypes.size > 0) {
+                collectedItems.push(`${constraintTypes.size} types de contraintes`);
+            }
+            
+            collected.innerHTML = collectedItems.length > 0 
+                ? collectedItems.map(item => `<li><span class="icon">✓</span> ${item}</li>`).join('')
+                : '<li><span class="icon">✓</span> Aucune contrainte ajoutée</li>';
+            
+            // Informations manquantes
+            const missingItems = [];
+            
+            if (!currentConstraints.some(c => c.constraint_type === 'friday_early_end')) {
+                missingItems.push('Configuration du vendredi court');
+            }
+            if (!currentConstraints.some(c => c.constraint_type === 'morning_prayer')) {
+                missingItems.push('Horaires de prière du matin');
+            }
+            if (!currentConstraints.some(c => c.constraint_type === 'lunch_break')) {
+                missingItems.push('Configuration des pauses déjeuner');
+            }
+            
+            missing.innerHTML = missingItems.length > 0
+                ? missingItems.map(item => `<li><span class="icon">⚠</span> ${item}</li>`).join('')
+                : '<li><span class="icon">✓</span> Toutes les informations de base sont configurées</li>';
+        }
+
+        // Affichage des alertes
+        function showAlert(message, type = 'info') {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `
+                <span class="icon">${type === 'success' ? '✓' : '⚠'}</span>
+                ${message}
+            `;
+            
+            document.querySelector('.container').insertBefore(alert, document.querySelector('.stats-grid'));
+            
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConstraints();
+            
+            // Rafraîchissement automatique
+            setInterval(loadConstraints, 30000);
+            
+            // Vérification de la connexion
+            setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/`);
+                    const status = document.getElementById('status');
+                    
+                    if (response.ok) {
+                        status.className = 'status-indicator connected';
+                        status.innerHTML = '<span class="icon">●</span> Connecté';
+                    } else {
+                        throw new Error();
+                    }
+                } catch {
+                    const status = document.getElementById('status');
+                    status.className = 'status-indicator error';
+                    status.innerHTML = '<span class="icon">●</span> Déconnecté';
+                }
+            }, 5000);
+        });
+    </script>
+</body>
+</html>

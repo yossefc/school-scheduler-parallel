@@ -14,7 +14,7 @@ from scheduler_ai.llm_router import LLMRouter, TaskComplexity
 @pytest.fixture
 def db_config():
     return {
-        "host": "localhost",
+        "host": "postgres",   # ✅ Pour Docker
         "database": "test_scheduler",
         "user": "test_user",
         "password": "test_pass"

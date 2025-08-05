@@ -5,7 +5,7 @@ import logging
 
 # Configuration DB
 db_config = {
-    "host": "localhost",  # Changé pour test local
+    "host": "postgres",  # Changé pour test local
     "database": "school_scheduler",
     "user": "admin",
     "password": "school123",

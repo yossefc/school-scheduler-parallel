@@ -18,7 +18,7 @@ class ScheduleSolver:
         
         if db_config is None:
             db_config = {
-                "host": "localhost",
+                "host": "postgres",
                 "database": "school_scheduler",
                 "user": "admin",
                 "password": "school123"
@@ -116,27 +116,70 @@ class ScheduleSolver:
         finally:
             cur.close()
             conn.close()
-    
-    def _explain_failure_to_user(self) -> str:
-        """Explique à l'utilisateur pourquoi la génération a échoué"""
-        explanations = []
+    def add_constraint(self, constraint_dict):
+        """CORRECTION BUG 2: Ajoute une contrainte au solver"""
+        # Ajouter à la liste des contraintes
+        self.constraints.append(constraint_dict)
         
-        # Test de faisabilité basique
-        total_hours = sum(load["hours"] for load in self.teacher_loads)
-        total_slots = len(self.time_slots) * len(self.classes)
+        # Sauvegarder dans la BD si nécessaire
+        if 'constraint_id' not in constraint_dict:
+            self._save_constraint_to_db(constraint_dict)
         
-        if total_hours > total_slots * 0.8:  # Plus de 80% d'occupation
-            explanations.append("🔴 Trop d'heures à planifier par rapport aux créneaux disponibles")
+        logger.info(f"Added constraint: {constraint_dict}")
+
+    def _save_constraint_to_db(self, constraint):
+        """CORRECTION BUG 3: Sauvegarde une contrainte dans la BD"""
+        conn = psycopg2.connect(**self.db_config)
+        cur = conn.cursor()
         
-        # Vérifier les professeurs sur-contraints
-        for teacher in self.teachers:
-            available_slots = self._count_available_slots(teacher)
-            required_hours = self._get_teacher_hours(teacher)
+        try:
+            cur.execute("""
+                INSERT INTO constraints 
+                (constraint_type, priority, entity_type, entity_name, constraint_data, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING constraint_id
+            """, (
+                constraint.get('constraint_type', 'custom'),
+                constraint.get('priority', 3),
+                constraint.get('entity_type', 'teacher'),
+                constraint.get('entity_name', ''),
+                json.dumps(constraint.get('constraint_data', {})),
+                True
+            ))
             
-            if required_hours > available_slots:
-                explanations.append(f"🔴 {teacher['name']} : {required_hours}h requises mais seulement {available_slots} créneaux disponibles")
-        
-        return "\n".join(explanations) if explanations else "❓ Problème non identifié - vérifiez les logs détaillés"
+            constraint_id = cur.fetchone()[0]
+            constraint['constraint_id'] = constraint_id
+            conn.commit()
+            
+            logger.info(f"Saved constraint to DB with ID: {constraint_id}")
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error saving constraint: {e}")
+            raise
+        finally:
+            cur.close()
+            conn.close()
+        def _explain_failure_to_user(self) -> str:
+            """Explique à l'utilisateur pourquoi la génération a échoué"""
+            explanations = []
+            
+            # Test de faisabilité basique
+            total_hours = sum(load["hours"] for load in self.teacher_loads)
+            total_slots = len(self.time_slots) * len(self.classes)
+            
+            if total_hours > total_slots * 0.8:  # Plus de 80% d'occupation
+                explanations.append("🔴 Trop d'heures à planifier par rapport aux créneaux disponibles")
+            
+            # Vérifier les professeurs sur-contraints
+            for teacher in self.teachers:
+                available_slots = self._count_available_slots(teacher)
+                required_hours = self._get_teacher_hours(teacher)
+                
+                if required_hours > available_slots:
+                    explanations.append(f"🔴 {teacher['name']} : {required_hours}h requises mais seulement {available_slots} créneaux disponibles")
+            
+            return "\n".join(explanations) if explanations else "❓ Problème non identifié - vérifiez les logs détaillés"
     def create_variables(self):
         """Crֳ©e les variables pour les cours individuels et parallֳ¨les"""
         teacher_id_map = {t["teacher_name"]: t["teacher_id"] for t in self.teachers}
@@ -307,7 +350,7 @@ class ScheduleSolver:
         elif constraint["constraint_type"] == "morning_prayer":
             self._apply_morning_prayer_constraint(constraint)
         elif constraint["constraint_type"] == "subject_timing":
-            self._apply_subject_timing_constraint(constraint)
+            self._apply_subject_timing_constraint(constraint) 
         # Ajouter d'autres types selon les besoins
     
     def _apply_availability_constraint(self, constraint):

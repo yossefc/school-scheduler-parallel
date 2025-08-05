@@ -20,7 +20,7 @@ def create_test_data():
     
     # Configuration de test - adapter selon votre environnement
     db_config = {
-        "host": "localhost",  # ou "postgres" si Docker
+        "host": "postgres",  # ou "postgres" si Docker
         "database": "school_scheduler", 
         "user": "admin",
         "password": "school123",
@@ -165,7 +165,7 @@ def cleanup_test_data():
     """Nettoie les données de test."""
     # Configuration de test
     db_config = {
-        "host": "localhost",
+        "host": "postgres",
         "database": "school_scheduler", 
         "user": "admin",
         "password": "school123",

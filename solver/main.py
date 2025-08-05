@@ -10,6 +10,8 @@ import logging
 from prometheus_fastapi_instrumentator import Instrumentator
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from api_constraints import register_constraint_routes
+
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +32,8 @@ app.add_middleware(
 
 # Instances
 constraints_manager = ConstraintsManager()
+register_constraint_routes(app)
+
 
 # Configuration DB  
 db_config = {
@@ -38,7 +42,12 @@ db_config = {
     "user": "admin", 
     "password": "school123"
 }
-
+@app.get("/constraints-manager")
+async def constraints_interface():
+    """Sert l'interface de gestion des contraintes"""
+    with open('constraints_manager.html', 'r', encoding='utf-8') as f:
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=f.read())
 @app.get("/")
 async def root():
     return {
@@ -51,8 +60,8 @@ async def root():
 async def generate_schedule(request: ScheduleRequest):
     """Gֳ©nֳ¨re un emploi du temps avec support des cours parallֳ¨les"""
     try:
-        # Utiliser le solver corrigֳ©
-        solver = ScheduleSolver()
+        # Utiliser le solver corrigé avec la configuration DB correcte
+        solver = ScheduleSolver(db_config)
         
         # Charger les donnֳ©es
         solver.load_data_from_db()
@@ -69,9 +78,10 @@ async def generate_schedule(request: ScheduleRequest):
             schedule_id = solver.save_schedule(schedule)
             return {
                 "status": "success",
+                "schedule": schedule,
                 "schedule_id": schedule_id,
                 "summary": solver.get_schedule_summary(schedule),
-                "message": "Emploi du temps gֳ©nֳ©rֳ© avec succֳ¨s (cours parallֳ¨les inclus)"
+                "message": "Emploi du temps généré avec succès (cours parallèles inclus)"
             }
         else:
             return {
