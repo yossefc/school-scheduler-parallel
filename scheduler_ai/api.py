@@ -1,6 +1,5 @@
 ﻿"""
-scheduler_ai/api.py - API Flask avec Socket.IO pour l'agent IA
-Version corrigée avec le bon middleware
+scheduler_ai/api.py - API Flask avec Socket.IO utilisant LLMRouter existant
 """
 import os
 import json
@@ -12,168 +11,155 @@ from typing import Dict, Any, Optional
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
+import redis
 
-# Import des modules locaux
-from llm_router import LLMRouter
-from models import ConstraintType, ConstraintPriority
+# Import de VOTRE LLMRouter existant
+from llm_router import LLMRouter, TaskComplexity
 
 # Configuration du logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialisation Flask
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-123')
 
-# Configuration CORS
-CORS(app, resources={
-    r"/*": {
-        "origins": ["http://localhost:3000", "http://localhost:3001", "http://localhost:8000"],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"],
-        "supports_credentials": True
-    }
-})
+# CORS
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Configuration Socket.IO
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode='threading',
-    logger=True,
-    engineio_logger=True
-)
+# Socket.IO
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Initialisation du routeur LLM
+# ============================================
+# INITIALISATION DES SERVICES
+# ============================================
+
+# Initialiser LLMRouter (votre classe existante)
 llm_router = LLMRouter()
+
+# Vérifier que les LLM sont disponibles
+if llm_router.openai_client:
+    logger.info("✅ OpenAI configuré")
+else:
+    logger.warning("⚠️ OpenAI non configuré")
+
+if llm_router.anthropic_client:
+    logger.info("✅ Anthropic configuré")
+else:
+    logger.warning("⚠️ Anthropic non configuré")
+
+# Redis pour cache
+redis_client = None
+if redis:
+    try:
+        redis_client = redis.Redis(
+            host=os.environ.get('REDIS_HOST', 'redis'),
+            port=6379,
+            decode_responses=True
+        )
+        redis_client.ping()
+        logger.info("✅ Redis connecté")
+    except:
+        logger.warning("⚠️ Redis non disponible")
+else:
+    logger.warning("⚠️ Module redis non installé")
 
 # Sessions actives
 active_sessions: Dict[str, Dict[str, Any]] = {}
 
 # ============================================
-# MIDDLEWARE DE CLARIFICATION SIMPLIFIÉ
+# MIDDLEWARE UTILISANT LLMROUTER
 # ============================================
 
-class SimpleClarificationMiddleware:
-    """Middleware simplifié pour gérer les clarifications"""
+class LLMMiddleware:
+    """Middleware qui utilise LLMRouter pour analyser les contraintes"""
     
-    def __init__(self):
+    def __init__(self, router: LLMRouter):
+        self.router = router
         self.sessions = {}
-        self.max_attempts = 3
     
     def analyze_constraint(self, text: str, session_id: str, context: Dict = None) -> Dict:
-        """Analyse une contrainte et détermine si des clarifications sont nécessaires"""
+        """Analyse une contrainte en utilisant LLMRouter"""
         
-        # Initialiser la session si nécessaire
-        if session_id not in self.sessions:
-            self.sessions[session_id] = {
-                'attempts': 0,
-                'history': [],
-                'pending_constraint': None
-            }
-        
-        session = self.sessions[session_id]
-        session['attempts'] += 1
-        
-        # Analyse basique du texte
-        result = self._parse_constraint(text)
-        
-        # Vérifier si des clarifications sont nécessaires
-        if result.get('needs_clarification'):
-            if session['attempts'] >= self.max_attempts:
+        try:
+            # Détecter la langue (français ou hébreu)
+            language = "he" if any(ord(c) > 0x0590 and ord(c) < 0x05FF for c in text) else "fr"
+            
+            logger.info(f"Analyse de contrainte ({language}): {text[:100]}...")
+            
+            # Utiliser parse_natural_language de LLMRouter
+            parsed = self.router.parse_natural_language(
+                text=text,
+                language=language,
+                session_id=session_id
+            )
+            
+            logger.info(f"Résultat parsing: {parsed}")
+            
+            # Vérifier si clarification nécessaire
+            if parsed.get('requires_clarification') or parsed.get('confidence', 0) < 0.6:
+                questions = parsed.get('clarification_questions', [])
+                if not questions:
+                    questions = [
+                        "Pouvez-vous préciser le type de contrainte ?",
+                        "Pour quelle entité (professeur, classe, salle) ?"
+                    ]
+                
                 return {
-                    'status': 'error',
-                    'message': 'Impossible de comprendre la contrainte après plusieurs tentatives'
+                    'status': 'clarification_needed',
+                    'clarification_questions': questions,
+                    'partial_result': parsed
                 }
             
+            # Extraire la contrainte
+            constraint = parsed.get('constraint', {})
+            
+            # S'assurer que tous les champs requis sont présents
+            if not constraint.get('type'):
+                constraint['type'] = 'custom'
+            if not constraint.get('entity'):
+                constraint['entity'] = 'Global'
+            if not constraint.get('data'):
+                constraint['data'] = {'original_text': text}
+            
+            # Ajouter la confiance et le modèle utilisé
+            constraint['confidence'] = parsed.get('confidence', 0.5)
+            constraint['model_used'] = parsed.get('model_used', 'unknown')
+            constraint['original_text'] = text
+            
+            # Si un résumé est fourni
+            if parsed.get('summary'):
+                constraint['interpretation'] = parsed['summary']
+            
             return {
-                'status': 'clarification_needed',
-                'clarification_questions': result.get('questions', [
-                    "Pouvez-vous préciser pour quelle entité (professeur, classe, salle) ?",
-                    "Quelle est la période concernée ?"
-                ])
+                'status': 'success',
+                'constraint': constraint,
+                'alternatives': parsed.get('alternatives', [])
             }
-        
-        # Contrainte comprise
-        return {
-            'status': 'success',
-            'constraint': result['constraint']
-        }
-    
-    def _parse_constraint(self, text: str) -> Dict:
-        """Parse basique d'une contrainte"""
-        text_lower = text.lower()
-        
-        # Détection simple des types
-        constraint = {
-            'type': 'time_preference',
-            'entity': 'Global',
-            'data': {'original_text': text},
-            'confidence': 0.5
-        }
-        
-        # Détection de professeur
-        if 'professeur' in text_lower or 'prof' in text_lower or 'מורה' in text:
-            constraint['type'] = 'teacher_availability'
-            # Essayer d'extraire le nom
-            import re
-            name_match = re.search(r'(?:professeur|prof\.?)\s+(\w+)', text, re.I)
-            if name_match:
-                constraint['entity'] = name_match.group(1)
-                constraint['confidence'] = 0.8
-        
-        # Détection de prière
-        elif 'prière' in text_lower or 'תפילה' in text or 'tefila' in text_lower:
-            constraint['type'] = 'morning_prayer'
-            constraint['data'] = {
-                'time_slot': '08:00-08:30',
-                'mandatory_for': ['all']
+            
+        except Exception as e:
+            logger.error(f"Erreur dans analyze_constraint: {str(e)}")
+            
+            # Fallback : analyse basique
+            return {
+                'status': 'success',
+                'constraint': {
+                    'type': 'custom',
+                    'entity': 'Global',
+                    'data': {'original_text': text},
+                    'confidence': 0.3,
+                    'model_used': 'fallback',
+                    'original_text': text
+                }
             }
-            constraint['confidence'] = 0.9
-        
-        # Détection vendredi
-        elif 'vendredi' in text_lower or 'שישי' in text:
-            constraint['type'] = 'friday_early_end'
-            constraint['data'] = {
-                'end_time': '13:00',
-                'applies_to': ['all']
-            }
-            constraint['confidence'] = 0.85
-        
-        # Vérifier si on a besoin de clarifications
-        needs_clarification = constraint['confidence'] < 0.6 or constraint['entity'] == 'Global'
-        
-        return {
-            'constraint': constraint,
-            'needs_clarification': needs_clarification,
-            'questions': self._generate_questions(constraint) if needs_clarification else []
-        }
-    
-    def _generate_questions(self, constraint: Dict) -> list:
-        """Génère des questions de clarification"""
-        questions = []
-        
-        if constraint['entity'] == 'Global':
-            questions.append("Pour quelle entité cette contrainte s'applique-t-elle (professeur, classe, salle) ?")
-        
-        if constraint['type'] == 'time_preference':
-            questions.append("Pouvez-vous préciser le type de contrainte (disponibilité, préférence horaire, limite) ?")
-        
-        if not constraint['data'].get('days') and not constraint['data'].get('time_slot'):
-            questions.append("Quels jours ou créneaux horaires sont concernés ?")
-        
-        return questions[:2]  # Maximum 2 questions à la fois
     
     def clear_session(self, session_id: str):
         """Nettoie une session"""
         if session_id in self.sessions:
             del self.sessions[session_id]
 
-# Initialiser le middleware
-clarification_middleware = SimpleClarificationMiddleware()
+# Initialiser le middleware avec LLMRouter
+middleware = LLMMiddleware(llm_router)
 
 # ============================================
 # ROUTES HTTP
@@ -181,16 +167,21 @@ clarification_middleware = SimpleClarificationMiddleware()
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Vérification de santé de l'API"""
+    """Vérification de santé"""
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
+        'ai_available': {
+            'claude': llm_router.anthropic_client is not None,
+            'gpt': llm_router.openai_client is not None,
+            'cache': redis_client is not None
+        },
         'active_sessions': len(active_sessions)
     })
 
 @app.route('/api/ai/apply_constraint', methods=['POST'])
 def apply_constraint():
-    """Applique une contrainte via HTTP (fallback)"""
+    """Analyse une contrainte via HTTP"""
     try:
         data = request.json
         constraint_text = data.get('constraint_text', '')
@@ -199,15 +190,11 @@ def apply_constraint():
         # Créer une session temporaire
         session_id = f"http_{datetime.now().timestamp()}"
         
-        # Analyser la contrainte
-        result = clarification_middleware.analyze_constraint(
-            constraint_text,
-            session_id,
-            context
-        )
+        # Analyser avec le middleware LLM
+        result = middleware.analyze_constraint(constraint_text, session_id, context)
         
-        # Nettoyer la session temporaire
-        clarification_middleware.clear_session(session_id)
+        # Nettoyer la session
+        middleware.clear_session(session_id)
         
         return jsonify(result)
         
@@ -218,35 +205,68 @@ def apply_constraint():
             'message': str(e)
         }), 500
 
+@app.route('/api/ai/answer', methods=['POST'])
+def answer_question():
+    """Répond à une question en utilisant LLMRouter"""
+    try:
+        data = request.json
+        question = data.get('question', '')
+        context = data.get('context', {})
+        
+        # Utiliser answer_question de LLMRouter
+        result = llm_router.answer_question(question, context)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Erreur answer_question: {str(e)}")
+        return jsonify({
+            'answer': f"Erreur: {str(e)}",
+            'model_used': 'error'
+        }), 500
+
 # ============================================
 # WEBSOCKET HANDLERS
 # ============================================
 
 @socketio.on('connect')
 def handle_connect():
-    """Gestion de la connexion WebSocket"""
+    """Connexion WebSocket"""
     session_id = request.sid
     active_sessions[session_id] = {
         'connected_at': datetime.now().isoformat(),
         'messages_count': 0
     }
     
+    # Informer sur les capacités
+    capabilities = {
+        'claude': llm_router.anthropic_client is not None,
+        'gpt': llm_router.openai_client is not None,
+        'cache': redis_client is not None
+    }
+    
     emit('connected', {
-        'message': 'Agent IA connecté - Prêt à analyser vos contraintes',
+        'message': 'Agent IA connecté',
         'session_id': session_id,
-        'capabilities': [
-            'Analyse en français et hébreu',
-            'Détection automatique du type de contrainte',
-            'Clarifications interactives',
-            'Support des contraintes complexes'
-        ]
+        'capabilities': capabilities,
+        'models_available': []
     })
     
-    logger.info(f"Nouvelle connexion: {session_id}")
+    # Ajouter les modèles disponibles
+    models = []
+    if capabilities['gpt']:
+        models.append('GPT-4o')
+    if capabilities['claude']:
+        models.append('Claude Opus')
+    
+    if models:
+        logger.info(f"✅ Connexion {session_id} - Modèles: {', '.join(models)}")
+    else:
+        logger.warning(f"⚠️ Connexion {session_id} - Aucun modèle IA configuré")
 
 @socketio.on('message')
 def handle_message(data):
-    """Traite un message de l'utilisateur"""
+    """Traite un message via WebSocket"""
     session_id = request.sid
     text = data.get('text', '')
     context = data.get('context', {})
@@ -254,44 +274,48 @@ def handle_message(data):
     logger.info(f"Message reçu de {session_id}: {text[:100]}...")
     
     try:
-        # Mettre à jour le compteur
+        # Incrémenter le compteur
         if session_id in active_sessions:
             active_sessions[session_id]['messages_count'] += 1
         
-        # Analyser avec le middleware
-        result = clarification_middleware.analyze_constraint(text, session_id, context)
+        # Analyser avec le middleware LLM
+        result = middleware.analyze_constraint(text, session_id, context)
+        
+        # Ajouter des informations de debug si en mode development
+        if os.environ.get('FLASK_ENV') == 'development':
+            result['debug'] = {
+                'session_id': session_id,
+                'language_detected': 'hebrew' if any(ord(c) > 0x0590 and ord(c) < 0x05FF for c in text) else 'french',
+                'tokens_estimated': len(text.split())
+            }
         
         # Envoyer la réponse
         emit('ai_response', result)
         
-        logger.info(f"Réponse envoyée: {result['status']}")
+        logger.info(f"Réponse envoyée: status={result['status']}")
         
     except Exception as e:
         logger.error(f"Erreur traitement message: {str(e)}")
         emit('ai_response', {
             'status': 'error',
-            'message': f'Erreur lors du traitement: {str(e)}'
+            'message': f'Erreur: {str(e)}'
         })
 
 @socketio.on('clarification_response')
-def handle_clarification_response(data):
-    """Gère les réponses aux questions de clarification"""
+def handle_clarification(data):
+    """Gère les réponses aux clarifications"""
     session_id = request.sid
     answers = data.get('answers', [])
     original_text = data.get('original_text', '')
     
-    logger.info(f"Réponses de clarification reçues de {session_id}")
-    
     try:
-        # Reconstruire le texte avec les clarifications
-        enhanced_text = f"{original_text}\n" + "\n".join(answers)
+        # Combiner le texte original avec les clarifications
+        enhanced_text = f"{original_text}\n"
+        enhanced_text += "Clarifications:\n"
+        enhanced_text += "\n".join(answers)
         
         # Réanalyser avec plus d'informations
-        result = clarification_middleware.analyze_constraint(
-            enhanced_text,
-            session_id,
-            data.get('context', {})
-        )
+        result = middleware.analyze_constraint(enhanced_text, session_id, {})
         
         emit('ai_response', result)
         
@@ -299,72 +323,67 @@ def handle_clarification_response(data):
         logger.error(f"Erreur clarification: {str(e)}")
         emit('ai_response', {
             'status': 'error',
-            'message': f'Erreur: {str(e)}'
+            'message': str(e)
         })
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Gestion de la déconnexion"""
+    """Déconnexion"""
     session_id = request.sid
     
     if session_id in active_sessions:
-        session_info = active_sessions[session_id]
-        logger.info(f"Déconnexion: {session_id} après {session_info['messages_count']} messages")
+        info = active_sessions[session_id]
+        logger.info(f"Déconnexion {session_id} après {info['messages_count']} messages")
         del active_sessions[session_id]
     
-    clarification_middleware.clear_session(session_id)
+    middleware.clear_session(session_id)
 
 # ============================================
 # ROUTES ADDITIONNELLES
 # ============================================
 
-@app.route('/api/ai/sessions', methods=['GET'])
-def get_sessions():
-    """Liste les sessions actives"""
-    return jsonify({
+@app.route('/api/ai/stats', methods=['GET'])
+def get_stats():
+    """Statistiques d'utilisation"""
+    stats = {
         'active_sessions': len(active_sessions),
-        'sessions': [
-            {
-                'id': sid,
-                'connected_at': info['connected_at'],
-                'messages_count': info['messages_count']
-            }
-            for sid, info in active_sessions.items()
-        ]
-    })
+        'total_messages': sum(s['messages_count'] for s in active_sessions.values()),
+        'models_available': {
+            'gpt': llm_router.openai_client is not None,
+            'claude': llm_router.anthropic_client is not None
+        }
+    }
+    
+    # Ajouter stats Redis si disponible
+    if redis_client:
+        try:
+            stats['cache_keys'] = len(redis_client.keys('constraint:*'))
+        except:
+            pass
+    
+    return jsonify(stats)
 
-@app.route('/api/ai/constraint_types', methods=['GET'])
-def get_constraint_types():
-    """Retourne les types de contraintes supportés"""
-    return jsonify({
-        'types': [
-            {
-                'id': 'teacher_availability',
-                'label': 'Disponibilité professeur',
-                'description': 'Définit quand un professeur n\'est pas disponible'
-            },
-            {
-                'id': 'morning_prayer',
-                'label': 'Prière du matin',
-                'description': 'Réserve un créneau pour la prière'
-            },
-            {
-                'id': 'friday_early_end',
-                'label': 'Vendredi court',
-                'description': 'Fin des cours plus tôt le vendredi'
-            },
-            {
-                'id': 'lunch_break',
-                'label': 'Pause déjeuner',
-                'description': 'Définit l\'horaire de pause déjeuner'
-            },
-            {
-                'id': 'time_preference',
-                'label': 'Préférence horaire',
-                'description': 'Préférences générales d\'horaires'
-            }
-        ]
-    })
+@app.route('/api/ai/test', methods=['POST'])
+def test_llm():
+    """Route de test pour vérifier que les LLM fonctionnent"""
+    try:
+        text = request.json.get('text', 'Le professeur Cohen ne peut pas enseigner le vendredi')
+        
+        # Tester avec LLMRouter
+        result = llm_router.parse_natural_language(text)
+        
+        return jsonify({
+            'success': True,
+            'input': text,
+            'output': result,
+            'model_used': result.get('model_used', 'unknown')
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 # ============================================
 # POINT D'ENTRÉE
@@ -374,13 +393,25 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     debug = os.environ.get('FLASK_ENV') == 'development'
     
-    logger.info(f"Démarrage de l'API IA sur le port {port}")
-    logger.info(f"Mode: {'development' if debug else 'production'}")
+    # Afficher la configuration
+    logger.info("=" * 60)
+    logger.info("CONFIGURATION DE L'API IA")
+    logger.info("=" * 60)
+    logger.info(f"Port: {port}")
+    logger.info(f"Mode: {'Development' if debug else 'Production'}")
+    logger.info(f"OpenAI: {'✅ Configuré' if llm_router.openai_client else '❌ Non configuré'}")
+    logger.info(f"Anthropic: {'✅ Configuré' if llm_router.anthropic_client else '❌ Non configuré'}")
+    logger.info(f"Redis: {'✅ Connecté' if redis_client else '❌ Non disponible'}")
+    logger.info("=" * 60)
     
-    socketio.run(
-        app,
-        host='0.0.0.0',
-        port=port,
-        debug=debug,
-        use_reloader=False  # Évite les doubles démarrages
-    )
+    if not llm_router.openai_client and not llm_router.anthropic_client:
+        logger.warning("""
+        ⚠️ ATTENTION: Aucune clé API configurée!
+        L'API fonctionnera en mode dégradé (parsing basique).
+        
+        Pour activer l'IA, ajoutez dans scheduler_ai/.env :
+        OPENAI_API_KEY=sk-...
+        ANTHROPIC_API_KEY=sk-ant-...
+        """)
+    
+    socketio.run(app, host='0.0.0.0', port=port, debug=debug)

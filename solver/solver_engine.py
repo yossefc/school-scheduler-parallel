@@ -246,7 +246,39 @@ class ScheduleSolver:
                             self.schedule_vars[class_var_name] = class_var
                             # Lier au groupe
                             self.model.Add(class_var == group_var)
-    
+        self.create_prayer_variables()
+       # Appel de la nouvelle méthode
+
+    def create_prayer_variables(self):
+        """Créer des variables spécifiques pour תפילה"""
+        teacher_id_map = {t["teacher_name"]: t["teacher_id"] for t in self.teachers}
+        
+        # Identifier les professeurs qui enseignent תפילה
+        prayer_teachers = [
+            load for load in self.teacher_loads 
+            if load["subject"] in ["תפילה", "tefila", "prayer", "tfila", "תפלה"]
+        ]
+        
+        # Pour chaque classe, créer des variables pour la première heure
+        for class_obj in self.classes:
+            class_name = class_obj["class_name"]
+            
+            # Créneaux de première heure (dimanche-jeudi)
+            first_hour_slots = [
+                s for s in self.time_slots 
+                if s["period_number"] == 1 and s["day_of_week"] < 5
+            ]
+            
+            for slot in first_hour_slots:
+                # Variables pour chaque professeur possible
+                for teacher_load in prayer_teachers:
+                    teacher_name = teacher_load["teacher_name"]
+                    teacher_id = teacher_id_map.get(teacher_name)
+                    if not teacher_id:
+                        continue
+                        
+                    var_name = f"t_{teacher_id}_c_{class_name}_s_תפילה_slot_{slot['slot_id']}"
+                    self.schedule_vars[var_name] = self.model.NewBoolVar(var_name)
     def add_hard_constraints(self):
         """Ajoute les contraintes dures incluant les contraintes parallֳ¨les"""
         
@@ -319,27 +351,22 @@ class ScheduleSolver:
                 ]
                 if meeting_vars:
                     self.model.Add(sum(meeting_vars) == hours)
-        
+        self._apply_prayer_assignment_constraint()
         # 4. Respecter le nombre d'heures pour les groupes parallֳ¨les
-        for group in self.parallel_groups:
-            group_id = group["group_id"]
+        for load in self.teacher_loads:
+            hours = load.get("hours", 0)
+            if not hours:
+                continue
             
-            # Obtenir les heures depuis les dֳ©tails
-            group_details = [d for d in self.parallel_details if d["group_id"] == group_id]
-            if group_details:
-                hours = group_details[0]["hours_per_teacher"]
-                
-                # Variables du groupe (pas les individuelles !)
-                group_vars = [
-                    var for name, var in self.parallel_vars.items()
-                    if f"parallel_g{group_id}_" in name
-                ]
-                if group_vars:
-                    self.model.Add(sum(group_vars) == hours)
+            # AJOUTER CETTE LIGNE :
+            if load["subject"] in ["תפילה", "tefila", "prayer", "tfila"]:
+                continue  # Traité séparément
         
         # 5. Appliquer les contraintes personnalisֳ©es
         for constraint in self.constraints:
             self._apply_custom_constraint(constraint)
+        self.add_prayer_hours_constraint()
+
     
     def _apply_custom_constraint(self, constraint):
         """Applique une contrainte personnalisֳ©e"""
@@ -397,22 +424,23 @@ class ScheduleSolver:
                         self.model.Add(var == 0)
     
     def _apply_morning_prayer_constraint(self, constraint):
-        """Rֳ©serve les premiֳ¨res pֳ©riodes pour la priֳ¨re"""
+        """Réserve les premières périodes pour la prière"""
         data = constraint["constraint_data"]
-        duration = data.get("duration", 1)  # Nombre de pֳ©riodes
+        duration = data.get("duration", 1)
         
-        for day in range(5):  # Dimanche ֳ  Jeudi
+        for day in range(5):  # Dimanche à Jeudi
             for period in range(1, duration + 1):
                 slot = next((s for s in self.time_slots 
-                           if s["day_of_week"] == day and s["period_number"] == period), None)
+                        if s["day_of_week"] == day and s["period_number"] == period), None)
                 if slot:
-                    # Bloquer pour les matiֳ¨res non religieuses
+                    # MODIFIER : Bloquer SEULEMENT les matières non-religieuses ET non-תפילה
                     for var_name, var in self.schedule_vars.items():
                         if (f"slot_{slot['slot_id']}" in var_name and 
+                            # NE PAS bloquer les variables de תפילה
                             not any(religious in var_name.lower() 
-                                   for religious in ["torah", "talmud", "priere", "תפילה", "tefila", "tfila", "׳×׳₪׳™׳׳”"])):
+                                for religious in ["torah", "talmud", "priere", "תפילה", 
+                                                    "tefila", "tfila", "תפלה", "prayer"])):
                             self.model.Add(var == 0)
-
     # ------------------------------------------------------------------
     # Sujet : subject_timing (ex. כל שיעור תורה ... בשעה ראשונה)
     # ------------------------------------------------------------------
@@ -434,7 +462,69 @@ class ScheduleSolver:
                     if f"_{subject_name}_" in var_name or subject_name.lower() in var_name.lower():
                         if f"slot_{slot['slot_id']}" in var_name:
                             self.model.Add(var == 0)
+    def _apply_prayer_assignment_constraint(self):
+        """Assigner UN professeur de תפילה par classe en première heure"""
+        teacher_id_map = {t["teacher_name"]: t["teacher_id"] for t in self.teachers}
+        
+        prayer_teachers = [
+            t for t in self.teacher_loads 
+            if t["subject"] in ["תפילה", "tefila", "prayer", "tfila", "תפלה"]
+        ]
+        
+        for class_obj in self.classes:
+            class_name = class_obj["class_name"]
             
+            # Pour chaque jour (dimanche-jeudi)
+            for day in range(5):
+                first_slot = next(
+                    (s for s in self.time_slots 
+                    if s["day_of_week"] == day and s["period_number"] == 1),
+                    None
+                )
+                
+                if not first_slot:
+                    continue
+                
+                # Variables de tous les profs possibles pour cette classe/créneau
+                possible_teachers = []
+                for teacher in prayer_teachers:
+                    teacher_name = teacher["teacher_name"]
+                    teacher_id = teacher_id_map.get(teacher_name)
+                    if not teacher_id:
+                        continue
+                        
+                    var_name = f"t_{teacher_id}_c_{class_name}_s_תפילה_slot_{first_slot['slot_id']}"
+                    if var_name in self.schedule_vars:
+                        possible_teachers.append(self.schedule_vars[var_name])
+                
+                if possible_teachers:
+                    # Maximum UN professeur (0 ou 1)
+                    self.model.Add(sum(possible_teachers) <= 1)
+
+    def add_prayer_hours_constraint(self):
+        """Respecter le nombre d'heures de תפילה par professeur"""
+        teacher_id_map = {t["teacher_name"]: t["teacher_id"] for t in self.teachers}
+        
+        for teacher_load in self.teacher_loads:
+            if teacher_load["subject"] not in ["תפילה", "tefila", "prayer", "tfila", "תפלה"]:
+                continue
+                
+            teacher_name = teacher_load["teacher_name"]
+            teacher_id = teacher_id_map.get(teacher_name)
+            if not teacher_id:
+                continue
+                
+            hours_required = teacher_load["hours"]
+            
+            # Toutes les variables תפילה de ce professeur
+            prayer_vars = [
+                var for name, var in self.schedule_vars.items()
+                if f"t_{teacher_id}_" in name and "תפילה" in name
+            ]
+            
+            if prayer_vars:
+                # Le professeur doit enseigner exactement le nombre d'heures spécifié
+                self.model.Add(sum(prayer_vars) == hours_required)
     def add_soft_constraints(self):
         """Ajoute des contraintes souples pour optimiser la qualitֳ©"""
         

@@ -63,3 +63,5 @@ USER ${USER}
 ENTRYPOINT ["bash", "/app/docker-entrypoint.sh"]
 # CORRECTIF: Utiliser api:app car les fichiers sont directement dans /app
 CMD ["gunicorn", "-k", "eventlet", "-w", "1", "api:app", "-b", "0.0.0.0:5001", "--log-level", "info"] 
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
