@@ -571,6 +571,75 @@
         const API_BASE = 'http://localhost:8000';
         let currentConstraints = [];
         let scheduleData = null;
+        // Mapping des types frontend vers backend
+    const TYPE_MAPPING = {
+        'custom': 'time_preference',  // Type par défaut valide
+        'teacher_availability': 'teacher_availability',
+        'time_preference': 'time_preference',
+        'class_preference': 'time_preference',
+        'room_availability': 'room_availability',
+        'morning_prayer': 'morning_prayer',
+        'lunch_break': 'lunch_break',
+        'friday_early_end': 'friday_early_end'
+    };
+
+    // Fonction pour formater les données selon le type
+    function formatDataForBackend(type, data, entity, originalText) {
+        const backendType = TYPE_MAPPING[type] || 'time_preference';
+        let formattedData = {};
+        
+        switch(backendType) {
+            case 'teacher_availability':
+                formattedData = {
+                    unavailable_days: data.unavailable_days || [],
+                    unavailable_periods: data.unavailable_periods || [],
+                    reason: originalText || "Non spécifié"
+                };
+                break;
+                
+            case 'morning_prayer':
+                formattedData = {
+                    time_slot: data.time_slot || "08:00-08:30",
+                    mandatory_for: ["all"]  // Requis par le backend
+                };
+                break;
+                
+            case 'time_preference':
+                formattedData = {
+                    preferred_time: "morning",  // Valeur par défaut requise
+                    preferred_periods: data.preferred_periods || [],
+                    avoid_periods: data.avoid_periods || [],
+                    description: originalText
+                };
+                break;
+                
+            case 'lunch_break':
+                formattedData = {
+                    time_slot: data.time_slot || "12:15-12:45",
+                    mandatory_for: ["all"]
+                };
+                break;
+                
+            case 'friday_early_end':
+                formattedData = {
+                    end_time: data.end_time || "13:00",
+                    applies_to: ["all"]
+                };
+                break;
+                
+            default:
+                // Pour les autres types, format générique
+                formattedData = {
+                    description: originalText,
+                    parameters: data
+                };
+        }
+        
+        return {
+            type: backendType,
+            data: formattedData
+        };
+    }
 
         // Changement d'onglet
         function switchTab(tabName) {
@@ -714,69 +783,178 @@ ${JSON.stringify(analysis.data, null, 2)}</pre>
         function analyzeConstraint(text) {
             const lowerText = text.toLowerCase();
             
-            // Détection du type
-            let type = 'custom';
-            let entity = '';
-            let data = {};
+            // Détection de mots-clés en hébreu
+            const hebrewKeywords = {
+                prayer: ['תפילה', 'תפילת', 'שחרית', 'מנחה', 'ערבית'],
+                teacher: ['מורה', 'מורים', 'מלמד', 'מלמדת'],
+                class: ['כיתה', 'כיתות', 'תלמידים'],
+                hour: ['שעה', 'שעות'],
+                first: ['ראשונה', 'ראשון', 'בוקר'],
+                day: ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'],
+                friday: ['שישי', 'יום שישי'],
+                room: ['חדר', 'כיתה', 'אולם']
+            };
             
-            if (lowerText.includes('disponible') || lowerText.includes('absent')) {
+            let type = 'time_preference';  // Type par défaut VALIDE
+            let entity = 'Global';
+            let data = {
+                original_text: text,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Détection de prière en hébreu
+            if (hebrewKeywords.prayer.some(word => text.includes(word))) {
+                type = 'morning_prayer';
+                entity = 'Global';
+                
+                // Extraire l'heure si mentionnée
+                if (text.includes('ראשונה') || text.includes('08:00')) {
+                    data.time_slot = '08:00-08:30';
+                } else {
+                    data.time_slot = '08:00-08:30'; // Par défaut
+                }
+                data.mandatory_for = ['all'];
+            }
+            
+            // Détection de professeur (hébreu ou français)
+            const profRegexHeb = new RegExp(`(${hebrewKeywords.teacher.join('|')})\\s+([א-ת]+)`, 'i');
+            const profRegexFr = /(?:professeur|prof\.?|enseignant)\s+([A-Z][a-zàâäéèêëïîôùûçœæ]+)/i;
+            
+            const profMatchHeb = text.match(profRegexHeb);
+            const profMatchFr = text.match(profRegexFr);
+            
+            if (profMatchHeb || profMatchFr) {
+                const match = profMatchHeb || profMatchFr;
+                entity = match[profMatchHeb ? 2 : 1];
                 type = 'teacher_availability';
                 
-                // Extraction du nom
-                const nameMatch = text.match(/(?:professeur|prof\.?)\s+(\w+)/i);
-                if (nameMatch) entity = nameMatch[1];
+                // Extraction des jours en hébreu ou français
+                const jourRegexFr = /(lundi|mardi|mercredi|jeudi|vendredi|dimanche)/gi;
+                const jourRegexHeb = new RegExp(`(${hebrewKeywords.day.join('|')})`, 'gi');
                 
-                // Extraction du jour
-                const days = {
-                    'dimanche': 0, 'lundi': 1, 'mardi': 2, 
-                    'mercredi': 3, 'jeudi': 4, 'vendredi': 5
-                };
+                const joursFr = text.match(jourRegexFr);
+                const joursHeb = text.match(jourRegexHeb);
                 
-                Object.entries(days).forEach(([dayName, dayNum]) => {
-                    if (lowerText.includes(dayName)) {
-                        data.unavailable_days = [dayNum];
-                    }
-                });
-                
-                // Extraction de l'heure
-                if (lowerText.includes('après-midi')) {
-                    data.unavailable_periods = [7, 8, 9, 10];
-                } else if (lowerText.includes('matin')) {
-                    data.unavailable_periods = [1, 2, 3, 4];
+                if (joursFr || joursHeb) {
+                    data.unavailable_days = (joursFr || []).concat(joursHeb || []);
                 }
             }
             
-            return { type, entity, data };
-        }
-
-        // Envoi de contrainte à l'API
-        async function sendConstraint(constraint) {
-            try {
-                const response = await fetch(`${API_BASE}/constraints`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        constraint_type: constraint.type,
-                        entity_name: constraint.entity,
-                        constraint_data: constraint.data,
-                        priority: 2
-                    })
-                });
-                
-                if (response.ok) {
-                    showAlert('Contrainte ajoutée avec succès', 'success');
-                    document.getElementById('constraintText').value = '';
-                    document.getElementById('aiAnalysis').style.display = 'none';
-                    loadConstraints();
-                } else {
-                    showAlert('Erreur lors de l\'ajout de la contrainte', 'danger');
-                }
-            } catch (error) {
-                console.error('Erreur:', error);
-                showAlert('Erreur de connexion', 'danger');
+            // Détection de vendredi court
+            if (hebrewKeywords.friday.some(word => text.includes(word))) {
+                type = 'friday_early_end';
+                data.end_time = '13:00';
             }
+            
+            return {
+                type: type,
+                entity: entity,
+                data: data
+            };
         }
-
+        // Envoi de contrainte à l'API
+        async function sendConstraint(analysis) {
+    const originalText = document.getElementById('constraintText').value;
+    
+    // Formatter les données pour le backend
+    const { type: backendType, data: formattedData } = formatDataForBackend(
+        analysis.type,
+        analysis.data,
+        analysis.entity,
+        originalText
+    );
+    
+    // Construire la contrainte selon le format attendu par le backend
+    const constraint = {
+        type: backendType,
+        entity: analysis.entity || 'Global',
+        priority: parseInt(document.getElementById('priority')?.value || '2'),
+        data: formattedData,
+        is_active: true,
+        description: originalText  // Garder le texte original
+    };
+    
+    console.log('Envoi de la contrainte:', constraint);  // Debug
+    
+    try {
+        const response = await fetch(`${API_BASE}/constraints/`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(constraint)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Erreur du serveur:', errorData);
+            
+            // Afficher les détails de l'erreur
+            if (errorData.detail) {
+                if (Array.isArray(errorData.detail)) {
+                    const errors = errorData.detail.map(e => 
+                        `${e.loc ? e.loc.join('.') : 'Champ'}: ${e.msg}`
+                    ).join('<br>');
+                    showAlert(`Erreur de validation:<br>${errors}`, 'danger');
+                } else {
+                    showAlert(`Erreur: ${errorData.detail}`, 'danger');
+                }
+            } else {
+                showAlert('Erreur lors de l\'ajout de la contrainte', 'danger');
+            }
+            return;
+        }
+        
+        const result = await response.json();
+        
+        // Ajouter à la liste locale avec l'ID du serveur
+        const newConstraint = {
+            ...constraint,
+            constraint_id: result.id || 'constraint_' + Date.now()
+        };
+        
+        currentConstraints.push(newConstraint);
+        renderConstraintList();
+        
+        // Réinitialiser le formulaire
+        document.getElementById('constraintForm').reset();
+        document.getElementById('aiAnalysis').style.display = 'none';
+        
+        showAlert('✅ Contrainte ajoutée avec succès!', 'success');
+        
+    } catch (error) {
+        console.error('Erreur réseau:', error);
+        showAlert(`Erreur de connexion: ${error.message}`, 'danger');
+    }
+}
+// Fonction de debug pour afficher les données avant envoi
+function debugConstraint() {
+    const text = document.getElementById('constraintText').value;
+    const analysis = analyzeConstraint(text);
+    const { type, data } = formatDataForBackend(
+        analysis.type, 
+        analysis.data, 
+        analysis.entity, 
+        text
+    );
+    
+    console.log('=== DEBUG CONTRAINTE ===');
+    console.log('Texte original:', text);
+    console.log('Analyse:', analysis);
+    console.log('Type backend:', type);
+    console.log('Données formatées:', data);
+    console.log('========================');
+    
+    // Afficher dans l'interface
+    const debugDiv = document.createElement('div');
+    debugDiv.className = 'alert alert-info mt-3';
+    debugDiv.innerHTML = `
+        <h5>🔍 Debug - Données qui seront envoyées:</h5>
+        <pre>${JSON.stringify({ type, entity: analysis.entity, data }, null, 2)}</pre>
+    `;
+    document.getElementById('aiAnalysis').appendChild(debugDiv);
+}
         // Toggle contrainte
         async function toggleConstraint(id) {
             const constraint = currentConstraints.find(c => c.constraint_id === id);

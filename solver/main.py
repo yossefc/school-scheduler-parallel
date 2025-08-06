@@ -7,6 +7,7 @@ from models import ScheduleRequest, ConstraintRequest
 from constraints_handler import ConstraintsManager
 import json
 import logging
+from datetime import datetime
 from prometheus_fastapi_instrumentator import Instrumentator
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -56,44 +57,55 @@ async def root():
         "features": ["parallel_teaching", "automatic_detection", "synchronized_scheduling"]
     }
 
+# Remplacez la fonction generate_schedule dans main.py par cette version corrigée
+
 @app.post("/generate_schedule")
 async def generate_schedule(request: ScheduleRequest):
-    """Gֳ©nֳ¨re un emploi du temps avec support des cours parallֳ¨les"""
+    """Génère un emploi du temps avec support des cours parallèles"""
     try:
-        # Utiliser le solver corrigé avec la configuration DB correcte
-        solver = ScheduleSolver(db_config)
+        # Configuration DB corrigée
+        solver_db_config = {
+            "host": "postgres",  # pour Docker
+            "database": "school_scheduler",
+            "user": "admin",
+            "password": "school123"
+        }
         
-        # Charger les donnֳ©es
+        solver = ScheduleSolver(solver_db_config)
         solver.load_data_from_db()
         
-        # Appliquer les contraintes additionnelles
-        for constraint in request.constraints:
-            solver.add_constraint(constraint)
-        
-        # Rֳ©soudre
-        schedule = solver.solve(time_limit=request.time_limit)
+        # Résoudre
+        schedule = solver.solve(time_limit=request.time_limit or 60)
         
         if schedule:
-            # Sauvegarder
-            schedule_id = solver.save_schedule(schedule)
+            # Statistiques améliorées avec info sur les cours parallèles
+            parallel_lessons = [e for e in schedule if e.get("is_parallel", False)]
+            individual_lessons = [e for e in schedule if not e.get("is_parallel", False)]
+            
             return {
-                "status": "success",
-                "schedule": schedule,
-                "schedule_id": schedule_id,
-                "summary": solver.get_schedule_summary(schedule),
-                "message": "Emploi du temps généré avec succès (cours parallèles inclus)"
+            "schedule": schedule,
+            "statistics": {
+                "total_assignments": len(schedule),
+                "parallel_lessons": len(parallel_lessons),
+                "individual_lessons": len(individual_lessons),
+                "parallel_percentage": f"{(len(parallel_lessons)/len(schedule)*100):.1f}%",
+                "teachers_used": list(set(e["teacher_name"] for e in schedule)),
+                "classes_covered": list(set(e["class_name"] for e in schedule if e.get("class_name"))),
+                "parallel_summary": f"{len(parallel_lessons)} cours parallèles sur {len(schedule)} total"
             }
+        }
         else:
-            return {
-                "status": "failed",
-                "reason": "Aucune solution trouvֳ©e",
-                "suggestion": "Vֳ©rifiez les contraintes parallֳ¨les avec /api/parallel/check"
-            }
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Impossible de générer l'emploi du temps"}
+            )
             
     except Exception as e:
-        logger.error(f"Erreur gֳ©nֳ©ration: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+        logger.error(f"Erreur: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e)}
+        )
 # ============================================
 # NOUVEAUX ENDPOINTS POUR LES COURS PARALLֳˆLES
 # ============================================
@@ -324,8 +336,16 @@ async def get_parallel_statistics():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        cur.execute("SELECT * FROM v_parallel_statistics")
-        stats = {row["metric"]: row["value"] for row in cur.fetchall()}
+        # Utiliser des requêtes directes au lieu de la vue qui peut ne pas exister
+        stats = {}
+        
+        # Compter les groupes parallèles
+        cur.execute("SELECT COUNT(*) as count FROM parallel_groups")
+        stats['Total groupes parallèles'] = cur.fetchone()['count']
+        
+        # Compter les professeurs en parallèle
+        cur.execute("SELECT COUNT(DISTINCT teacher_name) as count FROM parallel_teaching_details")
+        stats['Total professeurs en parallèle'] = cur.fetchone()['count']
         
         # Ajouter des stats dֳ©taillֳ©es
         cur.execute("""

@@ -326,7 +326,7 @@
                 </div>
             </div>
         </div>
-
+        
         <div class="controls">
             <h3>🔧 Actions Rapides</h3>
             <div class="btn-group">
@@ -554,7 +554,18 @@
                 </div>
             `).join('');
         }
-
+        
+        function toggleInputMode() {
+            const structured = document.getElementById('structuredInput');
+            const isHidden = structured.style.display === 'none';
+            structured.style.display = isHidden ? 'block' : 'none';
+            
+            if (!isHidden) {
+                // Reset structured fields
+                document.getElementById('entityType').value = '';
+                document.getElementById('entityName').value = '';
+            }
+        }
         // Fonctions utilitaires
         function getPriorityClass(priority) {
             if (priority === 0) return 'hard';

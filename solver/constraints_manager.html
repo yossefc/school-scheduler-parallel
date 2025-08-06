@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestionnaire de contraintes - Emploi du temps scolaire</title>
+    
+    <!-- Socket.IO pour la connexion WebSocket avec l'IA -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
     <style>
         :root {
             --primary: #2c3e50;
@@ -69,6 +73,21 @@
             background: var(--danger);
         }
 
+        .ai-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 15px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+
+        .ai-status.connected {
+            background: #7b1fa2;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -130,6 +149,16 @@
         .badge.danger {
             background: var(--danger);
             color: white;
+        }
+
+        .badge.info {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .badge.secondary {
+            background: var(--light);
+            color: var(--dark);
         }
 
         .constraint-form {
@@ -201,9 +230,24 @@
             color: white;
         }
 
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
         .btn-secondary {
             background: var(--light);
             color: var(--dark);
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 14px;
         }
 
         .constraint-list {
@@ -253,11 +297,6 @@
             margin-top: 10px;
         }
 
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 14px;
-        }
-
         .info-panel {
             background: #e3f2fd;
             border: 1px solid #90caf9;
@@ -269,6 +308,15 @@
         .info-panel h3 {
             color: #1976d2;
             margin-bottom: 10px;
+        }
+
+        .info-panel.ai-analysis {
+            background: #f3e5f5;
+            border-color: #ce93d8;
+        }
+
+        .info-panel.ai-analysis h3 {
+            color: #7b1fa2;
         }
 
         .info-list {
@@ -291,52 +339,19 @@
             justify-content: center;
         }
 
-        .schedule-preview {
-            margin-top: 20px;
-            overflow-x: auto;
-        }
-
-        .schedule-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-
-        .schedule-table th,
-        .schedule-table td {
-            border: 1px solid var(--border);
-            padding: 10px;
-            text-align: center;
-        }
-
-        .schedule-table th {
-            background: var(--primary);
-            color: white;
-            font-weight: 600;
-        }
-
-        .schedule-table td {
-            background: white;
-        }
-
-        .schedule-table td.has-course {
-            background: #e8f5e9;
-            font-weight: 500;
-        }
-
         .loading {
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 40px;
             color: var(--secondary);
+            gap: 15px;
         }
 
-        .loading::after {
-            content: '';
+        .spinner-border {
             width: 30px;
             height: 30px;
-            margin-left: 10px;
             border: 3px solid var(--light);
             border-top-color: var(--secondary);
             border-radius: 50%;
@@ -354,6 +369,18 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
         .alert-success {
@@ -372,6 +399,12 @@
             background: #fff3cd;
             color: #856404;
             border: 1px solid #ffeeba;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
         }
 
         .tabs {
@@ -446,6 +479,90 @@
             color: #666;
             text-transform: uppercase;
         }
+
+        .ai-analysis-result {
+            padding: 15px;
+        }
+
+        .analysis-details {
+            margin: 15px 0;
+        }
+
+        .analysis-details p {
+            margin-bottom: 10px;
+        }
+
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--success);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            transition: width 0.3s ease;
+        }
+
+        .clarification-panel {
+            padding: 15px;
+        }
+
+        .questions-list {
+            margin: 15px 0;
+        }
+
+        .clarification-answer {
+            width: 100%;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+
+        .schedule-preview {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .schedule-table th,
+        .schedule-table td {
+            border: 1px solid var(--border);
+            padding: 10px;
+            text-align: center;
+        }
+
+        .schedule-table th {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+
+        .schedule-table td {
+            background: white;
+        }
+
+        .schedule-table td.has-course {
+            background: #e8f5e9;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -454,10 +571,13 @@
             <h1>
                 📅 Gestionnaire de contraintes
                 <span class="status-indicator connected" id="status">
-                    <span class="icon">●</span> Connecté
+                    <span class="icon">●</span> Backend
+                </span>
+                <span class="ai-status" id="ai-status">
+                    <span class="icon">🤖</span> IA
                 </span>
             </h1>
-            <p>Système de planification d'emploi du temps scolaire israélien</p>
+            <p>Système de planification d'emploi du temps scolaire israélien avec assistant IA</p>
         </div>
 
         <div class="stats-grid">
@@ -495,18 +615,29 @@
                     
                     <form class="constraint-form" id="constraintForm">
                         <div class="form-group">
-                            <label for="constraintText">Décrivez votre contrainte en langage naturel :</label>
+                            <label for="constraintText">Décrivez votre contrainte en langage naturel (français ou hébreu) :</label>
                             <textarea class="form-control" id="constraintText" 
-                                placeholder="Exemple : Le professeur Cohen n'est pas disponible le vendredi après-midi">Le professeur Cohen n'est pas disponible le vendredi après-midi</textarea>
+                                placeholder="Exemples :&#10;- Le professeur Cohen n'est pas disponible le vendredi après-midi&#10;- כל שעה תפילה צריכים להיות בשעה ראשונה&#10;- Les classes de mathématiques ne doivent pas être après 15h"></textarea>
                         </div>
                         
-                        <div class="info-panel" id="aiAnalysis" style="display: none;">
+                        <div class="form-group">
+                            <label for="priority">Priorité par défaut :</label>
+                            <select id="priority" class="form-control">
+                                <option value="0">🔴 HARD - Incontournable</option>
+                                <option value="1">🟠 Très forte</option>
+                                <option value="2" selected>🟡 Moyenne</option>
+                                <option value="3">🔵 Normale</option>
+                                <option value="4">🟢 Faible</option>
+                            </select>
+                        </div>
+                        
+                        <div class="info-panel ai-analysis" id="aiAnalysis" style="display: none;">
                             <h3>🤖 Analyse IA</h3>
                             <div id="aiContent"></div>
                         </div>
                         
                         <button type="submit" class="btn btn-primary">
-                            <span class="icon">➕</span> Ajouter la contrainte
+                            <span class="icon">🤖</span> Analyser avec l'IA
                         </button>
                     </form>
                 </div>
@@ -518,7 +649,10 @@
                     </div>
                     
                     <div class="constraint-list" id="constraintList">
-                        <div class="loading">Chargement des contraintes</div>
+                        <div class="loading">
+                            <div class="spinner-border"></div>
+                            <p>Chargement des contraintes...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -567,12 +701,504 @@
     </div>
 
     <script>
-        // Configuration API
-        const API_BASE = 'http://localhost:8000';
+        // ============================================
+        // CONFIGURATION ET VARIABLES GLOBALES
+        // ============================================
+        
+        const API_BASE = 'http://localhost:8000';  // Backend principal
+        const AI_API = 'http://localhost:5001';    // API IA avec WebSocket
+        
         let currentConstraints = [];
         let scheduleData = null;
+        let socket = null;  // WebSocket connection
+        let aiSessionId = null;
+        let pendingConstraint = null;  // Contrainte en attente de confirmation
 
-        // Changement d'onglet
+        // ============================================
+        // MAPPING DES TYPES POUR LE BACKEND
+        // ============================================
+        
+        const TYPE_MAPPING = {
+            'custom': 'time_preference',
+            'teacher_availability': 'teacher_availability',
+            'time_preference': 'time_preference',
+            'class_preference': 'time_preference',
+            'room_availability': 'room_availability',
+            'morning_prayer': 'morning_prayer',
+            'lunch_break': 'lunch_break',
+            'friday_early_end': 'friday_early_end',
+            'consecutive_hours_limit': 'consecutive_hours_limit',
+            'parallel_teaching': 'parallel_teaching',
+            'school_hours': 'school_hours'
+        };
+
+        // ============================================
+        // CONNEXION WEBSOCKET AVEC L'IA
+        // ============================================
+        
+        function initializeAIConnection() {
+            socket = io(AI_API, {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000
+            });
+            
+            socket.on('connect', () => {
+                console.log('✅ Connecté à l\'agent IA');
+                const aiStatus = document.getElementById('ai-status');
+                aiStatus.className = 'ai-status connected';
+                aiStatus.innerHTML = '<span class="icon">🤖</span> IA Connectée';
+                showAlert('Agent IA connecté', 'success');
+            });
+            
+            socket.on('connected', (data) => {
+                aiSessionId = data.session_id;
+                console.log('Session IA:', aiSessionId);
+            });
+            
+            socket.on('ai_response', (response) => {
+                console.log('📨 Réponse IA:', response);
+                handleAIResponse(response);
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('❌ Déconnecté de l\'agent IA');
+                const aiStatus = document.getElementById('ai-status');
+                aiStatus.className = 'ai-status error';
+                aiStatus.innerHTML = '<span class="icon">🤖</span> IA Déconnectée';
+                showAlert('Agent IA déconnecté', 'warning');
+            });
+            
+            socket.on('error', (error) => {
+                console.error('Erreur WebSocket:', error);
+            });
+        }
+
+        // ============================================
+        // GESTION DES RÉPONSES DE L'IA
+        // ============================================
+        
+        function handleAIResponse(response) {
+            const aiContent = document.getElementById('aiContent');
+            
+            if (response.status === 'error') {
+                aiContent.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>❌ Erreur:</strong> ${response.message}
+                    </div>
+                `;
+                return;
+            }
+            
+            // Si l'IA demande des clarifications
+            if (response.clarification_questions && response.clarification_questions.length > 0) {
+                displayClarificationQuestions(response.clarification_questions);
+                return;
+            }
+            
+            // Si l'IA a analysé la contrainte
+            if (response.constraint) {
+                const constraint = response.constraint;
+                
+                aiContent.innerHTML = `
+                    <div class="ai-analysis-result">
+                        <h5>✅ Analyse terminée</h5>
+                        <div class="analysis-details">
+                            <p><strong>Type détecté:</strong> 
+                                <span class="badge badge-info">${constraint.type}</span>
+                            </p>
+                            <p><strong>Entité:</strong> 
+                                <span class="badge badge-secondary">${constraint.entity || 'Global'}</span>
+                            </p>
+                            <p><strong>Confiance:</strong></p>
+                            <div class="progress">
+                                <div class="progress-bar" 
+                                     style="width: ${(constraint.confidence || 0.8) * 100}%">
+                                    ${Math.round((constraint.confidence || 0.8) * 100)}%
+                                </div>
+                            </div>
+                            <p><strong>Données extraites:</strong></p>
+                            <pre>${JSON.stringify(constraint.data, null, 2)}</pre>
+                        </div>
+                        
+                        <div style="margin-top: 20px; display: flex; gap: 10px;">
+                            <button class="btn btn-success" onclick="confirmConstraint()">
+                                ✅ Confirmer et ajouter
+                            </button>
+                            <button class="btn btn-warning" onclick="modifyConstraint()">
+                                ✏️ Modifier
+                            </button>
+                            <button class="btn btn-danger" onclick="cancelConstraint()">
+                                ❌ Annuler
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // Sauvegarder temporairement la contrainte analysée
+                pendingConstraint = constraint;
+            }
+        }
+
+        // ============================================
+        // GESTION DES CLARIFICATIONS
+        // ============================================
+        
+        function displayClarificationQuestions(questions) {
+            const aiContent = document.getElementById('aiContent');
+            
+            let html = `
+                <div class="clarification-panel">
+                    <h5>🤔 L'agent IA a besoin de précisions :</h5>
+                    <div class="questions-list">
+            `;
+            
+            questions.forEach((q, index) => {
+                html += `
+                    <div class="form-group">
+                        <label class="font-weight-bold">${q}</label>
+                        <input type="text" 
+                               class="form-control clarification-answer" 
+                               data-index="${index}"
+                               placeholder="Votre réponse...">
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                    <button class="btn btn-primary" onclick="submitClarifications()">
+                        📤 Envoyer les réponses
+                    </button>
+                </div>
+            `;
+            
+            aiContent.innerHTML = html;
+        }
+
+        function submitClarifications() {
+            const answers = [];
+            document.querySelectorAll('.clarification-answer').forEach(input => {
+                answers.push(input.value);
+            });
+            
+            const originalText = document.getElementById('constraintText').value;
+            const clarifiedText = originalText + '\n' + answers.join('\n');
+            
+            // Renvoyer avec les clarifications
+            socket.emit('message', {
+                text: clarifiedText,
+                clarification_answers: answers,
+                original_text: originalText
+            });
+        }
+
+        // ============================================
+        // FORMATAGE DES DONNÉES POUR LE BACKEND
+        // ============================================
+        
+        function formatDataForBackend(type, data, entity, originalText) {
+            const backendType = TYPE_MAPPING[type] || 'time_preference';
+            let formattedData = {};
+            
+            switch(backendType) {
+                case 'teacher_availability':
+                    formattedData = {
+                        unavailable_days: data.unavailable_days || [],
+                        unavailable_periods: data.unavailable_periods || [],
+                        reason: originalText || "Non spécifié"
+                    };
+                    break;
+                    
+                case 'morning_prayer':
+                    formattedData = {
+                        time_slot: data.time_slot || "08:00-08:30",
+                        mandatory_for: ["all"]
+                    };
+                    break;
+                    
+                case 'time_preference':
+                    formattedData = {
+                        preferred_time: "morning",
+                        preferred_periods: data.preferred_periods || [],
+                        avoid_periods: data.avoid_periods || [],
+                        description: originalText
+                    };
+                    break;
+                    
+                case 'lunch_break':
+                    formattedData = {
+                        time_slot: data.time_slot || "12:15-12:45",
+                        mandatory_for: ["all"]
+                    };
+                    break;
+                    
+                case 'friday_early_end':
+                    formattedData = {
+                        end_time: data.end_time || "13:00",
+                        applies_to: ["all"]
+                    };
+                    break;
+                    
+                default:
+                    formattedData = {
+                        description: originalText,
+                        parameters: data
+                    };
+            }
+            
+            return {
+                type: backendType,
+                data: formattedData
+            };
+        }
+
+        // ============================================
+        // SOUMISSION DU FORMULAIRE
+        // ============================================
+        
+        document.getElementById('constraintForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const text = document.getElementById('constraintText').value;
+            if (!text.trim()) {
+                showAlert('Veuillez entrer une contrainte', 'warning');
+                return;
+            }
+            
+            // Afficher le panneau d'analyse
+            const aiPanel = document.getElementById('aiAnalysis');
+            const aiContent = document.getElementById('aiContent');
+            
+            aiPanel.style.display = 'block';
+            aiContent.innerHTML = `
+                <div class="loading">
+                    <div class="spinner-border"></div>
+                    <p>🤖 Analyse de votre contrainte par l'agent IA...</p>
+                </div>
+            `;
+            
+            // Envoyer au serveur IA via WebSocket
+            if (socket && socket.connected) {
+                socket.emit('message', {
+                    text: text,
+                    context: {
+                        current_constraints: currentConstraints,
+                        priority: document.getElementById('priority')?.value || 2
+                    }
+                });
+            } else {
+                // Fallback : Appel HTTP si WebSocket non disponible
+                await analyzeConstraintViaHTTP(text);
+            }
+        });
+
+        // ============================================
+        // FALLBACK HTTP
+        // ============================================
+        
+        async function analyzeConstraintViaHTTP(text) {
+            try {
+                const response = await fetch(`${AI_API}/api/ai/apply_constraint`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        constraint_text: text,
+                        context: {
+                            current_constraints: currentConstraints,
+                            priority: document.getElementById('priority')?.value || 2
+                        }
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    handleAIResponse(data);
+                } else {
+                    throw new Error('Erreur serveur IA');
+                }
+            } catch (error) {
+                console.error('Erreur HTTP:', error);
+                // Fallback vers analyse locale simple
+                const analysis = analyzeConstraintLocally(text);
+                handleAIResponse({
+                    status: 'success',
+                    constraint: analysis
+                });
+            }
+        }
+
+        // ============================================
+        // ANALYSE LOCALE DE SECOURS
+        // ============================================
+        
+        function analyzeConstraintLocally(text) {
+            const lowerText = text.toLowerCase();
+            
+            // Détection de mots-clés en hébreu
+            const hebrewKeywords = {
+                prayer: ['תפילה', 'תפילת', 'שחרית', 'מנחה', 'ערבית'],
+                teacher: ['מורה', 'מורים', 'מלמד', 'מלמדת'],
+                class: ['כיתה', 'כיתות', 'תלמידים'],
+                hour: ['שעה', 'שעות'],
+                first: ['ראשונה', 'ראשון', 'בוקר'],
+                day: ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'],
+                friday: ['שישי', 'יום שישי']
+            };
+            
+            let type = 'time_preference';
+            let entity = 'Global';
+            let data = {
+                original_text: text,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Détection de prière
+            if (hebrewKeywords.prayer.some(word => text.includes(word)) || 
+                lowerText.includes('prière') || lowerText.includes('tefila')) {
+                type = 'morning_prayer';
+                data.time_slot = '08:00-08:30';
+                data.mandatory_for = ['all'];
+            }
+            
+            // Détection de professeur
+            const profRegexFr = /(?:professeur|prof\.?|enseignant)\s+([A-Z][a-zàâäéèêëïîôùûçœæ]+)/i;
+            const profMatch = text.match(profRegexFr);
+            
+            if (profMatch) {
+                entity = profMatch[1];
+                type = 'teacher_availability';
+                
+                // Extraction des jours
+                const jourRegex = /(lundi|mardi|mercredi|jeudi|vendredi|dimanche)/gi;
+                const jours = text.match(jourRegex);
+                if (jours) {
+                    data.unavailable_days = jours.map(j => j.toLowerCase());
+                }
+            }
+            
+            // Détection vendredi court
+            if (hebrewKeywords.friday.some(word => text.includes(word)) || 
+                lowerText.includes('vendredi')) {
+                if (lowerText.includes('court') || lowerText.includes('tôt')) {
+                    type = 'friday_early_end';
+                    data.end_time = '13:00';
+                }
+            }
+            
+            return {
+                type: type,
+                entity: entity,
+                data: data,
+                confidence: 0.6  // Confiance plus faible pour l'analyse locale
+            };
+        }
+
+        // ============================================
+        // CONFIRMATION ET ENVOI DE LA CONTRAINTE
+        // ============================================
+        
+        async function confirmConstraint() {
+            if (!pendingConstraint) {
+                showAlert('Aucune contrainte à confirmer', 'warning');
+                return;
+            }
+            
+            const originalText = document.getElementById('constraintText').value;
+            const { type: backendType, data: formattedData } = formatDataForBackend(
+                pendingConstraint.type,
+                pendingConstraint.data,
+                pendingConstraint.entity,
+                originalText
+            );
+            
+            const constraint = {
+                type: backendType,
+                entity: pendingConstraint.entity || 'Global',
+                priority: parseInt(document.getElementById('priority')?.value || '2'),
+                data: formattedData,
+                is_active: true,
+                ai_confidence: pendingConstraint.confidence,
+                original_text: originalText
+            };
+            
+            console.log('Envoi de la contrainte:', constraint);
+            
+            try {
+                const response = await fetch(`${API_BASE}/constraints/`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(constraint)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Erreur du serveur:', errorData);
+                    
+                    if (errorData.detail) {
+                        if (Array.isArray(errorData.detail)) {
+                            const errors = errorData.detail.map(e => 
+                                `${e.loc ? e.loc.join('.') : 'Champ'}: ${e.msg}`
+                            ).join('<br>');
+                            showAlert(`Erreur de validation:<br>${errors}`, 'danger');
+                        } else {
+                            showAlert(`Erreur: ${errorData.detail}`, 'danger');
+                        }
+                    } else {
+                        showAlert('Erreur lors de l\'ajout de la contrainte', 'danger');
+                    }
+                    return;
+                }
+                
+                const result = await response.json();
+                
+                // Ajouter à la liste locale
+                const newConstraint = {
+                    ...constraint,
+                    constraint_id: result.id || 'constraint_' + Date.now()
+                };
+                
+                currentConstraints.push(newConstraint);
+                displayConstraints();
+                updateStats();
+                
+                // Réinitialiser
+                document.getElementById('constraintForm').reset();
+                document.getElementById('aiAnalysis').style.display = 'none';
+                pendingConstraint = null;
+                
+                showAlert('✅ Contrainte ajoutée avec succès!', 'success');
+                
+            } catch (error) {
+                console.error('Erreur réseau:', error);
+                showAlert(`Erreur de connexion: ${error.message}`, 'danger');
+            }
+        }
+
+        function modifyConstraint() {
+            // Remplir le textarea avec les données actuelles
+            if (pendingConstraint && pendingConstraint.data.original_text) {
+                document.getElementById('constraintText').value = pendingConstraint.data.original_text;
+            }
+            document.getElementById('aiAnalysis').style.display = 'none';
+            pendingConstraint = null;
+        }
+
+        function cancelConstraint() {
+            document.getElementById('aiAnalysis').style.display = 'none';
+            pendingConstraint = null;
+        }
+
+        // ============================================
+        // GESTION DES ONGLETS
+        // ============================================
+        
         function switchTab(tabName) {
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.classList.remove('active');
@@ -585,7 +1211,10 @@
             document.getElementById(`tab-${tabName}`).classList.add('active');
         }
 
-        // Chargement des contraintes
+        // ============================================
+        // CHARGEMENT ET AFFICHAGE DES CONTRAINTES
+        // ============================================
+        
         async function loadConstraints() {
             try {
                 const response = await fetch(`${API_BASE}/constraints`);
@@ -601,7 +1230,6 @@
             }
         }
 
-        // Affichage des contraintes
         function displayConstraints() {
             const container = document.getElementById('constraintList');
             
@@ -614,13 +1242,13 @@
                 <div class="constraint-item ${constraint.is_active ? '' : 'inactive'}">
                     <div class="constraint-header">
                         <div>
-                            <div class="constraint-title">${constraint.entity_name || 'Global'}</div>
+                            <div class="constraint-title">${constraint.entity || 'Global'}</div>
                             <div class="constraint-details">
-                                Type: ${constraint.constraint_type} | 
+                                Type: ${constraint.type || constraint.constraint_type} | 
                                 Priorité: ${getPriorityLabel(constraint.priority)}
                             </div>
                             <div class="constraint-details">
-                                ${formatConstraintData(constraint.constraint_data)}
+                                ${formatConstraintData(constraint.type || constraint.constraint_type, constraint.data || constraint.constraint_data)}
                             </div>
                         </div>
                         <span class="badge ${constraint.is_active ? 'success' : 'secondary'}">
@@ -628,10 +1256,10 @@
                         </span>
                     </div>
                     <div class="constraint-actions">
-                        <button class="btn btn-sm btn-secondary" onclick="toggleConstraint(${constraint.constraint_id})">
+                        <button class="btn btn-sm btn-secondary" onclick="toggleConstraint('${constraint.constraint_id}')">
                             ${constraint.is_active ? '❌ Désactiver' : '✓ Activer'}
                         </button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteConstraint(${constraint.constraint_id})">
+                        <button class="btn btn-sm btn-danger" onclick="deleteConstraint('${constraint.constraint_id}')">
                             🗑️ Supprimer
                         </button>
                     </div>
@@ -642,142 +1270,75 @@
                 currentConstraints.filter(c => c.is_active).length;
         }
 
-        // Formatage des données de contrainte
-        function formatConstraintData(data) {
-            if (typeof data === 'string') {
-                try {
-                    data = JSON.parse(data);
-                } catch (e) {
-                    return data;
-                }
+        function formatConstraintData(type, data) {
+            if (!data || Object.keys(data).length === 0) {
+                return '<em>Aucune donnée spécifique</em>';
             }
             
             const parts = [];
-            if (data.unavailable_days) {
-                const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-                const dayNames = data.unavailable_days.map(d => days[d]).join(', ');
-                parts.push(`Indisponible: ${dayNames}`);
-            }
-            if (data.unavailable_periods) {
-                parts.push(`Périodes bloquées: ${data.unavailable_periods.join(', ')}`);
-            }
-            if (data.max_hours) {
-                parts.push(`Max ${data.max_hours} heures consécutives`);
+            
+            switch(type) {
+                case 'teacher_availability':
+                    if (data.unavailable_days && data.unavailable_days.length > 0) {
+                        parts.push(`Jours: ${data.unavailable_days.join(', ')}`);
+                    }
+                    if (data.unavailable_periods && data.unavailable_periods.length > 0) {
+                        parts.push(`Périodes: ${data.unavailable_periods.join(', ')}`);
+                    }
+                    if (data.reason) {
+                        parts.push(`Raison: ${data.reason}`);
+                    }
+                    break;
+                    
+                case 'morning_prayer':
+                    if (data.time_slot) {
+                        parts.push(`Horaire: ${data.time_slot}`);
+                    }
+                    break;
+                    
+                case 'friday_early_end':
+                    if (data.end_time) {
+                        parts.push(`Fin des cours: ${data.end_time}`);
+                    }
+                    break;
+                    
+                case 'time_preference':
+                    if (data.description) {
+                        parts.push(data.description);
+                    }
+                    break;
+                    
+                default:
+                    // Affichage générique
+                    Object.entries(data).forEach(([key, value]) => {
+                        if (key !== 'timestamp' && key !== 'created_at' && key !== 'original_text') {
+                            if (Array.isArray(value)) {
+                                parts.push(`${key}: ${value.join(', ')}`);
+                            } else {
+                                parts.push(`${key}: ${value}`);
+                            }
+                        }
+                    });
             }
             
-            return parts.join(' | ') || JSON.stringify(data);
+            return parts.length > 0 ? parts.join(' | ') : '<em>Configuration définie</em>';
         }
 
-        // Labels de priorité
         function getPriorityLabel(priority) {
             const labels = {
-                0: 'Critique',
-                1: 'Haute',
+                0: 'Incontournable',
+                1: 'Très forte',
                 2: 'Moyenne',
                 3: 'Normale',
-                4: 'Basse'
+                4: 'Faible'
             };
             return labels[priority] || 'Inconnue';
         }
 
-        // Ajout de contrainte
-        document.getElementById('constraintForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const text = document.getElementById('constraintText').value;
-            if (!text.trim()) return;
-            
-            // Analyse IA simulée
-            const aiPanel = document.getElementById('aiAnalysis');
-            const aiContent = document.getElementById('aiContent');
-            
-            aiPanel.style.display = 'block';
-            aiContent.innerHTML = '<div class="loading">Analyse en cours</div>';
-            
-            // Simulation d'analyse (en production, appel à l'API IA)
-            setTimeout(() => {
-                const analysis = analyzeConstraint(text);
-                aiContent.innerHTML = `
-                    <p><strong>Type détecté:</strong> ${analysis.type}</p>
-                    <p><strong>Entité:</strong> ${analysis.entity}</p>
-                    <p><strong>Données extraites:</strong></p>
-                    <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
-${JSON.stringify(analysis.data, null, 2)}</pre>
-                `;
-                
-                // Envoi de la contrainte
-                sendConstraint(analysis);
-            }, 1000);
-        });
-
-        // Analyse simple de contrainte (simulation)
-        function analyzeConstraint(text) {
-            const lowerText = text.toLowerCase();
-            
-            // Détection du type
-            let type = 'custom';
-            let entity = '';
-            let data = {};
-            
-            if (lowerText.includes('disponible') || lowerText.includes('absent')) {
-                type = 'teacher_availability';
-                
-                // Extraction du nom
-                const nameMatch = text.match(/(?:professeur|prof\.?)\s+(\w+)/i);
-                if (nameMatch) entity = nameMatch[1];
-                
-                // Extraction du jour
-                const days = {
-                    'dimanche': 0, 'lundi': 1, 'mardi': 2, 
-                    'mercredi': 3, 'jeudi': 4, 'vendredi': 5
-                };
-                
-                Object.entries(days).forEach(([dayName, dayNum]) => {
-                    if (lowerText.includes(dayName)) {
-                        data.unavailable_days = [dayNum];
-                    }
-                });
-                
-                // Extraction de l'heure
-                if (lowerText.includes('après-midi')) {
-                    data.unavailable_periods = [7, 8, 9, 10];
-                } else if (lowerText.includes('matin')) {
-                    data.unavailable_periods = [1, 2, 3, 4];
-                }
-            }
-            
-            return { type, entity, data };
-        }
-
-        // Envoi de contrainte à l'API
-        async function sendConstraint(constraint) {
-            try {
-                const response = await fetch(`${API_BASE}/constraints`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        constraint_type: constraint.type,
-                        entity_name: constraint.entity,
-                        constraint_data: constraint.data,
-                        priority: 2
-                    })
-                });
-                
-                if (response.ok) {
-                    showAlert('Contrainte ajoutée avec succès', 'success');
-                    document.getElementById('constraintText').value = '';
-                    document.getElementById('aiAnalysis').style.display = 'none';
-                    loadConstraints();
-                } else {
-                    showAlert('Erreur lors de l\'ajout de la contrainte', 'danger');
-                }
-            } catch (error) {
-                console.error('Erreur:', error);
-                showAlert('Erreur de connexion', 'danger');
-            }
-        }
-
-        // Toggle contrainte
+        // ============================================
+        // ACTIONS SUR LES CONTRAINTES
+        // ============================================
+        
         async function toggleConstraint(id) {
             const constraint = currentConstraints.find(c => c.constraint_id === id);
             if (!constraint) return;
@@ -799,7 +1360,6 @@ ${JSON.stringify(analysis.data, null, 2)}</pre>
             }
         }
 
-        // Suppression de contrainte
         async function deleteConstraint(id) {
             if (!confirm('Êtes-vous sûr de vouloir supprimer cette contrainte ?')) return;
             
@@ -818,10 +1378,18 @@ ${JSON.stringify(analysis.data, null, 2)}</pre>
             }
         }
 
-        // Génération d'emploi du temps
+        // ============================================
+        // GÉNÉRATION D'EMPLOI DU TEMPS
+        // ============================================
+        
         async function generateSchedule() {
             const preview = document.getElementById('schedulePreview');
-            preview.innerHTML = '<div class="loading">Génération en cours</div>';
+            preview.innerHTML = `
+                <div class="loading">
+                    <div class="spinner-border"></div>
+                    <p>Génération en cours...</p>
+                </div>
+            `;
             
             try {
                 const response = await fetch(`${API_BASE}/generate_schedule`, {
@@ -855,13 +1423,8 @@ ${JSON.stringify(analysis.data, null, 2)}</pre>
             }
         }
 
-        // Affichage de l'emploi du temps
         function displaySchedule() {
             if (!scheduleData || !scheduleData.schedule) return;
-            
-            // Debug temporaire
-            console.log("Schedule data:", scheduleData);
-            console.log("First entry:", scheduleData.schedule[0]);
             
             const preview = document.getElementById('schedulePreview');
             const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven'];
@@ -927,18 +1490,20 @@ ${JSON.stringify(analysis.data, null, 2)}</pre>
             preview.innerHTML = html;
         }
 
-        // Mise à jour des statistiques
+        // ============================================
+        // MISE À JOUR DES STATISTIQUES ET ANALYSES
+        // ============================================
+        
         function updateStats() {
             const activeCount = currentConstraints.filter(c => c.is_active).length;
             document.getElementById('stat-constraints').textContent = activeCount;
             
-            // Simulation des autres stats (en production, appel API)
-            document.getElementById('stat-teachers').textContent = '67';
-            document.getElementById('stat-classes').textContent = '22';
+            // Simulation des autres stats
+            document.getElementById('stat-teachers').textContent = '12';
+            document.getElementById('stat-classes').textContent = '8';
             document.getElementById('stat-success').textContent = activeCount > 5 ? '85%' : '95%';
         }
 
-        // Mise à jour de l'analyse
         function updateAnalysis() {
             const collected = document.getElementById('collectedInfo');
             const missing = document.getElementById('missingInfo');
@@ -949,8 +1514,8 @@ ${JSON.stringify(analysis.data, null, 2)}</pre>
             const constraintTypes = new Set();
             
             currentConstraints.forEach(c => {
-                if (c.entity_name) entityTypes.add(c.entity_name);
-                constraintTypes.add(c.constraint_type);
+                if (c.entity) entityTypes.add(c.entity);
+                constraintTypes.add(c.type || c.constraint_type);
             });
             
             if (entityTypes.size > 0) {
@@ -967,13 +1532,13 @@ ${JSON.stringify(analysis.data, null, 2)}</pre>
             // Informations manquantes
             const missingItems = [];
             
-            if (!currentConstraints.some(c => c.constraint_type === 'friday_early_end')) {
+            if (!currentConstraints.some(c => (c.type || c.constraint_type) === 'friday_early_end')) {
                 missingItems.push('Configuration du vendredi court');
             }
-            if (!currentConstraints.some(c => c.constraint_type === 'morning_prayer')) {
+            if (!currentConstraints.some(c => (c.type || c.constraint_type) === 'morning_prayer')) {
                 missingItems.push('Horaires de prière du matin');
             }
-            if (!currentConstraints.some(c => c.constraint_type === 'lunch_break')) {
+            if (!currentConstraints.some(c => (c.type || c.constraint_type) === 'lunch_break')) {
                 missingItems.push('Configuration des pauses déjeuner');
             }
             
@@ -982,12 +1547,15 @@ ${JSON.stringify(analysis.data, null, 2)}</pre>
                 : '<li><span class="icon">✓</span> Toutes les informations de base sont configurées</li>';
         }
 
-        // Affichage des alertes
+        // ============================================
+        // UTILITAIRES
+        // ============================================
+        
         function showAlert(message, type = 'info') {
             const alert = document.createElement('div');
             alert.className = `alert alert-${type}`;
             alert.innerHTML = `
-                <span class="icon">${type === 'success' ? '✓' : '⚠'}</span>
+                <span class="icon">${type === 'success' ? '✓' : type === 'danger' ? '✗' : '⚠'}</span>
                 ${message}
             `;
             
@@ -996,29 +1564,36 @@ ${JSON.stringify(analysis.data, null, 2)}</pre>
             setTimeout(() => alert.remove(), 5000);
         }
 
-        // Initialisation
+        // ============================================
+        // INITIALISATION
+        // ============================================
+        
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialiser la connexion IA
+            initializeAIConnection();
+            
+            // Charger les contraintes
             loadConstraints();
             
-            // Rafraîchissement automatique
+            // Rafraîchissement automatique des contraintes
             setInterval(loadConstraints, 30000);
             
-            // Vérification de la connexion
+            // Vérification de la connexion backend
             setInterval(async () => {
                 try {
-                    const response = await fetch(`${API_BASE}/`);
+                    const response = await fetch(`${API_BASE}/constraints`);
                     const status = document.getElementById('status');
                     
                     if (response.ok) {
                         status.className = 'status-indicator connected';
-                        status.innerHTML = '<span class="icon">●</span> Connecté';
+                        status.innerHTML = '<span class="icon">●</span> Backend OK';
                     } else {
                         throw new Error();
                     }
                 } catch {
                     const status = document.getElementById('status');
                     status.className = 'status-indicator error';
-                    status.innerHTML = '<span class="icon">●</span> Déconnecté';
+                    status.innerHTML = '<span class="icon">●</span> Backend KO';
                 }
             }, 5000);
         });
