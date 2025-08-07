@@ -5,7 +5,6 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 from solver_engine import ScheduleSolver
-from models import ScheduleRequest, ConstraintRequest
 from constraints_handler import ConstraintsManager
 import json
 import logging
@@ -16,6 +15,7 @@ from psycopg2.extras import RealDictCursor
 from api_constraints import register_constraint_routes  # Import du module
 from pydantic import BaseModel
 import os
+from typing import Optional, List, Any
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -31,7 +31,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+instrumentator = Instrumentator()
+instrumentator.instrument(app).expose(app)
 # Instances
 constraints_manager = ConstraintsManager()
 
@@ -45,7 +46,9 @@ db_config = {
     "user": "admin", 
     "password": "school123"
 }
-
+class GenerateScheduleRequest(BaseModel):
+    constraints: Optional[List[Any]] = None  # réservée pour usage futur
+    time_limit: int = 300
 # Route pour servir l'interface HTML
 @app.get("/constraints-manager")
 async def constraints_interface():
@@ -102,20 +105,8 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-# Le reste de votre code main.py...
-@app.get("/constraints-manager")
-async def constraints_interface():
-    """Sert l'interface de gestion des contraintes"""
-    with open('constraints_manager.html', 'r', encoding='utf-8') as f:
-        from fastapi.responses import HTMLResponse
-        return HTMLResponse(content=f.read())
-@app.get("/")
-async def root():
-    return {
-        "message": "School Schedule Solver API - Parallel Teaching Edition",
-        "version": "2.0",
-        "features": ["parallel_teaching", "automatic_detection", "synchronized_scheduling"]
-    }
+
+    
 
 # Remplacez la fonction generate_schedule dans main.py par cette version corrigée
 @app.post("/parse")
@@ -587,15 +578,13 @@ async def get_general_stats():
 # ============================================================
 from typing import Optional, List, Any
 
-class GenerateScheduleRequest(BaseModel):
-    constraints: Optional[List[Any]] = None  # réservée pour usage futur
-    time_limit: int = 60
+
 
 @app.post("/generate_schedule")
 async def generate_schedule_endpoint(payload: GenerateScheduleRequest):
     """Génère un emploi du temps complet puis le renvoie (et l'enregistre)."""
     try:
-        solver = ScheduleSolver()
+        solver = ScheduleSolver(db_config)  # Passer la config DB
         # Charger les données depuis la BD
         solver.load_data_from_db()
 

@@ -1652,18 +1652,838 @@ displayConstraints();
             }
         }
 
-        function displaySchedule() {
-            if (!scheduleData || !scheduleData.schedule) return;
+
+
+
+function displaySchedule() {
+    if (!scheduleData || !scheduleData.schedule) {
+        document.getElementById('schedulePreview').innerHTML = 
+            '<p style="text-align: center; color: #666;">Aucun emploi du temps disponible</p>';
+        return;
+    }
+    
+    const preview = document.getElementById('schedulePreview');
+    const schedule = scheduleData.schedule;
+    
+    // Organiser les données par classe
+    const scheduleByClass = {};
+    const days = ['א', 'ב', 'ג', 'ד', 'ה', 'ו']; // Dimanche à Vendredi en hébreu
+    const dayNames = {
+        'א': 'Dimanche',
+        'ב': 'Lundi', 
+        'ג': 'Mardi',
+        'ד': 'Mercredi',
+        'ה': 'Jeudi',
+        'ו': 'Vendredi'
+    };
+    
+    // Déterminer les périodes et classes uniques
+    const periods = new Set();
+    const classes = new Set();
+    
+    schedule.forEach(slot => {
+        const className = slot.class || slot.class_name || 'Non assigné';
+        const period = slot.period || slot.time_slot || 0;
+        
+        classes.add(className);
+        periods.add(period);
+        
+        if (!scheduleByClass[className]) {
+            scheduleByClass[className] = {};
+        }
+        
+        const day = slot.day || 'א';
+        if (!scheduleByClass[className][day]) {
+            scheduleByClass[className][day] = {};
+        }
+        
+        scheduleByClass[className][day][period] = slot;
+    });
+    
+    // Trier les périodes
+    const sortedPeriods = Array.from(periods).sort((a, b) => a - b);
+    const sortedClasses = Array.from(classes).sort();
+    
+    // Créer le HTML de l'emploi du temps
+    let html = `
+        <div class="schedule-container">
+            <div class="schedule-stats" style="margin-bottom: 20px; padding: 15px; background: #e3f2fd; border-radius: 5px;">
+                <h4 style="margin: 0 0 10px 0; color: #1976d2;">📊 Statistiques de génération</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                    <div><strong>Total créneaux:</strong> ${schedule.length}</div>
+                    <div><strong>Classes:</strong> ${sortedClasses.length}</div>
+                    <div><strong>Périodes par jour:</strong> ${sortedPeriods.length}</div>
+                    <div><strong>Statut:</strong> <span style="color: #27ae60;">✓ Généré avec succès</span></div>
+                </div>
+            </div>
             
-            const preview = document.getElementById('schedulePreview');
-            // Affichage simplifié de l'emploi du temps
+            <div class="schedule-tabs" style="margin-bottom: 20px;">
+                <div style="display: flex; gap: 10px; border-bottom: 2px solid #ecf0f1; margin-bottom: 20px;">
+    `;
+    
+    // Créer les onglets pour chaque classe
+    sortedClasses.forEach((className, index) => {
+        const activeClass = index === 0 ? 'active' : '';
+        html += `
+            <button 
+                class="schedule-tab ${activeClass}" 
+                onclick="showClassSchedule('${className}')"
+                style="
+                    padding: 10px 20px;
+                    border: none;
+                    background: ${index === 0 ? '#3498db' : 'transparent'};
+                    color: ${index === 0 ? 'white' : '#34495e'};
+                    font-weight: 600;
+                    cursor: pointer;
+                    border-radius: 5px 5px 0 0;
+                    transition: all 0.3s;
+                "
+                onmouseover="this.style.backgroundColor='#3498db'; this.style.color='white';"
+                onmouseout="if(!this.classList.contains('active')){this.style.backgroundColor='transparent'; this.style.color='#34495e';}"
+            >
+                📚 ${className}
+            </button>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+            
+            <div class="schedule-tables">
+    `;
+    
+    // Créer un tableau pour chaque classe
+    sortedClasses.forEach((className, classIndex) => {
+        const displayStyle = classIndex === 0 ? 'block' : 'none';
+        
+        html += `
+            <div class="schedule-table-wrapper" id="schedule-${className}" style="display: ${displayStyle};">
+                <h3 style="margin-bottom: 15px; color: #2c3e50;">
+                    📅 Emploi du temps - ${className}
+                </h3>
+                <div style="overflow-x: auto;">
+                    <table style="
+                        width: 100%;
+                        border-collapse: collapse;
+                        background: white;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        border-radius: 5px;
+                        overflow: hidden;
+                    ">
+                        <thead>
+                            <tr style="background: #34495e; color: white;">
+                                <th style="padding: 12px; text-align: center; border: 1px solid #2c3e50;">
+                                    ⏰ Période
+                                </th>
+        `;
+        
+        // En-têtes des jours
+        days.forEach(day => {
+            const isShortDay = day === 'ו'; // Vendredi
+            html += `
+                <th style="
+                    padding: 12px; 
+                    text-align: center; 
+                    border: 1px solid #2c3e50;
+                    ${isShortDay ? 'background: #2c3e50;' : ''}
+                ">
+                    ${dayNames[day]}<br>
+                    <small style="opacity: 0.8;">${day}</small>
+                </th>
+            `;
+        });
+        
+        html += `
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
+        // Créer les lignes pour chaque période
+        sortedPeriods.forEach((period, periodIndex) => {
+            const rowColor = periodIndex % 2 === 0 ? '#f8f9fa' : 'white';
+            
+            html += `
+                <tr style="background: ${rowColor};">
+                    <td style="
+                        padding: 10px;
+                        text-align: center;
+                        font-weight: 600;
+                        border: 1px solid #dee2e6;
+                        background: #ecf0f1;
+                    ">
+                        ${formatPeriod(period)}
+                    </td>
+            `;
+            
+            // Cellules pour chaque jour
+            days.forEach(day => {
+                const slot = scheduleByClass[className]?.[day]?.[period];
+                const isShortDay = day === 'ו' && period > 4; // Vendredi après-midi
+                
+                if (isShortDay) {
+                    // Cellules grisées pour le vendredi après-midi
+                    html += `
+                        <td style="
+                            padding: 10px;
+                            text-align: center;
+                            border: 1px solid #dee2e6;
+                            background: #e0e0e0;
+                            color: #999;
+                        ">
+                            <span style="font-size: 12px;">—</span>
+                        </td>
+                    `;
+                } else if (slot) {
+                    const subject = slot.subject || slot.subject_name || '—';
+                    const teacher = slot.teacher || slot.teacher_name || '';
+                    const room = slot.room || slot.room_name || '';
+                    
+                    // Couleur selon le type de matière
+                    const bgColor = getSubjectColor(subject);
+                    
+                    html += `
+                        <td style="
+                            padding: 8px;
+                            text-align: center;
+                            border: 1px solid #dee2e6;
+                            background: ${bgColor};
+                            position: relative;
+                        ">
+                            <div style="font-weight: 600; color: #2c3e50;">
+                                ${subject}
+                            </div>
+                            ${teacher ? `<div style="font-size: 12px; color: #666; margin-top: 2px;">👨‍🏫 ${teacher}</div>` : ''}
+                            ${room ? `<div style="font-size: 11px; color: #888;">📍 ${room}</div>` : ''}
+                        </td>
+                    `;
+                } else {
+                    // Cellule vide
+                    html += `
+                        <td style="
+                            padding: 10px;
+                            text-align: center;
+                            border: 1px solid #dee2e6;
+                        ">
+                            <span style="color: #ccc;">—</span>
+                        </td>
+                    `;
+                }
+            });
+            
+            html += `</tr>`;
+        });
+        
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                    <small style="color: #666;">
+                        💡 <strong>Légende:</strong> 
+                        Les matières sont colorées selon leur type. 
+                        Le vendredi après-midi est bloqué (journée courte).
+                    </small>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    // Ajouter les styles CSS nécessaires
+    html += `
+        <style>
+            .schedule-container {
+                animation: fadeIn 0.5s ease-in;
+            }
+            
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            
+            .schedule-tab.active {
+                background: #3498db !important;
+                color: white !important;
+            }
+            
+            table td:hover {
+                transform: scale(1.02);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                transition: all 0.2s;
+                z-index: 10;
+                position: relative;
+            }
+        </style>
+    `;
+    
+    preview.innerHTML = html;
+}
+
+function analyzeScheduleProblems() {
+    if (!scheduleData || !scheduleData.schedule) {
+        console.error("Pas de données d'emploi du temps à analyser");
+        return;
+    }
+    
+    const schedule = scheduleData.schedule;
+    const diagnostics = {
+        totalSlots: schedule.length,
+        byDay: {},
+        byClass: {},
+        byTeacher: {},
+        bySubject: {},
+        missingDays: [],
+        parallelGroups: [],
+        conflicts: [],
+        coverage: {}
+    };
+    
+    // Jours de la semaine en hébreu
+    const allDays = ['א', 'ב', 'ג', 'ד', 'ה', 'ו'];
+    const dayNames = {
+        'א': 'Dimanche',
+        'ב': 'Lundi',
+        'ג': 'Mardi', 
+        'ד': 'Mercredi',
+        'ה': 'Jeudi',
+        'ו': 'Vendredi'
+    };
+    
+    // Analyser la distribution par jour
+    allDays.forEach(day => {
+        diagnostics.byDay[day] = schedule.filter(s => s.day === day).length;
+        if (diagnostics.byDay[day] === 0) {
+            diagnostics.missingDays.push(dayNames[day]);
+        }
+    });
+    
+    // Analyser par classe, professeur et matière
+    schedule.forEach(slot => {
+        const className = slot.class || slot.class_name || 'Non assigné';
+        const teacher = slot.teacher || slot.teacher_name || 'Non assigné';
+        const subject = slot.subject || slot.subject_name || 'Non assigné';
+        const day = slot.day || '?';
+        const period = slot.period || slot.time_slot || 0;
+        
+        // Par classe
+        if (!diagnostics.byClass[className]) {
+            diagnostics.byClass[className] = {
+                total: 0,
+                byDay: {},
+                subjects: new Set()
+            };
+        }
+        diagnostics.byClass[className].total++;
+        diagnostics.byClass[className].byDay[day] = (diagnostics.byClass[className].byDay[day] || 0) + 1;
+        diagnostics.byClass[className].subjects.add(subject);
+        
+        // Par professeur
+        if (!diagnostics.byTeacher[teacher]) {
+            diagnostics.byTeacher[teacher] = {
+                total: 0,
+                byDay: {},
+                classes: new Set()
+            };
+        }
+        diagnostics.byTeacher[teacher].total++;
+        diagnostics.byTeacher[teacher].byDay[day] = (diagnostics.byTeacher[teacher].byDay[day] || 0) + 1;
+        diagnostics.byTeacher[teacher].classes.add(className);
+        
+        // Par matière
+        if (!diagnostics.bySubject[subject]) {
+            diagnostics.bySubject[subject] = {
+                total: 0,
+                classes: new Set()
+            };
+        }
+        diagnostics.bySubject[subject].total++;
+        diagnostics.bySubject[subject].classes.add(className);
+    });
+    
+    // Détecter les groupes parallèles
+    const timeSlots = {};
+    schedule.forEach(slot => {
+        const key = `${slot.day}-${slot.period}`;
+        if (!timeSlots[key]) timeSlots[key] = [];
+        timeSlots[key].push(slot);
+    });
+    
+    Object.entries(timeSlots).forEach(([key, slots]) => {
+        if (slots.length > 1) {
+            // Vérifier si c'est vraiment un groupe parallèle (même matière)
+            const subjects = {};
+            slots.forEach(slot => {
+                const subject = slot.subject || slot.subject_name;
+                if (!subjects[subject]) subjects[subject] = [];
+                subjects[subject].push(slot);
+            });
+            
+            Object.entries(subjects).forEach(([subject, parallelSlots]) => {
+                if (parallelSlots.length > 1) {
+                    diagnostics.parallelGroups.push({
+                        time: key,
+                        subject: subject,
+                        classes: parallelSlots.map(s => s.class || s.class_name)
+                    });
+                }
+            });
+        }
+    });
+    
+    // Calculer le taux de couverture
+    const expectedSlotsPerDay = 8; // Ajustez selon vos besoins
+    const expectedDays = 6;
+    const expectedClasses = Object.keys(diagnostics.byClass).length || 1;
+    const expectedTotal = expectedSlotsPerDay * expectedDays * expectedClasses;
+    diagnostics.coverage = {
+        expected: expectedTotal,
+        actual: schedule.length,
+        percentage: Math.round((schedule.length / expectedTotal) * 100)
+    };
+    
+    // Afficher le rapport de diagnostic
+    displayDiagnosticReport(diagnostics);
+    
+    return diagnostics;
+}
+
+function displayDiagnosticReport(diagnostics) {
+    const reportHTML = `
+        <div class="diagnostic-report" style="
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        ">
+            <h2 style="color: #e74c3c; margin-bottom: 20px;">
+                ⚠️ Rapport de diagnostic - Problèmes détectés
+            </h2>
+            
+            <!-- Problème 1: Jours manquants -->
+            ${diagnostics.missingDays.length > 0 ? `
+                <div class="alert alert-danger" style="
+                    background: #fee;
+                    border-left: 4px solid #e74c3c;
+                    padding: 15px;
+                    margin-bottom: 15px;
+                ">
+                    <h4>🚨 Jours sans cours générés:</h4>
+                    <p>${diagnostics.missingDays.join(', ')}</p>
+                    <small>Le système n'a généré des cours que pour ${Object.keys(diagnostics.byDay).filter(d => diagnostics.byDay[d] > 0).length} jour(s) sur 6.</small>
+                </div>
+            ` : ''}
+            
+            <!-- Distribution par jour -->
+            <div style="
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 5px;
+                margin-bottom: 15px;
+            ">
+                <h4>📊 Distribution des créneaux par jour:</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px;">
+                    ${Object.entries(diagnostics.byDay).map(([day, count]) => `
+                        <div style="
+                            text-align: center;
+                            padding: 10px;
+                            background: ${count === 0 ? '#fee' : '#efe'};
+                            border-radius: 5px;
+                        ">
+                            <strong>${day}</strong><br>
+                            <span style="font-size: 24px; color: ${count === 0 ? '#e74c3c' : '#27ae60'};">
+                                ${count}
+                            </span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- Taux de couverture -->
+            <div style="
+                background: ${diagnostics.coverage.percentage < 50 ? '#fee' : '#efe'};
+                padding: 15px;
+                border-radius: 5px;
+                margin-bottom: 15px;
+            ">
+                <h4>📈 Taux de couverture:</h4>
+                <div style="
+                    font-size: 32px;
+                    font-weight: bold;
+                    color: ${diagnostics.coverage.percentage < 50 ? '#e74c3c' : '#27ae60'};
+                ">
+                    ${diagnostics.coverage.percentage}%
+                </div>
+                <small>
+                    ${diagnostics.coverage.actual} créneaux générés sur ${diagnostics.coverage.expected} attendus
+                </small>
+            </div>
+            
+            <!-- Groupes parallèles détectés -->
+            <div style="
+                background: #f0f4ff;
+                padding: 15px;
+                border-radius: 5px;
+                margin-bottom: 15px;
+            ">
+                <h4>👥 Groupes parallèles détectés:</h4>
+                ${diagnostics.parallelGroups.length > 0 ? `
+                    <ul>
+                        ${diagnostics.parallelGroups.map(group => `
+                            <li>
+                                <strong>${group.subject}</strong> - 
+                                Classes: ${group.classes.join(', ')} 
+                                (${group.time})
+                            </li>
+                        `).join('')}
+                    </ul>
+                ` : '<p style="color: #e74c3c;">❌ Aucun groupe parallèle trouvé</p>'}
+            </div>
+            
+            <!-- Charge des professeurs -->
+            <div style="
+                background: #fff9e6;
+                padding: 15px;
+                border-radius: 5px;
+                margin-bottom: 15px;
+            ">
+                <h4>👨‍🏫 Charge des professeurs:</h4>
+                <div style="max-height: 200px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f0f0f0;">
+                                <th style="padding: 8px; text-align: left;">Professeur</th>
+                                <th style="padding: 8px; text-align: center;">Total heures</th>
+                                <th style="padding: 8px; text-align: center;">Classes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(diagnostics.byTeacher).map(([teacher, data]) => `
+                                <tr>
+                                    <td style="padding: 8px; border-top: 1px solid #ddd;">${teacher}</td>
+                                    <td style="padding: 8px; text-align: center; border-top: 1px solid #ddd;">
+                                        <span style="
+                                            color: ${data.total < 10 ? '#e74c3c' : '#27ae60'};
+                                            font-weight: bold;
+                                        ">${data.total}</span>
+                                    </td>
+                                    <td style="padding: 8px; text-align: center; border-top: 1px solid #ddd;">
+                                        ${data.classes.size}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Actions correctives suggérées -->
+            <div style="
+                background: #e3f2fd;
+                padding: 15px;
+                border-radius: 5px;
+                border-left: 4px solid #2196f3;
+            ">
+                <h4>💡 Actions correctives recommandées:</h4>
+                <ol>
+                    ${diagnostics.missingDays.length > 0 ? `
+                        <li><strong>Vérifier les contraintes de jours:</strong> Le système semble bloquer sur certains jours. Vérifiez que les contraintes ne sont pas trop restrictives.</li>
+                    ` : ''}
+                    ${diagnostics.coverage.percentage < 50 ? `
+                        <li><strong>Augmenter le temps de calcul:</strong> Essayez d'augmenter la limite de temps pour le solveur (time_limit).</li>
+                    ` : ''}
+                    ${diagnostics.parallelGroups.length === 0 ? `
+                        <li><strong>Configurer les groupes parallèles:</strong> Ajoutez des contraintes de type "parallel_group" pour les matières qui doivent être enseignées simultanément.</li>
+                    ` : ''}
+                    <li><strong>Vérifier les disponibilités:</strong> Assurez-vous que les professeurs ont suffisamment de créneaux disponibles.</li>
+                    <li><strong>Réviser les contraintes dures:</strong> Certaines contraintes peuvent être incompatibles entre elles.</li>
+                </ol>
+            </div>
+            
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button class="btn btn-primary" onclick="exportDiagnosticData()">
+                    📥 Exporter le diagnostic
+                </button>
+                <button class="btn btn-warning" onclick="suggestConstraintFixes()">
+                    🔧 Suggérer des corrections
+                </button>
+                <button class="btn btn-success" onclick="regenerateWithFixes()">
+                    🔄 Régénérer avec corrections
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Insérer le rapport dans la page
+    const schedulePreview = document.getElementById('schedulePreview');
+    const existingReport = schedulePreview.querySelector('.diagnostic-report');
+    
+    if (existingReport) {
+        existingReport.outerHTML = reportHTML;
+    } else {
+        schedulePreview.insertAdjacentHTML('afterbegin', reportHTML);
+    }
+}
+
+// Fonction pour suggérer des corrections automatiques
+async function suggestConstraintFixes() {
+    const diagnostics = analyzeScheduleProblems();
+    const fixes = [];
+    
+    // Si des jours manquent complètement
+    if (diagnostics.missingDays.length > 0) {
+        fixes.push({
+            type: 'relaxation',
+            message: 'Désactiver temporairement les contraintes de disponibilité pour les jours manquants',
+            action: async () => {
+                // Identifier et désactiver les contraintes problématiques
+                const problematicConstraints = currentConstraints.filter(c => {
+                    const data = c.data || c.constraint_data || {};
+                    return diagnostics.missingDays.some(day => 
+                        JSON.stringify(data).includes(day)
+                    );
+                });
+                
+                for (const constraint of problematicConstraints) {
+                    await toggleConstraint(constraint.constraint_id || constraint.id);
+                }
+            }
+        });
+    }
+    
+    // Si le taux de couverture est très bas
+    if (diagnostics.coverage.percentage < 30) {
+        fixes.push({
+            type: 'configuration',
+            message: 'Augmenter le temps de calcul et réduire les contraintes strictes',
+            action: () => {
+                // Suggérer de nouvelles configurations
+                console.log('Configuration suggérée: time_limit=300, priority_threshold=100');
+            }
+        });
+    }
+    
+    // Afficher les suggestions
+    displaySuggestedFixes(fixes);
+}
+
+function displaySuggestedFixes(fixes) {
+    const fixesHTML = `
+        <div class="suggested-fixes" style="
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        ">
+            <h4>🔧 Corrections suggérées:</h4>
+            <ul>
+                ${fixes.map((fix, index) => `
+                    <li style="margin: 10px 0;">
+                        <strong>${fix.message}</strong>
+                        <button class="btn btn-sm btn-warning" onclick="applyFix(${index})">
+                            Appliquer
+                        </button>
+                    </li>
+                `).join('')}
+            </ul>
+        </div>
+    `;
+    
+    const schedulePreview = document.getElementById('schedulePreview');
+    schedulePreview.insertAdjacentHTML('beforeend', fixesHTML);
+}
+
+// Fonction pour régénérer avec des paramètres améliorés
+async function regenerateWithFixes() {
+    const preview = document.getElementById('schedulePreview');
+    preview.innerHTML = `
+        <div class="loading">
+            <div class="spinner-border"></div>
+            <p>🔧 Régénération avec optimisations...</p>
+        </div>
+    `;
+    
+    try {
+        // Paramètres optimisés pour une meilleure génération
+        const optimizedParams = {
+            constraints: currentConstraints.filter(c => 
+                c.is_active !== false && c.is_active !== 0
+            ),
+            time_limit: 300,  // Augmenter le temps de calcul
+            parallel_processing: true,  // Activer le traitement parallèle
+            optimization_level: 3,  // Niveau d'optimisation maximal
+            allow_soft_violations: true,  // Permettre la violation de contraintes souples
+            days_to_generate: ['א', 'ב', 'ג', 'ד', 'ה', 'ו'],  // Forcer tous les jours
+            min_coverage: 0.8,  // Exiger au moins 80% de couverture
+            enable_parallel_groups: true  // Activer explicitement les groupes parallèles
+        };
+        
+        console.log('Régénération avec paramètres optimisés:', optimizedParams);
+        
+        const response = await fetch(`${API_BASE}/generate_schedule`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(optimizedParams)
+        });
+        
+        if (response.ok) {
+            scheduleData = await response.json();
+            
+            // Afficher le nouvel emploi du temps
+            displaySchedule();
+            
+            // Analyser automatiquement les nouveaux résultats
+            setTimeout(() => {
+                analyzeScheduleProblems();
+            }, 500);
+            
+            showAlert('✅ Emploi du temps régénéré avec optimisations', 'success');
+        } else {
+            const error = await response.json();
             preview.innerHTML = `
-                <div class="alert alert-success">
-                    Emploi du temps généré avec succès!
-                    <br>Total: ${scheduleData.schedule.length} créneaux assignés
+                <div class="alert alert-danger">
+                    <strong>Erreur:</strong> ${error.detail || 'Impossible de régénérer'}
+                    <br><small>Essayez de désactiver certaines contraintes conflictuelles.</small>
                 </div>
             `;
         }
+    } catch (error) {
+        console.error('Erreur de régénération:', error);
+        preview.innerHTML = `
+            <div class="alert alert-danger">
+                <strong>Erreur:</strong> Problème de connexion au serveur
+            </div>
+        `;
+    }
+}
+
+// Fonction pour exporter les données de diagnostic
+function exportDiagnosticData() {
+    const diagnostics = analyzeScheduleProblems();
+    const dataStr = JSON.stringify(diagnostics, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `diagnostic_${new Date().toISOString()}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+}
+
+// Ajouter un bouton de diagnostic dans l'interface
+document.addEventListener('DOMContentLoaded', function() {
+    // Ajouter le bouton de diagnostic après la génération
+    const scheduleHeader = document.querySelector('#tab-schedule .card-header');
+    if (scheduleHeader) {
+        scheduleHeader.insertAdjacentHTML('beforeend', `
+            <button class="btn btn-warning" onclick="analyzeScheduleProblems()" style="margin-left: 10px;">
+                🔍 Diagnostic
+            </button>
+        `);
+    }
+});
+
+// Modifier la fonction generateSchedule existante pour inclure l'analyse automatique
+const originalGenerateSchedule = window.generateSchedule;
+window.generateSchedule = async function() {
+    await originalGenerateSchedule();
+    
+    // Attendre que l'emploi du temps soit affiché
+    setTimeout(() => {
+        if (scheduleData && scheduleData.schedule) {
+            // Lancer automatiquement l'analyse
+            analyzeScheduleProblems();
+        }
+    }, 1000);
+};
+// Fonction pour formater les périodes
+function formatPeriod(period) {
+    const periodTimes = {
+        0: '07:45-08:30',
+        1: '08:30-09:15',
+        2: '09:15-10:00',
+        3: '10:15-11:00',
+        4: '11:00-11:45',
+        5: '12:00-12:45',
+        6: '12:45-13:30',
+        7: '13:30-14:15',
+        8: '14:15-15:00',
+        9: '15:00-15:45'
+    };
+    
+    return `<div>Période ${period + 1}</div><small style="opacity: 0.7;">${periodTimes[period] || `${8 + period}:00`}</small>`;
+}
+
+// Fonction pour obtenir la couleur selon la matière
+function getSubjectColor(subject) {
+    const subjectColors = {
+        'מתמטיקה': '#e3f2fd', // Mathématiques - bleu clair
+        'Math': '#e3f2fd',
+        'עברית': '#f3e5f5', // Hébreu - violet clair
+        'Hebrew': '#f3e5f5',
+        'אנגלית': '#e8f5e9', // Anglais - vert clair
+        'English': '#e8f5e9',
+        'תורה': '#fff3e0', // Torah - orange clair
+        'Torah': '#fff3e0',
+        'תפילה': '#fff3e0', // Prière - orange clair
+        'Prayer': '#fff3e0',
+        'מדעים': '#fce4ec', // Sciences - rose clair
+        'Science': '#fce4ec',
+        'היסטוריה': '#f3f4f6', // Histoire - gris clair
+        'History': '#f3f4f6',
+        'ספורט': '#e0f2f1', // Sport - cyan clair
+        'Sport': '#e0f2f1',
+        'אומנות': '#fef3c7', // Art - jaune clair
+        'Art': '#fef3c7'
+    };
+    
+    // Recherche partielle dans le nom de la matière
+    for (const [key, color] of Object.entries(subjectColors)) {
+        if (subject.includes(key)) {
+            return color;
+        }
+    }
+    
+    return '#f5f5f5'; // Couleur par défaut
+}
+
+// Fonction pour afficher l'emploi du temps d'une classe spécifique
+function showClassSchedule(className) {
+    // Cacher tous les emplois du temps
+    document.querySelectorAll('.schedule-table-wrapper').forEach(table => {
+        table.style.display = 'none';
+    });
+    
+    // Retirer la classe active de tous les onglets
+    document.querySelectorAll('.schedule-tab').forEach(tab => {
+        tab.classList.remove('active');
+        tab.style.backgroundColor = 'transparent';
+        tab.style.color = '#34495e';
+    });
+    
+    // Afficher l'emploi du temps sélectionné
+    const selectedSchedule = document.getElementById(`schedule-${className}`);
+    if (selectedSchedule) {
+        selectedSchedule.style.display = 'block';
+    }
+    
+    // Marquer l'onglet comme actif
+    event.target.classList.add('active');
+    event.target.style.backgroundColor = '#3498db';
+    event.target.style.color = 'white';
+}
 
         // ============================================
         // UTILITAIRES

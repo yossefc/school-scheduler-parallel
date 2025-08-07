@@ -33,6 +33,117 @@ done
 echo "✅ PostgreSQL is ready!"
 
 # ================================================================
+# ÉTAPE 0 : Initialisation du schéma de base (si nécessaire)
+# ================================================================
+echo "🔍 Checking if database schema is initialized..."
+
+# Vérifier si les tables de base existent
+if ! run_sql "SELECT 1 FROM time_slots LIMIT 1;" >/dev/null 2>&1; then
+    echo "📥 Database not initialized. Loading initial schema..."
+    
+    # Chemin vers le fichier schema.sql
+    SCHEMA_FILE="/app/database/schema.sql"
+    
+    if [ -f "$SCHEMA_FILE" ]; then
+        echo "   ▶️  Executing schema.sql..."
+        if run_sql_file "$SCHEMA_FILE"; then
+            echo "   ✅ Schema loaded successfully!"
+            
+            # Vérifier que les données de base sont bien là
+            time_slots_count=$(run_sql "SELECT COUNT(*) FROM time_slots;" | grep -oE '[0-9]+' | tail -1)
+            echo "   📊 Time slots created: $time_slots_count"
+            
+        else
+            echo "   ❌ Failed to load schema!"
+            exit 1
+        fi
+    else
+        echo "   ⚠️  Schema file not found at $SCHEMA_FILE"
+        echo "   Creating minimal structure..."
+        
+        # Créer au minimum les tables nécessaires
+        run_sql "
+        CREATE TABLE IF NOT EXISTS time_slots (
+            slot_id SERIAL PRIMARY KEY,
+            day_of_week INTEGER,
+            period_number INTEGER,
+            start_time TIME NOT NULL,
+            end_time TIME NOT NULL,
+            is_break BOOLEAN DEFAULT FALSE
+        );
+        
+        CREATE TABLE IF NOT EXISTS classes (
+            class_id SERIAL PRIMARY KEY,
+            grade INTEGER NOT NULL,
+            section VARCHAR(10) NOT NULL,
+            class_name VARCHAR(50) UNIQUE NOT NULL,
+            student_count INTEGER
+        );
+        
+        CREATE TABLE IF NOT EXISTS teachers (
+            teacher_id SERIAL PRIMARY KEY,
+            teacher_name VARCHAR(100) UNIQUE NOT NULL,
+            total_hours INTEGER,
+            work_days VARCHAR(50),
+            email VARCHAR(100),
+            phone VARCHAR(20),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE TABLE IF NOT EXISTS subjects (
+            subject_id SERIAL PRIMARY KEY,
+            subject_name VARCHAR(100) NOT NULL,
+            subject_code VARCHAR(20) UNIQUE,
+            category VARCHAR(50),
+            difficulty_level INTEGER DEFAULT 3
+        );"
+        
+        # Insérer des créneaux horaires simplifiés (périodes 1-8)
+        echo "   📅 Creating simple time slots (periods 1-8)..."
+        run_sql "
+        INSERT INTO time_slots (day_of_week, period_number, start_time, end_time, is_break)
+        SELECT d, p, '00:00'::time, '00:00'::time, FALSE
+        FROM generate_series(0,5) AS d      -- 0=Dimanche, 1=Lundi...5=Vendredi
+        CROSS JOIN generate_series(1,8) AS p  -- Périodes 1 à 8
+        ON CONFLICT DO NOTHING;"
+        
+        # Ne pas créer de classes de démonstration - elles seront générées automatiquement
+        echo "   ℹ️  Classes will be auto-generated from teacher_load data..."
+        
+        echo "   ✅ Minimal structure created!"
+    fi
+else
+    echo "   ✅ Database already initialized."
+fi
+
+# ================================================================
+# ÉTAPE 0.5 : Synchronisation automatique des classes depuis teacher_load
+# ================================================================
+echo "🔄 Synchronizing classes from teacher_load data..."
+
+# Extraire toutes les classes mentionnées dans teacher_load et les insérer
+run_sql "
+INSERT INTO classes (grade, section, class_name, student_count)
+SELECT 
+    NULL AS grade,
+    NULL AS section,
+    TRIM(class_name) AS class_name,
+    NULL AS student_count
+FROM (
+    SELECT DISTINCT unnest(string_to_array(class_list, ',')) AS class_name
+    FROM teacher_load
+    WHERE class_list IS NOT NULL 
+      AND class_list != ''
+      AND class_list != 'NULL'
+) AS extracted_classes
+WHERE TRIM(class_name) != ''
+ON CONFLICT (class_name) DO NOTHING;" 2>/dev/null || echo "   ⚠️  No teacher_load data found yet (will sync after data import)"
+
+# Compter les classes créées
+classes_count=$(run_sql "SELECT COUNT(*) FROM classes;" | grep -oE '[0-9]+' | tail -1)
+echo "   📊 Total classes in database: $classes_count"
+
+# ================================================================
 # ÉTAPE 1 : Créer la table de contrôle des migrations
 # ================================================================
 echo "📋 Setting up migration control..."
