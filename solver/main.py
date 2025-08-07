@@ -1,8 +1,10 @@
-﻿from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
+﻿# Ajouter ces lignes au début de votre main.py dans ./solver/main.py
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
-from solver_engine import ScheduleSolver  # Solver corrigֳ©
+from solver_engine import ScheduleSolver
 from models import ScheduleRequest, ConstraintRequest
 from constraints_handler import ConstraintsManager
 import json
@@ -11,21 +13,20 @@ from datetime import datetime
 from prometheus_fastapi_instrumentator import Instrumentator
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from api_constraints import register_constraint_routes
-
+from api_constraints import register_constraint_routes  # Import du module
+from pydantic import BaseModel
+import os
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="School Schedule Solver - Parallel Teaching Edition")
-# Instrumentation Prometheus (/metrics)
-Instrumentator().instrument(app).expose(app, include_in_schema=False)
+app = FastAPI(title="School Schedule Solver - Docker Edition")
 
-# CORS
+# CORS - Très important pour Docker
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Permet toutes les origines en dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,16 +34,75 @@ app.add_middleware(
 
 # Instances
 constraints_manager = ConstraintsManager()
+
+# IMPORTANT: Enregistrer les routes des contraintes
 register_constraint_routes(app)
 
-
-# Configuration DB  
+# Configuration DB pour Docker
 db_config = {
-    "host": "host.docker.internal",  # Utiliser host.docker.internal comme ai_agent
+    "host": "postgres",  # Nom du service Docker, pas localhost !
     "database": "school_scheduler",
     "user": "admin", 
     "password": "school123"
 }
+
+# Route pour servir l'interface HTML
+@app.get("/constraints-manager")
+async def constraints_interface():
+    """Sert l'interface de gestion des contraintes"""
+    try:
+        # Chemin du fichier HTML dans le container
+        html_path = '/app/constraints_manager.html'
+        
+        # Si le fichier n'existe pas dans /app, essayer le dossier courant
+        if not os.path.exists(html_path):
+            html_path = 'constraints_manager.html'
+        
+        with open(html_path, 'r', encoding='utf-8') as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        logger.error(f"Fichier constraints_manager.html non trouvé")
+        return HTMLResponse(content="""
+            <h1>Erreur: Interface non trouvée</h1>
+            <p>Le fichier constraints_manager.html n'est pas présent dans le container.</p>
+            <p>Vérifiez que le fichier est bien dans le dossier ./solver/</p>
+        """, status_code=404)
+
+@app.get("/")
+async def root():
+    return {
+        "message": "School Schedule Solver API - Docker Version",
+        "version": "2.0",
+        "features": ["parallel_teaching", "automatic_detection", "synchronized_scheduling"],
+        "endpoints": {
+            "interface": "http://localhost:8000/constraints-manager",
+            "api_constraints": "http://localhost:8000/api/constraints",
+            "api_stats": "http://localhost:8000/api/stats"
+        }
+    }
+
+# Route de santé pour Docker
+@app.get("/health")
+async def health_check():
+    """Health check endpoint pour Docker"""
+    try:
+        # Test de connexion à la DB
+        conn = psycopg2.connect(**db_config)
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.close()
+        conn.close()
+        db_status = "healthy"
+    except:
+        db_status = "unhealthy"
+    
+    return {
+        "status": "healthy",
+        "database": db_status,
+        "timestamp": datetime.now().isoformat()
+    }
+
+# Le reste de votre code main.py...
 @app.get("/constraints-manager")
 async def constraints_interface():
     """Sert l'interface de gestion des contraintes"""
@@ -58,57 +118,113 @@ async def root():
     }
 
 # Remplacez la fonction generate_schedule dans main.py par cette version corrigée
-
-@app.post("/generate_schedule")
-async def generate_schedule(request: ScheduleRequest):
-    """Génère un emploi du temps avec support des cours parallèles"""
+@app.post("/parse")
+async def parse_excel(file: UploadFile = File(...)):
+    """Parse un fichier Excel et extrait les données pour l'emploi du temps"""
     try:
-        # Configuration DB corrigée
-        solver_db_config = {
-            "host": "postgres",  # pour Docker
-            "database": "school_scheduler",
-            "user": "admin",
-            "password": "school123"
-        }
+        logger.info(f"Réception du fichier: {file.filename}")
         
-        solver = ScheduleSolver(solver_db_config)
-        solver.load_data_from_db()
+        # Vérifier l'extension du fichier
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            raise HTTPException(status_code=400, detail="Le fichier doit être un Excel (.xlsx ou .xls)")
         
-        # Résoudre
-        schedule = solver.solve(time_limit=request.time_limit or 60)
+        # Lire le fichier Excel
+        contents = await file.read()
         
-        if schedule:
-            # Statistiques améliorées avec info sur les cours parallèles
-            parallel_lessons = [e for e in schedule if e.get("is_parallel", False)]
-            individual_lessons = [e for e in schedule if not e.get("is_parallel", False)]
-            
-            return {
-            "schedule": schedule,
-            "statistics": {
-                "total_assignments": len(schedule),
-                "parallel_lessons": len(parallel_lessons),
-                "individual_lessons": len(individual_lessons),
-                "parallel_percentage": f"{(len(parallel_lessons)/len(schedule)*100):.1f}%",
-                "teachers_used": list(set(e["teacher_name"] for e in schedule)),
-                "classes_covered": list(set(e["class_name"] for e in schedule if e.get("class_name"))),
-                "parallel_summary": f"{len(parallel_lessons)} cours parallèles sur {len(schedule)} total"
+        # Traiter les différents onglets
+        df_teachers = pd.read_excel(contents, sheet_name='Teachers', engine='openpyxl')
+        df_subjects = pd.read_excel(contents, sheet_name='Teacher_Subjects', engine='openpyxl')
+        df_parallel = pd.read_excel(contents, sheet_name='Parallel_Groups', engine='openpyxl')
+        df_constraints = pd.read_excel(contents, sheet_name='Constraints', engine='openpyxl')
+        
+        # Nettoyer et formater les données des professeurs
+        teachers = []
+        for _, row in df_teachers.iterrows():
+            teacher = {
+                "teacher_name": str(row['Teacher Name']).strip(),
+                "total_hours": int(row['Total Hours']) if pd.notna(row['Total Hours']) else None,
+                "work_days": str(row['Work Days']) if pd.notna(row['Work Days']) else None,
+                "grades": str(row['Grades']) if pd.notna(row['Grades']) else None,
+                "email": str(row['Email']) if pd.notna(row['Email']) else None,
+                "phone": str(row['Phone']) if pd.notna(row['Phone']) else None
+            }
+            teachers.append(teacher)
+        
+        # Nettoyer et formater les charges d'enseignement
+        teacher_subjects = []
+        for _, row in df_subjects.iterrows():
+            subject = {
+                "teacher_name": str(row['Teacher Name']).strip(),
+                "subject": str(row['Subject']).strip(),
+                "grade": str(row['Grade']),
+                "class_list": str(row['Class List']) if pd.notna(row['Class List']) else "",
+                "hours": int(row['Hours']) if pd.notna(row['Hours']) else 0,
+                "work_days": str(row['Work Days']) if pd.notna(row['Work Days']) else None
+            }
+            teacher_subjects.append(subject)
+        
+        # Nettoyer et formater les groupes parallèles
+        parallel_groups = []
+        for _, row in df_parallel.iterrows():
+            group = {
+                "subject": str(row['Subject']).strip(),
+                "grade": str(row['Grade']),
+                "teachers": str(row['Teachers']).split(',') if pd.notna(row['Teachers']) else [],
+                "class_lists": str(row['Class Lists']).split(',') if pd.notna(row['Class Lists']) else []
+            }
+            # Nettoyer les espaces dans les listes
+            group["teachers"] = [t.strip() for t in group["teachers"]]
+            group["class_lists"] = [c.strip() for c in group["class_lists"]]
+            parallel_groups.append(group)
+        
+        # Nettoyer et formater les contraintes
+        constraints = []
+        for _, row in df_constraints.iterrows():
+            constraint = {
+                "type": str(row['Type']).strip() if pd.notna(row['Type']) else "custom",
+                "weight": int(row['Weight']) if pd.notna(row['Weight']) else 1,
+                "details": json.dumps({
+                    "description": str(row['Description']) if pd.notna(row['Description']) else "",
+                    "entity_type": str(row['Entity Type']) if pd.notna(row['Entity Type']) else "",
+                    "entity_name": str(row['Entity Name']) if pd.notna(row['Entity Name']) else "",
+                    "day": str(row['Day']) if pd.notna(row['Day']) else None,
+                    "period": str(row['Period']) if pd.notna(row['Period']) else None,
+                    "room": str(row['Room']) if pd.notna(row['Room']) else None
+                })
+            }
+            constraints.append(constraint)
+        
+        # Préparer la réponse
+        result = {
+            "teachers": teachers,
+            "teacher_subjects": teacher_subjects,
+            "parallel_groups": parallel_groups,
+            "constraints": constraints,
+            "metadata": {
+                "filename": file.filename,
+                "imported_at": datetime.now().isoformat(),
+                "counts": {
+                    "teachers": len(teachers),
+                    "teacher_subjects": len(teacher_subjects),
+                    "parallel_groups": len(parallel_groups),
+                    "constraints": len(constraints)
+                }
             }
         }
-        else:
-            return JSONResponse(
-                status_code=400,
-                content={"detail": "Impossible de générer l'emploi du temps"}
-            )
-            
+        
+        logger.info(f"Parsing réussi: {result['metadata']['counts']}")
+        return JSONResponse(content=result)
+        
+    except pd.errors.EmptyDataError:
+        logging.error("Trace solver :", exc_info=e)        
+        raise HTTPException(status_code=400, detail="Le fichier Excel est vide ou mal formaté")
+    except KeyError as e:
+        logging.error("Trace solver :", exc_info=e)        # <-- ajoute ceci
+        raise HTTPException(status_code=400, detail=f"Colonne manquante dans le fichier Excel: {str(e)}")
     except Exception as e:
-        logger.error(f"Erreur: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"detail": str(e)}
-        )
-# ============================================
-# NOUVEAUX ENDPOINTS POUR LES COURS PARALLֳˆLES
-# ============================================
+        logger.error(f"Erreur lors du parsing: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors du traitement du fichier: {str(e)}")
+
 
 @app.get("/api/parallel/groups")
 async def get_parallel_groups():
@@ -245,6 +361,7 @@ async def analyze_for_parallel(data: dict):
         }
         
     except Exception as e:
+        logging.error("Trace solver :", exc_info=e)        # <-- ajoute ceci
         raise HTTPException(status_code=400, detail=str(e))
 
 # ============================================
@@ -434,17 +551,70 @@ async def get_general_stats():
         except:
             stats['active_constraints'] = 0
         
-        # Données par défaut pour les tables manquantes
-        stats['total_classes'] = 0  # Table classes n'existe pas encore
-        stats['total_teachers'] = 0  # Table teachers n'existe pas encore
-        stats['total_lessons'] = 0  # Table schedule_entries n'existe pas encore
-        stats['total_subjects'] = 0  # Table teacher_load n'existe pas encore
+        # Compter les données réelles
+        try:
+            cur.execute("SELECT COUNT(*) as count FROM classes")
+            stats['total_classes'] = cur.fetchone()['count']
+        except:
+            stats['total_classes'] = 0
+            
+        try:
+            cur.execute("SELECT COUNT(*) as count FROM teachers")
+            stats['total_teachers'] = cur.fetchone()['count']
+        except:
+            stats['total_teachers'] = 0
+            
+        try:
+            cur.execute("SELECT COUNT(*) as count FROM schedule_entries")
+            stats['total_lessons'] = cur.fetchone()['count']
+        except:
+            stats['total_lessons'] = 0
+            
+        try:
+            cur.execute("SELECT COUNT(*) as count FROM subjects")
+            stats['total_subjects'] = cur.fetchone()['count']
+        except:
+            stats['total_subjects'] = 0
         
         return {"general": stats, "note": "Statistiques basées sur les tables existantes"}
     finally:
         cur.close()
         conn.close()
 
+
+# ============================================================
+# GÉNÉRATION D'EMPLOI DU TEMPS (API)
+# ============================================================
+from typing import Optional, List, Any
+
+class GenerateScheduleRequest(BaseModel):
+    constraints: Optional[List[Any]] = None  # réservée pour usage futur
+    time_limit: int = 60
+
+@app.post("/generate_schedule")
+async def generate_schedule_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps complet puis le renvoie (et l'enregistre)."""
+    try:
+        solver = ScheduleSolver()
+        # Charger les données depuis la BD
+        solver.load_data_from_db()
+
+        # TODO: appliquer payload.constraints dans le solver si nécessaire
+        schedule = solver.solve(time_limit=payload.time_limit)
+        if schedule is None:
+            raise HTTPException(status_code=500, detail="Échec du solveur – aucune solution trouvée")
+
+        # Sauver dans la BD (facultatif)
+        try:
+            schedule_id = solver.save_schedule(schedule)
+        except Exception:
+            schedule_id = None  # Ne pas bloquer la réponse si la sauvegarde échoue
+
+        summary = solver.get_schedule_summary(schedule)
+        return {"schedule": schedule, "summary": summary, "schedule_id": schedule_id}
+    except Exception as e:
+        logger.error(f"Error generating schedule: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

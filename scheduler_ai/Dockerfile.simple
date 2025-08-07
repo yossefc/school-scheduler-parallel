@@ -1,6 +1,6 @@
-######################## DOCKERFILE SIMPLIFIÉ ############################
-# Version alternative qui évite les problèmes de structure Python
-# Build context: racine du projet (où se trouve docker-compose.yml)
+﻿######################## DOCKERFILE SIMPLIFIֳ‰ ############################
+# Version alternative qui ֳ©vite les problֳ¨mes de structure Python
+# Build context: racine du projet (oֳ¹ se trouve docker-compose.yml)
 ##########################################################################
 
 ARG PYTHON_VERSION=3.11-slim
@@ -17,15 +17,15 @@ ARG HTTPS_PROXY
 ENV HTTP_PROXY=${HTTP_PROXY} \
     HTTPS_PROXY=${HTTPS_PROXY}
 
-# ---------- Dépendances système ----------------------------------------
+# ---------- Dֳ©pendances systֳ¨me ----------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl postgresql-client netcat-openbsd \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ---------- Répertoire de travail --------------------------------------
+# ---------- Rֳ©pertoire de travail --------------------------------------
 WORKDIR /app
 
-# ---------- Dépendances Python ------------------------------------------
+# ---------- Dֳ©pendances Python ------------------------------------------
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir eventlet gunicorn psycopg2-binary
@@ -36,7 +36,7 @@ COPY . ./
 # S'assurer que __init__.py existe pour faire de /app un package Python
 RUN touch __init__.py
 
-# ---------- Script d'entrée --------------------------------------------
+# ---------- Script d'entrֳ©e --------------------------------------------
 # Le fichier est maintenant dans /app/docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh
 
@@ -60,8 +60,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
 USER ${USER}
 
 # ---------- Commandes ---------------------------------------------------
-ENTRYPOINT ["bash", "/app/docker-entrypoint.sh"]
-# CORRECTIF: Utiliser api:app car les fichiers sont directement dans /app
-CMD ["gunicorn", "-k", "eventlet", "-w", "1", "api:app", "-b", "0.0.0.0:5001", "--log-level", "info"] 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENTRYPOINT ["bash", "/app/docker-entrypoint-fixed.sh"]
+# Utiliser api:app car les fichiers sont directement dans /app
+CMD ["gunicorn", "-k", "eventlet", "-w", "1", "api:app", "-b", "0.0.0.0:5001", "--log-level", "info"]
