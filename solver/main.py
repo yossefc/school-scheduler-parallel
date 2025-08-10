@@ -4,8 +4,9 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
-from solver_engine import ScheduleSolver
+from solver_engine_with_constraints import ScheduleSolverWithConstraints as ScheduleSolver
 from constraints_handler import ConstraintsManager
+from ortools.sat.python import cp_model
 import json
 import logging
 from datetime import datetime
@@ -580,31 +581,79 @@ from typing import Optional, List, Any
 
 
 
+# Dans main.py, remplacez la fonction generate_schedule_endpoint par :
+
 @app.post("/generate_schedule")
 async def generate_schedule_endpoint(payload: GenerateScheduleRequest):
-    """Génère un emploi du temps complet puis le renvoie (et l'enregistre)."""
+    """Génère un emploi du temps complet avec gestion améliorée"""
     try:
-        solver = ScheduleSolver(db_config)  # Passer la config DB
-        # Charger les données depuis la BD
+        logger.info("=== DÉBUT GÉNÉRATION EMPLOI DU TEMPS ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Créer le solver avec la config Docker
+        solver = ScheduleSolver(db_config)
+        
+        # Charger les données
+        logger.info("Chargement des données...")
         solver.load_data_from_db()
-
-        # TODO: appliquer payload.constraints dans le solver si nécessaire
-        schedule = solver.solve(time_limit=payload.time_limit)
+        
+        # IMPORTANT: Utiliser un temps suffisant vu le taux d'utilisation de 95%
+        time_limit = max(payload.time_limit, 600)  # Minimum 10 minutes
+        logger.info(f"Génération avec time_limit={time_limit}s")
+        
+        # Résoudre
+        schedule = solver.solve(time_limit=time_limit)
+        
         if schedule is None:
-            raise HTTPException(status_code=500, detail="Échec du solveur – aucune solution trouvée")
-
-        # Sauver dans la BD (facultatif)
+            logger.error("Aucune solution trouvée")
+            
+            # Essayer avec des paramètres plus permissifs
+            logger.info("Tentative avec paramètres assouplis...")
+            solver.solver.parameters.search_branching = cp_model.PORTFOLIO_SEARCH
+            solver.solver.parameters.linearization_level = 2
+            solver.solver.parameters.cp_model_presolve = True
+            
+            schedule = solver.solve(time_limit=time_limit * 2)  # Doubler le temps
+            
+            if schedule is None:
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Impossible de générer un emploi du temps. Vérifiez les contraintes."
+                )
+        
+        # Sauvegarder systématiquement si une solution existe
+        schedule_id = None
         try:
             schedule_id = solver.save_schedule(schedule)
-        except Exception:
-            schedule_id = None  # Ne pas bloquer la réponse si la sauvegarde échoue
-
+            logger.info(f"Schedule sauvegardé avec ID: {schedule_id}")
+        except Exception as e:
+            logger.error(f"Erreur sauvegarde schedule: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Erreur de sauvegarde: {e}")
+        
+        # Générer le résumé
         summary = solver.get_schedule_summary(schedule)
-        return {"schedule": schedule, "summary": summary, "schedule_id": schedule_id}
+        
+        logger.info("=== GÉNÉRATION TERMINÉE ===")
+        logger.info(f"Résultat: {len(schedule)} créneaux générés")
+        logger.info(f"Jours utilisés: {summary.get('days_used', [])}")
+        logger.info(f"Classes couvertes: {summary.get('classes_covered', 0)}")
+        
+        return {
+            "success": True,
+            "schedule": schedule,
+            "summary": summary,
+            "schedule_id": schedule_id,
+            "message": f"Emploi du temps généré: {len(schedule)} créneaux"
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error generating schedule: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+        logger.error(f"Erreur génération: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Erreur lors de la génération: {str(e)}"
+        )
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

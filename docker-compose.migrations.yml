@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Service de migrations automatiques
+  migrations:
+    build:
+      context: .
+      dockerfile: migrations/Dockerfile
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=school_scheduler
+      - DB_USER=admin
+      - DB_PASSWORD=password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["migrations-only"]
+    volumes:
+      - ./database:/migrations/database:ro
+      - ./fix_solver_data.sh:/migrations/fix_solver_data.sh:ro
+    networks:
+      - school-scheduler-network
+
+  # Service de correction manuelle (one-shot)
+  fix-solver-data:
+    image: postgres:15-alpine
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=school_scheduler
+      - DB_USER=admin
+      - DB_PASSWORD=password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./fix_solver_data.sh:/fix_solver_data.sh:ro
+      - ./database:/database:ro
+    command: ["/bin/sh", "-c", "apk add --no-cache bash && chmod +x /fix_solver_data.sh && /fix_solver_data.sh"]
+    networks:
+      - school-scheduler-network
+
+networks:
+  school-scheduler-network:
+    external: true
+
+

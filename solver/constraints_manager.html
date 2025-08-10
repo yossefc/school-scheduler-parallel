@@ -1655,6 +1655,14 @@ displayConstraints();
 
 
 
+// Normaliseur de jour : mapping 0..5 -> א..ו
+const HEB_DAYS = ['א','ב','ג','ד','ה','ו'];
+function toHebDay(d) {
+    if (typeof d === 'number') return HEB_DAYS[d] ?? 'א';
+    const n = parseInt(d, 10);
+    return Number.isFinite(n) ? (HEB_DAYS[n] ?? 'א') : (d || 'א');
+}
+
 function displaySchedule() {
     if (!scheduleData || !scheduleData.schedule) {
         document.getElementById('schedulePreview').innerHTML = 
@@ -1683,7 +1691,7 @@ function displaySchedule() {
     
     schedule.forEach(slot => {
         const className = slot.class || slot.class_name || 'Non assigné';
-        const period = slot.period || slot.time_slot || 0;
+        const period = (slot.period ?? slot.period_number ?? slot.time_slot ?? 0);
         
         classes.add(className);
         periods.add(period);
@@ -1692,7 +1700,7 @@ function displaySchedule() {
             scheduleByClass[className] = {};
         }
         
-        const day = slot.day || 'א';
+        const day = toHebDay(slot.day ?? slot.day_of_week);
         if (!scheduleByClass[className][day]) {
             scheduleByClass[className][day] = {};
         }
@@ -1837,7 +1845,7 @@ function displaySchedule() {
                     `;
                 } else if (slot) {
                     const subject = slot.subject || slot.subject_name || '—';
-                    const teacher = slot.teacher || slot.teacher_name || '';
+                    const teacher = slot.teacher || slot.teacher_name || slot.teacher_names || '';
                     const room = slot.room || slot.room_name || '';
                     
                     // Couleur selon le type de matière
@@ -1958,7 +1966,7 @@ function analyzeScheduleProblems() {
     
     // Analyser la distribution par jour
     allDays.forEach(day => {
-        diagnostics.byDay[day] = schedule.filter(s => s.day === day).length;
+        diagnostics.byDay[day] = schedule.filter(s => toHebDay(s.day ?? s.day_of_week) === day).length;
         if (diagnostics.byDay[day] === 0) {
             diagnostics.missingDays.push(dayNames[day]);
         }
@@ -1969,8 +1977,8 @@ function analyzeScheduleProblems() {
         const className = slot.class || slot.class_name || 'Non assigné';
         const teacher = slot.teacher || slot.teacher_name || 'Non assigné';
         const subject = slot.subject || slot.subject_name || 'Non assigné';
-        const day = slot.day || '?';
-        const period = slot.period || slot.time_slot || 0;
+        const day = toHebDay(slot.day ?? slot.day_of_week);
+        const period = (slot.period ?? slot.period_number ?? slot.time_slot ?? 0);
         
         // Par classe
         if (!diagnostics.byClass[className]) {
@@ -2010,7 +2018,8 @@ function analyzeScheduleProblems() {
     // Détecter les groupes parallèles
     const timeSlots = {};
     schedule.forEach(slot => {
-        const key = `${slot.day}-${slot.period}`;
+        const day = toHebDay(slot.day ?? slot.day_of_week);
+        const key = `${day}-${(slot.period ?? slot.period_number ?? slot.time_slot ?? 0)}`;
         if (!timeSlots[key]) timeSlots[key] = [];
         timeSlots[key].push(slot);
     });
