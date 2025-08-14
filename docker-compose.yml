@@ -87,6 +87,25 @@ services:
       timeout: 10s
       retries: 3
 
+  # -------- Agent Conseiller IA --------
+  advisor_agent:
+    build:
+      context: ./scheduler_ai
+      dockerfile: Dockerfile.advisor
+    container_name: school_advisor_agent
+    ports: [ "5002:5002" ]
+    environment:
+      DB_HOST: postgres
+      DB_NAME: school_scheduler
+      DB_USER: admin
+      DB_PASSWORD: school123
+      FLASK_ENV: production
+    volumes:
+      - ./scheduler_ai:/app
+    depends_on: [ postgres ]
+    networks: [ school_network ]
+    restart: unless-stopped
+
   # -------- Frontend React --------
   ai_frontend:
     build:

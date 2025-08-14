@@ -1,0 +1,95 @@
+{
+  "timestamp": "2025-08-13T12:47:55.700615",
+  "school_profile": {
+    "type": "hebrew_religious",
+    "special_requirements": true
+  },
+  "constraints": [
+    {
+      "id": "hebrew_morning_only",
+      "description": "sich boker (conversation hebreu) MATIN uniquement",
+      "subject": "שיח בוקר",
+      "type": "time_preference",
+      "periods_allowed": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "periods_forbidden": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "priority": "HIGH",
+      "is_hard": true,
+      "reasoning": "Concentration maximale requise le matin"
+    },
+    {
+      "id": "hebrew_max_2h",
+      "description": "sich boker maximum 2h consecutives (pas 3h suite)",
+      "subject": "שיח בוקר",
+      "type": "duration_limit",
+      "max_consecutive": 2,
+      "priority": "HIGH",
+      "is_hard": true,
+      "reasoning": "Eviter fatigue cognitive"
+    },
+    {
+      "id": "monday_classes_structure",
+      "description": "Lundi: classes 7,9,8 finissent APRES periode 4",
+      "classes": [
+        "ז",
+        "ט",
+        "ח"
+      ],
+      "day": "monday",
+      "type": "schedule_structure",
+      "min_periods": 4,
+      "priority": "HIGH",
+      "is_hard": true,
+      "reasoning": "Structure pedagogique lundi importante"
+    },
+    {
+      "id": "monday_teacher_majority",
+      "description": "Lundi: majorite professeurs presents",
+      "day": "monday",
+      "type": "teacher_availability",
+      "min_presence_rate": 0.8,
+      "priority": "MEDIUM",
+      "is_hard": false,
+      "reasoning": "Jour coordination et reunions"
+    },
+    {
+      "id": "monday_critical_teachers",
+      "description": "Lundi: professeurs sich boker et hinokh OBLIGATOIRES",
+      "day": "monday",
+      "type": "critical_teacher_presence",
+      "critical_subjects": [
+        "שיח בוקר",
+        "חינוך"
+      ],
+      "presence_rate": 1.0,
+      "priority": "CRITICAL",
+      "is_hard": true,
+      "reasoning": "Matieres fondamentales"
+    }
+  ],
+  "optimization_settings": {
+    "preferred_algorithm": "constraint_programming",
+    "objective_weights": {
+      "religious_constraints": 35,
+      "morning_subjects": 25,
+      "monday_structure": 20,
+      "teacher_presence": 15,
+      "general_quality": 5
+    },
+    "quality_targets": {
+      "pedagogical_quality": 85,
+      "hebrew_morning_compliance": 95,
+      "monday_structure_compliance": 98,
+      "teacher_presence_monday": 92
+    }
+  }
+}

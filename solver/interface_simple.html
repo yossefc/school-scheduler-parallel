@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Générateur d'Emploi du Temps - École Hébraïque</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #1f2937;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 40px;
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .description {
+            text-align: center;
+            color: #6b7280;
+            margin-bottom: 40px;
+            font-size: 1.2rem;
+            line-height: 1.6;
+        }
+        .generate-section {
+            text-align: center;
+            margin: 60px 0;
+        }
+        .generate-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 25px 80px;
+            border-radius: 50px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 15px 35px -5px rgba(102, 126, 234, 0.4);
+        }
+        .generate-btn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px -5px rgba(102, 126, 234, 0.6);
+        }
+        .generate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .features-list {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+        .features-list h3 {
+            color: #2d3748;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+        .features-list ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .features-list li {
+            padding: 10px 0;
+            color: #4a5568;
+            font-size: 1rem;
+        }
+        .features-list li:before {
+            content: "✅ ";
+            color: #10b981;
+            font-weight: bold;
+        }
+        .status-section {
+            background: #f0fdf4;
+            border: 2px solid #10b981;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+        .status-section.error {
+            background: #fef2f2;
+            border-color: #ef4444;
+        }
+        .status-section.info {
+            background: #eff6ff;
+            border-color: #3b82f6;
+        }
+        .progress-container {
+            margin: 30px 0;
+            display: none;
+        }
+        .progress-bar {
+            height: 40px;
+            background: #e2e8f0;
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+            width: 0%;
+            transition: width 0.5s ease;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            color: white;
+            z-index: 1;
+            font-size: 1.1rem;
+        }
+        .results-section {
+            display: none;
+            margin-top: 40px;
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 30px;
+        }
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .result-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .result-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .result-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        .schedule-section {
+            display: none;
+            margin-top: 30px;
+        }
+        .schedule-controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .view-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 0 10px;
+            transition: all 0.3s;
+        }
+        .view-btn:hover {
+            transform: translateY(-2px);
+        }
+        .schedule-grid {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .schedule-table th, .schedule-table td {
+            border: 1px solid #e2e8f0;
+            padding: 8px;
+            text-align: center;
+            vertical-align: top;
+        }
+        .schedule-table th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: bold;
+        }
+        .schedule-table th:first-child {
+            background: #4a5568;
+        }
+        .schedule-cell {
+            min-height: 60px;
+            background: #f8fafc;
+        }
+        .lesson-block {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            margin: 2px;
+            padding: 4px;
+            border-radius: 4px;
+            font-size: 10px;
+            line-height: 1.2;
+        }
+        .lesson-block.parallel {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        }
+        .lesson-class {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        .lesson-subject {
+            font-style: italic;
+        }
+        .lesson-teacher {
+            font-size: 9px;
+            opacity: 0.9;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin: 2px;
+        }
+        .badge.success { background: #10b981; color: white; }
+        .badge.info { background: #3b82f6; color: white; }
+        .badge.warning { background: #f59e0b; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Générateur d'Emploi du Temps ULTIME</h1>
+        
+        <div class="description">
+            <p><strong>École Hébraïque - Génération Automatique Complète</strong></p>
+            <p>Tous les algorithmes et optimisations sont intégrés automatiquement</p>
+        </div>
+
+        <div class="features-list">
+            <h3>🚀 Fonctionnalités Intégrées Automatiquement</h3>
+            <ul>
+                <li>Logique parallèle corrigée (cours synchronisés)</li>
+                <li>Optimisation pédagogique (blocs 2h)</li>
+                <li>Élimination des trous dans l'emploi du temps</li>
+                <li>Contraintes École Hébraïque (שיח בוקר matin)</li>
+                <li>Contraintes religieuses (Vendredi court)</li>
+                <li>Lundi spécial : ז,ט,ח après période 4</li>
+                <li>Minimisation des conflits</li>
+                <li>Groupement par jour</li>
+                <li>Équilibrage charge professeurs</li>
+                <li>CP-SAT algorithme avancé</li>
+                <li>Smart Scheduler avec IA</li>
+                <li>Algorithme de résolution fixe</li>
+            </ul>
+        </div>
+
+        <div class="generate-section">
+            <button class="generate-btn" onclick="generateComplete()" id="generateBtn">
+                🚀 GÉNÉRER EMPLOI DU TEMPS COMPLET
+            </button>
+        </div>
+
+        <div class="status-section" id="statusSection"></div>
+        
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+                <div class="progress-text" id="progressText">Génération en cours...</div>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <h2>📊 Résultats de Génération</h2>
+            <div class="results-grid" id="resultsGrid"></div>
+            <div id="detailedResults"></div>
+            
+            <div class="schedule-section" id="scheduleSection">
+                <h2>📅 Emploi du Temps Généré</h2>
+                <div class="schedule-controls">
+                    <div class="view-options" style="margin-bottom: 20px;">
+                        <button onclick="showScheduleView('global')" class="view-btn" id="globalBtn">📋 Vue Globale</button>
+                        <button onclick="showScheduleView('class')" class="view-btn" id="classBtn">👥 Par Classe</button>
+                        <button onclick="showScheduleView('teacher')" class="view-btn" id="teacherBtn">👨‍🏫 Par Professeur</button>
+                    </div>
+                    <div class="selector-section" id="selectorSection" style="display: none; margin-bottom: 20px;">
+                        <select id="itemSelector" style="padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 1rem; min-width: 200px;">
+                            <option value="">Sélectionner...</option>
+                        </select>
+                        <button onclick="loadSelectedItem()" class="view-btn" style="margin-left: 10px;">Afficher</button>
+                    </div>
+                    <div class="action-controls">
+                        <button onclick="downloadSchedule()" class="view-btn" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);">💾 Télécharger</button>
+                    </div>
+                </div>
+                <div class="current-view" id="currentView" style="text-align: center; margin: 15px 0; font-weight: bold; color: #667eea;"></div>
+                <div class="schedule-grid" id="scheduleGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let currentScheduleId = null;
+        let currentViewType = 'global';
+        let currentViewData = null;
+
+        function showStatus(message, type) {
+            type = type || 'info';
+            const status = document.getElementById('statusSection');
+            status.style.display = 'block';
+            status.className = 'status-section ' + type;
+            status.innerHTML = '<strong>' + type.toUpperCase() + ':</strong> ' + message;
+        }
+
+        function showProgress(show, text) {
+            show = show !== false;
+            text = text || 'Génération en cours...';
+            const container = document.getElementById('progressContainer');
+            const textEl = document.getElementById('progressText');
+            container.style.display = show ? 'block' : 'none';
+            textEl.textContent = text;
+            
+            if (show) {
+                animateProgress();
+            }
+        }
+
+        function animateProgress() {
+            const fill = document.getElementById('progressFill');
+            let width = 0;
+            const interval = setInterval(function() {
+                width += Math.random() * 8 + 2;
+                if (width > 95) width = 95;
+                fill.style.width = width + '%';
+            }, 500);
+            
+            fill.dataset.interval = interval;
+        }
+
+        function stopProgress() {
+            const fill = document.getElementById('progressFill');
+            if (fill.dataset.interval) {
+                clearInterval(fill.dataset.interval);
+            }
+            fill.style.width = '100%';
+            setTimeout(function() { showProgress(false); }, 1000);
+        }
+
+        async function generateComplete() {
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            
+            try {
+                // Configuration COMPLÈTE avec TOUS les algorithmes et optimisations
+                const completeOptions = {
+                    // TOUS les algorithmes activés
+                    algorithms: ['corrected', 'pedagogical', 'fixed', 'advanced', 'smart', 'solver_input'],
+                    
+                    // Paramètres optimaux
+                    time_limit: 600,
+                    quality_target: 85,
+                    
+                    // TOUTES les optimisations activées
+                    eliminate_gaps: true,
+                    prevent_conflicts: true,
+                    two_hour_blocks: true,
+                    group_by_day: true,
+                    friday_short: true,
+                    
+                    // École hébraïque - TOUT activé
+                    monday_constraint: true,
+                    religious_constraints: true,
+                    hebrew_optimized: true,
+                    
+                    // Cours parallèles - TOUT activé
+                    parallel_sync: true,
+                    parallel_optimized: true,
+                    
+                    // Qualité - TOUT activé
+                    minimize_days: true,
+                    balance_workload: true,
+                    teacher_preferences: true,
+                    
+                    // Flags avancés
+                    advanced: true,
+                    optimization_level: 'ultimate',
+                    enable_all_algorithms: true
+                };
+                
+                showStatus('🚀 Lancement de la génération COMPLÈTE avec tous les algorithmes...', 'info');
+                showProgress(true, 'Utilisation de TOUS les algorithmes combinés...');
+                
+                console.log('Génération COMPLÈTE avec options:', completeOptions);
+                
+                const result = await makeRequest('/generate_schedule_ultimate', completeOptions);
+                
+                if (result && result.success) {
+                    stopProgress();
+                    showStatus('✅ Génération COMPLÈTE réussie avec tous les algorithmes!', 'success');
+                    displayResults(result);
+                } else {
+                    throw new Error('Échec de génération complète');
+                }
+                
+            } catch (error) {
+                stopProgress();
+                showStatus('❌ Erreur: ' + error.message, 'error');
+                console.error('Erreur génération complète:', error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function makeRequest(endpoint, payload) {
+            payload = payload || {};
+            const response = await fetch(API_BASE + endpoint, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.detail || 'Erreur HTTP ' + response.status);
+            }
+            
+            return data;
+        }
+
+        function displayResults(data) {
+            const section = document.getElementById('resultsSection');
+            const grid = document.getElementById('resultsGrid');
+            const detailed = document.getElementById('detailedResults');
+            
+            section.style.display = 'block';
+            currentScheduleId = data.schedule_id;
+            
+            // Statistiques principales
+            const stats = [
+                { label: 'ID Emploi du Temps', value: data.schedule_id || 'N/A' },
+                { label: 'Total Cours', value: data.total_entries || (data.summary && data.summary.total_lessons) || 0 },
+                { label: 'Classes', value: (data.summary && data.summary.classes_covered) || 0 },
+                { label: 'Professeurs', value: (data.summary && data.summary.teachers_involved) || 0 },
+                { label: 'Cours Parallèles', value: (data.summary && data.summary.parallel_lessons) || 0 },
+                { label: 'Temps Résolution', value: (data.solve_time || 0) + 's' }
+            ];
+            
+            grid.innerHTML = stats.map(function(stat) {
+                return '<div class="result-card">' +
+                       '<div class="result-value">' + stat.value + '</div>' +
+                       '<div class="result-label">' + stat.label + '</div>' +
+                       '</div>';
+            }).join('');
+            
+            // Détails avancés
+            let detailsHtml = '<h3>🎯 Algorithmes & Optimisations Appliqués</h3><div style="margin: 20px 0;">';
+            
+            if (data.features) {
+                Object.keys(data.features).forEach(function(key) {
+                    const value = data.features[key];
+                    if (value) {
+                        let badgeClass = 'info';
+                        if (key.indexOf('corrected') >= 0) badgeClass = 'success';
+                        else if (key.indexOf('parallel') >= 0) badgeClass = 'info';
+                        else if (key.indexOf('gap') >= 0) badgeClass = 'warning';
+                        
+                        detailsHtml += '<span class="badge ' + badgeClass + '">' + key.replace(/_/g, ' ') + '</span>';
+                    }
+                });
+            }
+            
+            // Afficher les algorithmes utilisés
+            if (data.ultimate_stats) {
+                detailsHtml += '</div><h3>📈 Statistiques Complètes</h3><div style="margin: 20px 0;">';
+                detailsHtml += '<p><strong>Algorithmes testés:</strong> ' + data.ultimate_stats.algorithms_tried + '</p>';
+                detailsHtml += '<p><strong>Algorithmes réussis:</strong> ' + data.ultimate_stats.algorithms_successful + '</p>';
+                detailsHtml += '<p><strong>Meilleur algorithme:</strong> ' + data.ultimate_stats.best_algorithm + '</p>';
+                detailsHtml += '<p><strong>Score qualité:</strong> ' + data.ultimate_stats.best_quality + '%</p>';
+            }
+            
+            detailsHtml += '</div>';
+            detailed.innerHTML = detailsHtml;
+            
+            // Afficher la section emploi du temps
+            if (currentScheduleId) {
+                const scheduleSection = document.getElementById('scheduleSection');
+                scheduleSection.style.display = 'block';
+            }
+        }
+
+        async function showScheduleView(viewType) {
+            if (!currentScheduleId) {
+                showStatus('Aucun emploi du temps à afficher', 'error');
+                return;
+            }
+            
+            currentViewType = viewType || 'global';
+            
+            // Mettre à jour l'interface
+            updateViewButtons();
+            
+            if (viewType === 'global') {
+                document.getElementById('selectorSection').style.display = 'none';
+                await loadGlobalSchedule();
+            } else if (viewType === 'class') {
+                await loadClassScheduleList();
+            } else if (viewType === 'teacher') {
+                await loadTeacherScheduleList();
+            }
+        }
+
+        function updateViewButtons() {
+            const buttons = ['globalBtn', 'classBtn', 'teacherBtn'];
+            buttons.forEach(function(btnId) {
+                const btn = document.getElementById(btnId);
+                btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            });
+            
+            const activeBtn = currentViewType + 'Btn';
+            if (currentViewType === 'global') document.getElementById('globalBtn').style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            if (currentViewType === 'class') document.getElementById('classBtn').style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            if (currentViewType === 'teacher') document.getElementById('teacherBtn').style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+        }
+
+        async function loadGlobalSchedule() {
+            try {
+                showStatus('Chargement de la vue globale...', 'info');
+                const response = await fetch(API_BASE + '/get_schedule/' + currentScheduleId);
+                const scheduleData = await response.json();
+                
+                if (scheduleData.success) {
+                    renderScheduleTable(scheduleData);
+                    document.getElementById('currentView').textContent = '🌐 Vue Globale - Toutes les Classes';
+                    showStatus('✅ Vue globale chargée!', 'success');
+                } else {
+                    showStatus('❌ Erreur: ' + scheduleData.error, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur de chargement: ' + error.message, 'error');
+            }
+        }
+
+        async function loadClassScheduleList() {
+            try {
+                showStatus('Chargement des classes...', 'info');
+                const response = await fetch(API_BASE + '/get_schedule_by_class/' + currentScheduleId);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentViewData = data;
+                    const selector = document.getElementById('itemSelector');
+                    selector.innerHTML = '<option value="">Choisir une classe...</option>';
+                    
+                    data.classes.forEach(function(className) {
+                        const option = document.createElement('option');
+                        option.value = className;
+                        option.textContent = className;
+                        selector.appendChild(option);
+                    });
+                    
+                    document.getElementById('selectorSection').style.display = 'block';
+                    document.getElementById('scheduleGrid').innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">Sélectionnez une classe pour voir son emploi du temps</p>';
+                    document.getElementById('currentView').textContent = '👥 Vue par Classe - Sélection';
+                    showStatus('✅ Classes chargées! Sélectionnez une classe.', 'success');
+                } else {
+                    showStatus('❌ Erreur: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur de chargement: ' + error.message, 'error');
+            }
+        }
+
+        async function loadTeacherScheduleList() {
+            try {
+                showStatus('Chargement des professeurs...', 'info');
+                const response = await fetch(API_BASE + '/get_schedule_by_teacher/' + currentScheduleId);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentViewData = data;
+                    const selector = document.getElementById('itemSelector');
+                    selector.innerHTML = '<option value="">Choisir un professeur...</option>';
+                    
+                    data.teachers.forEach(function(teacherName) {
+                        const option = document.createElement('option');
+                        option.value = teacherName;
+                        option.textContent = teacherName;
+                        selector.appendChild(option);
+                    });
+                    
+                    document.getElementById('selectorSection').style.display = 'block';
+                    document.getElementById('scheduleGrid').innerHTML = '<p style="text-align: center; color: #6b7280; padding: 40px;">Sélectionnez un professeur pour voir son emploi du temps</p>';
+                    document.getElementById('currentView').textContent = '👨‍🏫 Vue par Professeur - Sélection';
+                    showStatus('✅ Professeurs chargés! Sélectionnez un professeur.', 'success');
+                } else {
+                    showStatus('❌ Erreur: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur de chargement: ' + error.message, 'error');
+            }
+        }
+
+        function loadSelectedItem() {
+            const selector = document.getElementById('itemSelector');
+            const selectedValue = selector.value;
+            
+            if (!selectedValue) {
+                showStatus('Veuillez sélectionner un élément', 'error');
+                return;
+            }
+            
+            if (currentViewType === 'class') {
+                renderClassSchedule(selectedValue);
+            } else if (currentViewType === 'teacher') {
+                renderTeacherSchedule(selectedValue);
+            }
+        }
+
+        function renderScheduleTable(scheduleData) {
+            const scheduleGrid = document.getElementById('scheduleGrid');
+            const schedule_grid = scheduleData.schedule_grid;
+            const days = scheduleData.days;
+            
+            // Déterminer les périodes disponibles
+            let maxPeriod = 0;
+            Object.keys(schedule_grid).forEach(function(day) {
+                const daySchedule = schedule_grid[day];
+                Object.keys(daySchedule).forEach(function(period) {
+                    maxPeriod = Math.max(maxPeriod, parseInt(period));
+                });
+            });
+            
+            // Construire le tableau
+            let tableHtml = '<table class="schedule-table">';
+            
+            // En-tête
+            tableHtml += '<thead><tr><th>Période</th>';
+            days.forEach(function(day) {
+                tableHtml += '<th>' + day + '</th>';
+            });
+            tableHtml += '</tr></thead><tbody>';
+            
+            // Lignes de périodes
+            for (let period = 1; period <= maxPeriod; period++) {
+                tableHtml += '<tr><th>Période ' + period + '</th>';
+                
+                days.forEach(function(day) {
+                    tableHtml += '<td class="schedule-cell">';
+                    
+                    if (schedule_grid[day] && schedule_grid[day][period]) {
+                        schedule_grid[day][period].forEach(function(lesson) {
+                            const parallelClass = lesson.is_parallel ? ' parallel' : '';
+                            tableHtml += '<div class="lesson-block' + parallelClass + '">' +
+                                        '<div class="lesson-class">' + lesson.class_name + '</div>' +
+                                        '<div class="lesson-subject">' + (lesson.subject || '') + '</div>' +
+                                        '<div class="lesson-teacher">' + (lesson.teacher_name || '') + '</div>' +
+                                        '</div>';
+                        });
+                    }
+                    
+                    tableHtml += '</td>';
+                });
+                
+                tableHtml += '</tr>';
+            }
+            
+            tableHtml += '</tbody></table>';
+            scheduleGrid.innerHTML = tableHtml;
+        }
+
+        function renderClassSchedule(className) {
+            if (!currentViewData || !currentViewData.schedules_by_class[className]) {
+                showStatus('Données de classe non disponibles', 'error');
+                return;
+            }
+            
+            const classSchedule = currentViewData.schedules_by_class[className];
+            const days = currentViewData.days;
+            
+            // Déterminer les périodes disponibles
+            let maxPeriod = 0;
+            Object.keys(classSchedule).forEach(function(day) {
+                const daySchedule = classSchedule[day];
+                Object.keys(daySchedule).forEach(function(period) {
+                    maxPeriod = Math.max(maxPeriod, parseInt(period));
+                });
+            });
+            
+            // Construire le tableau
+            let tableHtml = '<table class="schedule-table">';
+            
+            // En-tête
+            tableHtml += '<thead><tr><th>Période</th>';
+            days.forEach(function(day) {
+                tableHtml += '<th>' + day + '</th>';
+            });
+            tableHtml += '</tr></thead><tbody>';
+            
+            // Lignes de périodes
+            for (let period = 1; period <= maxPeriod; period++) {
+                tableHtml += '<tr><th>Période ' + period + '</th>';
+                
+                days.forEach(function(day) {
+                    tableHtml += '<td class="schedule-cell">';
+                    
+                    if (classSchedule[day] && classSchedule[day][period]) {
+                        const lesson = classSchedule[day][period];
+                        const parallelClass = lesson.is_parallel ? ' parallel' : '';
+                        tableHtml += '<div class="lesson-block' + parallelClass + '">' +
+                                    '<div class="lesson-subject">' + (lesson.subject || '') + '</div>' +
+                                    '<div class="lesson-teacher">' + (lesson.teacher_name || '') + '</div>' +
+                                    '</div>';
+                    }
+                    
+                    tableHtml += '</td>';
+                });
+                
+                tableHtml += '</tr>';
+            }
+            
+            tableHtml += '</tbody></table>';
+            document.getElementById('scheduleGrid').innerHTML = tableHtml;
+            document.getElementById('currentView').textContent = '👥 Classe: ' + className;
+            showStatus('✅ Emploi du temps de la classe ' + className + ' affiché!', 'success');
+        }
+
+        function renderTeacherSchedule(teacherName) {
+            if (!currentViewData || !currentViewData.schedules_by_teacher[teacherName]) {
+                showStatus('Données de professeur non disponibles', 'error');
+                return;
+            }
+            
+            const teacherSchedule = currentViewData.schedules_by_teacher[teacherName];
+            const days = currentViewData.days;
+            
+            // Déterminer les périodes disponibles
+            let maxPeriod = 0;
+            Object.keys(teacherSchedule).forEach(function(day) {
+                const daySchedule = teacherSchedule[day];
+                Object.keys(daySchedule).forEach(function(period) {
+                    maxPeriod = Math.max(maxPeriod, parseInt(period));
+                });
+            });
+            
+            // Construire le tableau
+            let tableHtml = '<table class="schedule-table">';
+            
+            // En-tête
+            tableHtml += '<thead><tr><th>Période</th>';
+            days.forEach(function(day) {
+                tableHtml += '<th>' + day + '</th>';
+            });
+            tableHtml += '</tr></thead><tbody>';
+            
+            // Lignes de périodes
+            for (let period = 1; period <= maxPeriod; period++) {
+                tableHtml += '<tr><th>Période ' + period + '</th>';
+                
+                days.forEach(function(day) {
+                    tableHtml += '<td class="schedule-cell">';
+                    
+                    if (teacherSchedule[day] && teacherSchedule[day][period]) {
+                        teacherSchedule[day][period].forEach(function(lesson) {
+                            const parallelClass = lesson.is_parallel ? ' parallel' : '';
+                            tableHtml += '<div class="lesson-block' + parallelClass + '">' +
+                                        '<div class="lesson-class">' + lesson.class_name + '</div>' +
+                                        '<div class="lesson-subject">' + (lesson.subject || '') + '</div>' +
+                                        '</div>';
+                        });
+                    }
+                    
+                    tableHtml += '</td>';
+                });
+                
+                tableHtml += '</tr>';
+            }
+            
+            tableHtml += '</tbody></table>';
+            document.getElementById('scheduleGrid').innerHTML = tableHtml;
+            document.getElementById('currentView').textContent = '👨‍🏫 Professeur: ' + teacherName;
+            showStatus('✅ Emploi du temps du professeur ' + teacherName + ' affiché!', 'success');
+        }
+
+        function downloadSchedule() {
+            if (!currentScheduleId) {
+                showStatus('Aucun emploi du temps à télécharger', 'error');
+                return;
+            }
+            
+            let url = API_BASE + '/get_schedule/' + currentScheduleId;
+            if (currentViewType === 'class') {
+                url = API_BASE + '/get_schedule_by_class/' + currentScheduleId;
+            } else if (currentViewType === 'teacher') {
+                url = API_BASE + '/get_schedule_by_teacher/' + currentScheduleId;
+            }
+            
+            window.open(url, '_blank');
+        }
+    </script>
+</body>
+</html>

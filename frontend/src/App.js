@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import axios from 'axios';
 import AgentChat from './components/AgentChat';
+import ScheduleAdvisor from './components/ScheduleAdvisor';
 
 const API_URL = 'http://localhost:8000/api';
 const AI_SOCKET_URL = 'http://localhost:5001';
@@ -32,11 +33,13 @@ function App() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notification, setNotification] = useState(null);
 
   // États pour l'agent IA
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [aiPanelVisible, setAiPanelVisible] = useState(false);
+  const [showAdvisor, setShowAdvisor] = useState(false);
 
   // Initialisation
   useEffect(() => {
@@ -55,6 +58,9 @@ function App() {
 
       const teachersResponse = await axios.get(`${API_URL}/teachers`);
       setAllTeachers(teachersResponse.data.teachers || []);
+
+      // Vérifier s'il y a un emploi du temps récent généré
+      checkForRecentSchedule();
 
       // Initialiser l'agent IA
       initializeAI();
@@ -143,14 +149,94 @@ function App() {
     link.click();
   };
 
+  const checkForRecentSchedule = async () => {
+    try {
+      // Vérifier s'il y a un emploi du temps récemment généré
+      const response = await axios.get(`${API_URL}/last_schedule_info`);
+      if (response.data && response.data.recent) {
+        const scheduleInfo = response.data;
+        showNotification(
+          `📅 Emploi du temps trouvé (${scheduleInfo.entries_count} créneaux) - Score: ${scheduleInfo.quality_score}/100`, 
+          'success'
+        );
+        
+        // Si on a des classes disponibles, sélectionner automatiquement la première
+        if (allClasses.length > 0) {
+          setSelectedName(allClasses[0]);
+          setViewType('class');
+          // Charger automatiquement l'emploi du temps
+          setTimeout(() => loadScheduleForName(allClasses[0], 'class'), 1000);
+        }
+      }
+    } catch (error) {
+      // Pas de problème si pas d'emploi du temps récent
+      console.log('Aucun emploi du temps récent trouvé');
+    }
+  };
+
+  const loadScheduleForName = async (name, type) => {
+    if (!name) return;
+    
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await axios.get(`${API_URL}/schedule/${type}/${encodeURIComponent(name)}`);
+      setCurrentSchedule(response.data.schedule || []);
+      showNotification(`✅ מערכת שעות נטענה עבור ${name}`, 'success');
+    } catch (error) {
+      setError('שגיאה בטעינת הנתונים');
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLatestSchedule = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_URL}/last_schedule_info`);
+      if (response.data && response.data.recent) {
+        const scheduleInfo = response.data;
+        
+        // Sélectionner la première classe disponible si aucune n'est sélectionnée
+        if (!selectedName && allClasses.length > 0) {
+          setSelectedName(allClasses[0]);
+          setViewType('class');
+        }
+        
+        const targetName = selectedName || allClasses[0];
+        const targetType = viewType;
+        
+        if (targetName) {
+          await loadScheduleForName(targetName, targetType);
+          showNotification(
+            `✅ Emploi du temps chargé - Score: ${scheduleInfo.quality_score}/100 (${scheduleInfo.entries_count} créneaux)`,
+            'success'
+          );
+        } else {
+          showNotification('❌ Aucune classe disponible pour afficher l\'emploi du temps', 'error');
+        }
+      } else {
+        showNotification('❌ Aucun emploi du temps récent trouvé. Lancez d\'abord une optimisation.', 'error');
+      }
+    } catch (error) {
+      showNotification('❌ Erreur lors du chargement de l\'emploi du temps', 'error');
+      console.error('Error loading latest schedule:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const refreshData = () => {
     showNotification('🔄 מרענן נתונים...', 'success');
     initializeApp();
   };
 
   const showNotification = (message, type) => {
-    // Implémentation simple de notification
-    console.log(`${type}: ${message}`);
+    setNotification({ message, type });
+    // Auto-masquer après 5 secondes
+    setTimeout(() => setNotification(null), 5000);
   };
 
   const renderScheduleTable = () => {
@@ -218,6 +304,22 @@ function App() {
       <div style={styles.mainContent}>
         <h1 style={styles.title}>מערכת שעות בית ספרית - עם עוזר AI</h1>
         
+        {/* Notification */}
+        {notification && (
+          <div style={{
+            ...styles.notification,
+            backgroundColor: notification.type === 'success' ? '#d4edda' : '#f8d7da',
+            color: notification.type === 'success' ? '#155724' : '#721c24',
+            border: `1px solid ${notification.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`
+          }}>
+            {notification.message}
+            <button 
+              onClick={() => setNotification(null)}
+              style={styles.notificationClose}
+            >×</button>
+          </div>
+        )}
+        
         {/* Statistiques */}
         <div style={styles.stats}>
           {stats ? (
@@ -255,9 +357,18 @@ function App() {
           </select>
           
           <button onClick={loadSchedule} style={styles.button}>הצג מערכת</button>
+          <button onClick={() => loadLatestSchedule()} style={{...styles.button, backgroundColor: '#ff9800'}}>
+            📅 הצג מערכת אחרונה
+          </button>
           <button onClick={exportToExcel} style={styles.button}>ייצא לאקסל</button>
           <button onClick={() => window.print()} style={styles.button}>הדפס</button>
           <button onClick={refreshData} style={styles.button}>רענן נתונים</button>
+          <button 
+            onClick={() => setShowAdvisor(true)} 
+            style={{...styles.button, backgroundColor: '#9c27b0'}}
+          >
+            🤖 Agent Conseiller
+          </button>
         </div>
 
         {/* Tableau des emplois du temps */}
@@ -286,6 +397,21 @@ function App() {
             }}></div>
           </div>
           <AgentChat socket={socket} connected={connected} />
+        </div>
+      )}
+
+      {/* Modal Agent Conseiller */}
+      {showAdvisor && (
+        <div style={styles.advisorModal} onClick={() => setShowAdvisor(false)}>
+          <div style={styles.advisorContent} onClick={(e) => e.stopPropagation()}>
+            <button 
+              style={styles.advisorClose} 
+              onClick={() => setShowAdvisor(false)}
+            >
+              ×
+            </button>
+            <ScheduleAdvisor />
+          </div>
         </div>
       )}
     </div>
@@ -466,6 +592,62 @@ const styles = {
     height: '10px',
     borderRadius: '50%',
     marginLeft: '10px',
+  },
+  notification: {
+    padding: '15px',
+    borderRadius: '8px',
+    marginBottom: '20px',
+    position: 'relative',
+    fontSize: '16px',
+    fontWeight: '500',
+  },
+  notificationClose: {
+    position: 'absolute',
+    top: '10px',
+    right: '15px',
+    background: 'none',
+    border: 'none',
+    fontSize: '20px',
+    cursor: 'pointer',
+    color: 'inherit',
+  },
+  advisorModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+  },
+  advisorContent: {
+    backgroundColor: 'white',
+    borderRadius: '15px',
+    width: '95vw',
+    height: '90vh',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  advisorClose: {
+    position: 'absolute',
+    top: '15px',
+    right: '20px',
+    background: '#f87171',
+    color: 'white',
+    border: 'none',
+    borderRadius: '50%',
+    width: '35px',
+    height: '35px',
+    fontSize: '20px',
+    cursor: 'pointer',
+    zIndex: 2001,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
   },
 };
 

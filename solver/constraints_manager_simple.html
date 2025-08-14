@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="fr" data-locale="fr" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestion des contraintes & Génération - Version Corrigée</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif; 
+      margin:0; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color:#1f2937;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #4a5568;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    .generation-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .option-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      transition: all 0.3s;
+    }
+    .option-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .option-card h3 {
+      margin-top: 0;
+      color: #2d3748;
+    }
+    .option-card p {
+      color: #718096;
+      margin: 10px 0;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 6px;
+      background: #f7fafc;
+      border-left: 4px solid #667eea;
+    }
+    .status.success {
+      background: #f0fdf4;
+      border-left-color: #10b981;
+    }
+    .status.error {
+      background: #fef2f2;
+      border-left-color: #ef4444;
+    }
+    .checkbox-group {
+      margin: 15px 0;
+    }
+    .checkbox-group label {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+      cursor: pointer;
+    }
+    .checkbox-group input[type="checkbox"] {
+      margin-right: 8px;
+    }
+    .progress {
+      display: none;
+      margin-top: 20px;
+    }
+    .progress-bar {
+      height: 20px;
+      background: #e2e8f0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      width: 0%;
+      transition: width 0.3s;
+      animation: shimmer 1s infinite;
+    }
+    @keyframes shimmer {
+      0% { opacity: 0.8; }
+      50% { opacity: 1; }
+      100% { opacity: 0.8; }
+    }
+    .results {
+      display: none;
+      margin-top: 30px;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .badge.recommended {
+      background: #10b981;
+      color: white;
+    }
+    .badge.fast {
+      background: #3b82f6;
+      color: white;
+    }
+    .badge.quality {
+      background: #f59e0b;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎯 Générateur d'Emploi du Temps - École Hébraïque</h1>
+    
+    <div class="generation-options">
+      <!-- Option 1: Génération Rapide Corrigée -->
+      <div class="option-card">
+        <h3>⚡ Génération Rapide <span class="badge fast">RAPIDE</span></h3>
+        <p>Utilise la logique corrigée des cours parallèles</p>
+        <ul>
+          <li>✅ Cours parallèles synchronisés</li>
+          <li>✅ Respect des contraintes de base</li>
+          <li>⏱️ Temps: ~1 minute</li>
+        </ul>
+        <button onclick="generateCorrected()">Générer Rapidement</button>
+      </div>
+
+      <!-- Option 2: Optimisation Sans Trous -->
+      <div class="option-card">
+        <h3>🎯 Sans Trous <span class="badge recommended">RECOMMANDÉ</span></h3>
+        <p>Élimine tous les trous dans l'emploi du temps</p>
+        
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" id="eliminate_gaps" checked>
+            Éliminer les trous
+          </label>
+          <label>
+            <input type="checkbox" id="prevent_conflicts" checked>
+            Prévenir les conflits
+          </label>
+          <label>
+            <input type="checkbox" id="group_by_day" checked>
+            Grouper par jour
+          </label>
+        </div>
+        
+        <button onclick="generateFixed()">Générer Sans Trous</button>
+      </div>
+
+      <!-- Option 3: Optimisation Pédagogique -->
+      <div class="option-card">
+        <h3>📚 Pédagogique Avancée <span class="badge quality">QUALITÉ MAX</span></h3>
+        <p>Optimisation complète avec critères pédagogiques</p>
+        
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" id="two_hour_blocks" checked>
+            Blocs de 2h consécutives
+          </label>
+          <label>
+            <input type="checkbox" id="minimize_days" checked>
+            Minimiser les jours
+          </label>
+          <label>
+            <input type="checkbox" id="respect_religious" checked>
+            Contraintes religieuses
+          </label>
+          <label>
+            <input type="checkbox" id="monday_constraint" checked>
+            Lundi: ז,ט,ח après période 4
+          </label>
+        </div>
+        
+        <button onclick="generatePedagogical()">Optimisation Complète</button>
+      </div>
+
+      <!-- Option 4: Depuis Solver Input -->
+      <div class="option-card">
+        <h3>📊 Depuis Base de Données</h3>
+        <p>Utilise directement les données de solver_input</p>
+        <ul>
+          <li>✅ Données actuelles de la BD</li>
+          <li>✅ Tous les cours configurés</li>
+          <li>✅ Paramètres par défaut</li>
+        </ul>
+        <button onclick="generateFromSolverInput()">Générer depuis BD</button>
+      </div>
+    </div>
+
+    <div id="status" class="status" style="display: none;"></div>
+    
+    <div id="progress" class="progress">
+      <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <p id="progress-text" style="text-align: center; margin-top: 10px;">Génération en cours...</p>
+    </div>
+
+    <div id="results" class="results"></div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:8000';
+    
+    function showStatus(message, type = 'info') {
+      const status = document.getElementById('status');
+      status.style.display = 'block';
+      status.className = `status ${type}`;
+      status.textContent = message;
+    }
+    
+    function showProgress(show = true) {
+      const progress = document.getElementById('progress');
+      progress.style.display = show ? 'block' : 'none';
+      if (show) {
+        animateProgress();
+      }
+    }
+    
+    function animateProgress() {
+      const fill = document.getElementById('progress-fill');
+      let width = 0;
+      const interval = setInterval(() => {
+        width += Math.random() * 10;
+        if (width > 90) width = 90;
+        fill.style.width = width + '%';
+      }, 500);
+      
+      // Store interval ID to clear later
+      fill.dataset.interval = interval;
+    }
+    
+    function stopProgress() {
+      const fill = document.getElementById('progress-fill');
+      if (fill.dataset.interval) {
+        clearInterval(fill.dataset.interval);
+      }
+      fill.style.width = '100%';
+      setTimeout(() => showProgress(false), 500);
+    }
+    
+    async function makeRequest(endpoint, payload = {}) {
+      try {
+        showProgress(true);
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.detail || `Erreur HTTP ${response.status}`);
+        }
+        
+        return data;
+      } catch (error) {
+        throw error;
+      } finally {
+        stopProgress();
+      }
+    }
+    
+    function showResults(data) {
+      const results = document.getElementById('results');
+      results.style.display = 'block';
+      
+      let html = '<h2>✅ Génération Réussie!</h2>';
+      
+      if (data.schedule_id) {
+        html += `<p><strong>ID de l'emploi du temps:</strong> ${data.schedule_id}</p>`;
+      }
+      
+      if (data.summary) {
+        html += '<h3>Résumé:</h3><ul>';
+        html += `<li>Total des cours: ${data.summary.total_lessons || data.total_entries}</li>`;
+        html += `<li>Classes couvertes: ${data.summary.classes_covered}</li>`;
+        html += `<li>Professeurs: ${data.summary.teachers_involved}</li>`;
+        if (data.summary.parallel_lessons) {
+          html += `<li>Cours parallèles: ${data.summary.parallel_lessons}</li>`;
+        }
+        if (data.summary.quality_score) {
+          html += `<li>Score qualité: ${data.summary.quality_score}%</li>`;
+        }
+        html += '</ul>';
+      }
+      
+      if (data.features) {
+        html += '<h3>Caractéristiques:</h3><ul>';
+        Object.entries(data.features).forEach(([key, value]) => {
+          if (value) {
+            html += `<li>✅ ${key.replace(/_/g, ' ')}</li>`;
+          }
+        });
+        html += '</ul>';
+      }
+      
+      html += `<p><a href="${API_BASE}/constraints-manager" target="_blank">Voir l'emploi du temps complet →</a></p>`;
+      
+      results.innerHTML = html;
+    }
+    
+    // Fonction 1: Génération Corrigée
+    async function generateCorrected() {
+      try {
+        showStatus('Génération avec logique corrigée...', 'info');
+        const data = await makeRequest('/generate_schedule_corrected');
+        showStatus('Génération réussie!', 'success');
+        showResults(data);
+      } catch (error) {
+        showStatus(`Erreur: ${error.message}`, 'error');
+      }
+    }
+    
+    // Fonction 2: Génération Sans Trous
+    async function generateFixed() {
+      try {
+        showStatus('Génération sans trous...', 'info');
+        const payload = {
+          eliminate_gaps: document.getElementById('eliminate_gaps').checked,
+          prevent_conflicts: document.getElementById('prevent_conflicts').checked
+        };
+        const data = await makeRequest('/generate_schedule_fixed', payload);
+        showStatus('Génération sans trous réussie!', 'success');
+        showResults(data);
+      } catch (error) {
+        showStatus(`Erreur: ${error.message}`, 'error');
+      }
+    }
+    
+    // Fonction 3: Optimisation Pédagogique
+    async function generatePedagogical() {
+      try {
+        showStatus('Optimisation pédagogique avancée...', 'info');
+        document.getElementById('progress-text').textContent = 'Optimisation en cours (peut prendre 2-3 minutes)...';
+        
+        const payload = {
+          optimization_level: 'pedagogical',
+          quality_target: 85,
+          features: {
+            two_hour_blocks: document.getElementById('two_hour_blocks').checked,
+            minimize_days: document.getElementById('minimize_days').checked,
+            respect_religious: document.getElementById('respect_religious').checked,
+            monday_constraint: document.getElementById('monday_constraint').checked
+          }
+        };
+        
+        const data = await makeRequest('/api/advanced/optimize', payload);
+        showStatus('Optimisation complète!', 'success');
+        showResults(data);
+      } catch (error) {
+        showStatus(`Erreur: ${error.message}`, 'error');
+      }
+    }
+    
+    // Fonction 4: Génération depuis Solver Input
+    async function generateFromSolverInput() {
+      try {
+        showStatus('Génération depuis la base de données...', 'info');
+        const data = await makeRequest('/generate_schedule_from_solver_input');
+        showStatus('Génération depuis BD réussie!', 'success');
+        showResults(data);
+      } catch (error) {
+        // Si erreur, essayer l'alternative
+        try {
+          showStatus('Tentative avec méthode alternative...', 'info');
+          const data = await makeRequest('/generate_clean_from_solver_input');
+          showStatus('Génération alternative réussie!', 'success');
+          showResults(data);
+        } catch (error2) {
+          showStatus(`Erreur: ${error2.message}`, 'error');
+        }
+      }
+    }
+  </script>
+</body>
+</html>

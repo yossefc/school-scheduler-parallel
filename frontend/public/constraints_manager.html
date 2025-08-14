@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #ffffff;
             min-height: 100vh;
             color: #333;
         }
@@ -25,12 +25,12 @@
         }
 
         .header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
             border-radius: 15px;
             padding: 25px;
             margin-bottom: 25px;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
         }
 
         .header h1 {
@@ -62,12 +62,12 @@
         }
 
         .controls {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
             border-radius: 15px;
             padding: 25px;
             margin-bottom: 25px;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
         }
 
         .btn-group {
@@ -123,11 +123,11 @@
         }
 
         .constraint-panel {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
             border-radius: 15px;
             padding: 25px;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
         }
 
         .constraint-panel h3 {
@@ -218,11 +218,11 @@
         }
 
         .add-constraint-form {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
             border-radius: 15px;
             padding: 25px;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
         }
 
         .form-group {
@@ -298,6 +298,49 @@
             .btn-group {
                 flex-direction: column;
             }
+        }
+
+        /* Nouveaux styles pour les notifications */
+        .status-warning {
+            background: #fed7aa;
+            color: #c05621;
+            border-left: 4px solid #ed8936;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Styles pour les notifications fixes */
+        .schedule-update-notification,
+        .regeneration-suggestion {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.4;
+        }
+
+        .schedule-update-notification button:hover,
+        .regeneration-suggestion button:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
+            transition: all 0.2s ease;
         }
     </style>
 </head>
@@ -736,7 +779,35 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    showStatus('✅ Contrainte ajoutée avec succès!', 'success');
+                    // Vérifier si une régénération automatique a eu lieu
+                    if (result.auto_regenerated) {
+                        if (result.regeneration_details && result.regeneration_details.success) {
+                            const method = result.regeneration_details.method || 'standard';
+                            const qualityScore = result.regeneration_details.quality_score;
+                            let statusMessage = `✅ ${result.message || 'Contrainte ajoutée et emploi du temps régénéré!'}`;
+                            
+                            if (method === 'advanced' && qualityScore) {
+                                statusMessage += ` (Score qualité: ${Math.round(qualityScore)}%)`;
+                            }
+                            
+                            showStatus(statusMessage, 'success');
+                            
+                            // Afficher une notification spéciale pour la régénération
+                            setTimeout(() => {
+                                showScheduleUpdateNotification(result.regeneration_details);
+                            }, 1000);
+                        } else {
+                            showStatus('⚠️ Contrainte ajoutée mais échec de la régénération automatique', 'warning');
+                        }
+                    } else {
+                        showStatus(result.message || '✅ Contrainte ajoutée avec succès!', 'success');
+                        
+                        // Suggestion de régénération manuelle
+                        setTimeout(() => {
+                            showManualRegenerationSuggestion();
+                        }, 2000);
+                    }
+                    
                     document.getElementById('constraintForm').reset();
                     loadConstraints();
                 } else {
@@ -752,10 +823,178 @@
             const statusDiv = document.getElementById('statusMessage');
             statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
             
-            if (type === 'success') {
+            if (type === 'success' || type === 'warning') {
                 setTimeout(() => {
                     statusDiv.innerHTML = '';
-                }, 3000);
+                }, type === 'success' ? 3000 : 5000);
+            }
+        }
+
+        // Notification spéciale pour la mise à jour de l'emploi du temps
+        function showScheduleUpdateNotification(regenerationDetails) {
+            const notification = document.createElement('div');
+            notification.className = 'schedule-update-notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(45deg, #48bb78, #38a169);
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+                z-index: 10000;
+                max-width: 400px;
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            let content = `
+                <div style="font-weight: bold; margin-bottom: 8px;">
+                    📅 Emploi du temps mis à jour automatiquement !
+                </div>
+                <div style="font-size: 14px; opacity: 0.9;">
+                    Méthode: ${regenerationDetails.method === 'advanced' ? 'Optimisation avancée' : 'Standard'}
+            `;
+            
+            if (regenerationDetails.quality_score) {
+                content += `<br>Score qualité: ${Math.round(regenerationDetails.quality_score)}%`;
+            }
+            
+            if (regenerationDetails.schedule_id) {
+                content += `<br>ID: ${regenerationDetails.schedule_id}`;
+            }
+            
+            content += `
+                </div>
+                <div style="margin-top: 10px;">
+                    <button onclick="viewUpdatedSchedule()" style="
+                        background: rgba(255,255,255,0.2);
+                        border: 1px solid rgba(255,255,255,0.3);
+                        color: white;
+                        padding: 6px 12px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        margin-right: 8px;
+                    ">📊 Voir l'emploi du temps</button>
+                    <button onclick="this.parentElement.parentElement.remove()" style="
+                        background: rgba(255,255,255,0.1);
+                        border: 1px solid rgba(255,255,255,0.2);
+                        color: white;
+                        padding: 6px 12px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    ">✕</button>
+                </div>
+            `;
+            
+            notification.innerHTML = content;
+            document.body.appendChild(notification);
+            
+            // Auto-remove après 10 secondes
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 10000);
+        }
+
+        // Suggestion de régénération manuelle
+        function showManualRegenerationSuggestion() {
+            const suggestion = document.createElement('div');
+            suggestion.className = 'regeneration-suggestion';
+            suggestion.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: linear-gradient(45deg, #ed8936, #dd6b20);
+                color: white;
+                padding: 15px;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                z-index: 9999;
+                max-width: 350px;
+                animation: slideUp 0.3s ease-out;
+            `;
+            
+            suggestion.innerHTML = `
+                <div style="font-weight: bold; margin-bottom: 8px;">
+                    💡 Suggestion
+                </div>
+                <div style="font-size: 14px; margin-bottom: 10px;">
+                    Cette contrainte pourrait nécessiter une régénération de l'emploi du temps
+                </div>
+                <div>
+                    <button onclick="triggerManualRegeneration()" style="
+                        background: rgba(255,255,255,0.9);
+                        border: none;
+                        color: #dd6b20;
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: bold;
+                        margin-right: 8px;
+                    ">🔄 Régénérer maintenant</button>
+                    <button onclick="this.parentElement.parentElement.remove()" style="
+                        background: rgba(255,255,255,0.2);
+                        border: 1px solid rgba(255,255,255,0.3);
+                        color: white;
+                        padding: 6px 12px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    ">Plus tard</button>
+                </div>
+            `;
+            
+            document.body.appendChild(suggestion);
+            
+            // Auto-remove après 15 secondes
+            setTimeout(() => {
+                if (suggestion.parentElement) {
+                    suggestion.remove();
+                }
+            }, 15000);
+        }
+
+        // Fonction pour voir l'emploi du temps mis à jour
+        function viewUpdatedSchedule() {
+            // Ouvrir la page de visualisation dans un nouvel onglet
+            window.open('/api/schedule_entries', '_blank');
+        }
+
+        // Fonction pour déclencher une régénération manuelle
+        async function triggerManualRegeneration() {
+            showStatus('🔄 Régénération de l\'emploi du temps en cours...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/advanced/optimize`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showStatus(`✅ Régénération réussie! Score qualité: ${Math.round(result.quality_score || 0)}%`, 'success');
+                    
+                    // Fermer la suggestion
+                    document.querySelectorAll('.regeneration-suggestion').forEach(el => el.remove());
+                    
+                    // Afficher notification de succès
+                    setTimeout(() => {
+                        showScheduleUpdateNotification({
+                            success: true,
+                            method: 'advanced',
+                            quality_score: result.quality_score,
+                            schedule_id: result.schedule_id
+                        });
+                    }, 1000);
+                } else {
+                    showStatus('❌ Échec de la régénération', 'error');
+                }
+            } catch (error) {
+                showStatus('❌ Erreur lors de la régénération', 'error');
             }
         }
     </script>

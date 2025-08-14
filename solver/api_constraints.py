@@ -6,6 +6,9 @@ import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 import json
 import logging
+import httpx
+import asyncio
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +209,17 @@ async def create_constraint(constraint: ConstraintCreate = Body(...)):
         formatted = format_constraint_for_frontend(new_constraint)
         formatted['id'] = new_constraint['constraint_id']  # Ajouter l'ID pour la réponse
         
+        # NOUVEAU: Déclencher la régénération automatique pour les contraintes critiques
+        should_regenerate = await _should_trigger_regeneration(constraint_type, constraint.priority, constraint_data)
+        if should_regenerate:
+            logger.info(f"Déclenchement de la régénération automatique pour contrainte critique: {constraint_type}")
+            regeneration_result = await _trigger_schedule_regeneration()
+            formatted['auto_regenerated'] = regeneration_result
+            formatted['message'] = "Contrainte ajoutée et emploi du temps automatiquement régénéré"
+        else:
+            formatted['auto_regenerated'] = False
+            formatted['message'] = "Contrainte ajoutée (régénération manuelle requise)"
+        
         return formatted
         
     except Exception as e:
@@ -242,6 +256,26 @@ async def toggle_constraint(constraint_id: int, toggle: ConstraintToggle = Body(
         
         conn.commit()
         logger.info(f"Contrainte {constraint_id} mise à jour: is_active={toggle.is_active}")
+        
+        # NOUVEAU: Déclencher la régénération si on active une contrainte critique
+        if toggle.is_active:
+            # Récupérer les détails de la contrainte pour vérifier si elle est critique
+            cur.execute("SELECT constraint_type, priority, constraint_data FROM constraints WHERE constraint_id = %s", (constraint_id,))
+            constraint_info = cur.fetchone()
+            if constraint_info:
+                constraint_type, priority, constraint_data_raw = constraint_info
+                constraint_data = constraint_data_raw if isinstance(constraint_data_raw, dict) else json.loads(constraint_data_raw) if constraint_data_raw else {}
+                
+                should_regenerate = await _should_trigger_regeneration(constraint_type, priority, constraint_data)
+                if should_regenerate:
+                    logger.info(f"Déclenchement de la régénération automatique pour contrainte critique activée: {constraint_id}")
+                    regeneration_result = await _trigger_schedule_regeneration()
+                    return {
+                        "success": True, 
+                        "is_active": toggle.is_active,
+                        "auto_regenerated": regeneration_result,
+                        "message": "Contrainte activée et emploi du temps automatiquement régénéré"
+                    }
         
         return {"success": True, "is_active": toggle.is_active}
         
@@ -456,6 +490,148 @@ def _count_by_type(constraints):
         ctype = c['constraint_type']
         counts[ctype] = counts.get(ctype, 0) + 1
     return counts
+
+# ============================================
+# FONCTIONS DE RÉGÉNÉRATION AUTOMATIQUE
+# ============================================
+
+async def _should_trigger_regeneration(constraint_type: str, priority: int, constraint_data: dict) -> bool:
+    """Détermine si une contrainte doit déclencher la régénération automatique"""
+    
+    # Contraintes critiques qui nécessitent une régénération immédiate
+    critical_types = [
+        'teacher_availability',    # Disponibilité des professeurs
+        'class_schedule',         # Horaires de classe
+        'parallel_teaching',      # Enseignement parallèle
+        'room_assignment',        # Affectation de salles
+        'time_preference',        # Préférences horaires importantes
+        'friday_short',           # Contraintes de vendredi écourté
+        'morning_prayer',         # Contraintes de prière matinale
+        'lunch_break',           # Pauses déjeuner
+        'subject_timing'         # Horaires de matières spécifiques
+    ]
+    
+    # Vérifier le type de contrainte
+    if constraint_type in critical_types:
+        logger.info(f"Contrainte critique détectée: {constraint_type}")
+        return True
+    
+    # Vérifier la priorité (0 = critique, 1 = importante)
+    if priority <= 1:
+        logger.info(f"Contrainte haute priorité détectée: {priority}")
+        return True
+    
+    # Vérifier certains mots-clés dans les données qui indiquent une contrainte critique
+    if constraint_data and isinstance(constraint_data, dict):
+        original_text = constraint_data.get('original_text', '').lower()
+        critical_keywords = [
+            'indisponible', 'pas disponible', 'trop de trous', 'trou', 'gap', 'conflit',
+            'parallèle', 'simultané', 'même temps', 'overlap', 'collision',
+            'urgent', 'obligatoire', 'critique', 'nécessaire', 'beaucoup de trous'
+        ]
+        
+        # Mots-clés hébreux
+        hebrew_critical = [
+            'לא זמין', 'לא פנוי', 'חובה', 'דחוף', 'חשוב', 'נדרש'
+        ]
+        
+        for keyword in critical_keywords + hebrew_critical:
+            if keyword in original_text:
+                logger.info(f"Mot-clé critique détecté dans le texte: {keyword}")
+                return True
+    
+    logger.info(f"Contrainte non critique: {constraint_type}, priorité: {priority}")
+    return False
+
+async def _trigger_schedule_regeneration() -> dict:
+    """Déclenche la régénération automatique de l'emploi du temps"""
+    
+    try:
+        logger.info("Début de la régénération automatique de l'emploi du temps...")
+        
+        # Essayer d'abord le solver avancé/pédagogique
+        regeneration_payload = {
+            "time_limit": 300,  # 5 minutes max pour la régénération auto
+            "advanced": True,
+            "minimize_gaps": True,
+            "friday_short": True
+        }
+        
+        # Appeler l'endpoint de génération avancée en local
+        async with httpx.AsyncClient() as client:
+            try:
+                # Essayer d'abord l'optimisation avancée
+                response = await client.post(
+                    "http://localhost:8000/api/advanced/optimize",
+                    timeout=310.0  # Un peu plus que time_limit
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    logger.info(f"Régénération avancée réussie: score {result.get('quality_score', 0)}")
+                    return {
+                        "success": True,
+                        "method": "advanced",
+                        "quality_score": result.get('quality_score', 0),
+                        "schedule_id": result.get('schedule_id'),
+                        "message": "Emploi du temps régénéré avec optimisation avancée"
+                    }
+                else:
+                    logger.warning(f"Optimisation avancée échouée: {response.status_code}")
+                    
+            except Exception as e:
+                logger.warning(f"Erreur optimisation avancée: {e}")
+            
+            # Fallback sur la génération standard
+            try:
+                response = await client.post(
+                    "http://localhost:8000/generate_schedule",
+                    json=regeneration_payload,
+                    timeout=310.0
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get('success'):
+                        logger.info("Régénération standard réussie")
+                        return {
+                            "success": True,
+                            "method": "standard",
+                            "schedule_id": result.get('schedule_id'),
+                            "total_entries": result.get('total_entries', 0),
+                            "message": "Emploi du temps régénéré avec méthode standard"
+                        }
+                    else:
+                        logger.error(f"Régénération standard échouée: {result}")
+                        return {
+                            "success": False,
+                            "error": "Génération standard échouée",
+                            "details": result
+                        }
+                else:
+                    logger.error(f"Erreur HTTP régénération: {response.status_code}")
+                    return {
+                        "success": False,
+                        "error": f"Erreur HTTP: {response.status_code}"
+                    }
+                    
+            except Exception as e:
+                logger.error(f"Erreur lors de la régénération standard: {e}")
+                return {
+                    "success": False,
+                    "error": f"Erreur technique: {str(e)}"
+                }
+                
+    except Exception as e:
+        logger.error(f"Erreur générale lors de la régénération: {e}")
+        return {
+            "success": False,
+            "error": f"Erreur système: {str(e)}"
+        }
+
+# ============================================
+# FONCTION D'INTÉGRATION
+# ============================================
 
 # Fonction pour intégrer dans main.py
 def register_constraint_routes(app):

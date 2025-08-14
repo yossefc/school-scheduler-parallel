@@ -1,0 +1,532 @@
+{
+  "time_slots": [
+    {
+      "day": 0,
+      "index": 0,
+      "start": "8:00",
+      "end": "9:00"
+    },
+    {
+      "day": 0,
+      "index": 1,
+      "start": "9:00",
+      "end": "10:00"
+    },
+    {
+      "day": 0,
+      "index": 2,
+      "start": "10:00",
+      "end": "11:00"
+    },
+    {
+      "day": 0,
+      "index": 3,
+      "start": "11:00",
+      "end": "12:00"
+    },
+    {
+      "day": 0,
+      "index": 4,
+      "start": "12:00",
+      "end": "13:00"
+    },
+    {
+      "day": 0,
+      "index": 5,
+      "start": "13:00",
+      "end": "14:00"
+    },
+    {
+      "day": 0,
+      "index": 6,
+      "start": "14:00",
+      "end": "15:00"
+    },
+    {
+      "day": 0,
+      "index": 7,
+      "start": "15:00",
+      "end": "16:00"
+    },
+    {
+      "day": 1,
+      "index": 0,
+      "start": "8:00",
+      "end": "9:00"
+    },
+    {
+      "day": 1,
+      "index": 1,
+      "start": "9:00",
+      "end": "10:00"
+    },
+    {
+      "day": 1,
+      "index": 2,
+      "start": "10:00",
+      "end": "11:00"
+    },
+    {
+      "day": 1,
+      "index": 3,
+      "start": "11:00",
+      "end": "12:00"
+    },
+    {
+      "day": 1,
+      "index": 4,
+      "start": "12:00",
+      "end": "13:00"
+    },
+    {
+      "day": 1,
+      "index": 5,
+      "start": "13:00",
+      "end": "14:00"
+    },
+    {
+      "day": 1,
+      "index": 6,
+      "start": "14:00",
+      "end": "15:00"
+    },
+    {
+      "day": 1,
+      "index": 7,
+      "start": "15:00",
+      "end": "16:00"
+    },
+    {
+      "day": 2,
+      "index": 0,
+      "start": "8:00",
+      "end": "9:00"
+    },
+    {
+      "day": 2,
+      "index": 1,
+      "start": "9:00",
+      "end": "10:00"
+    },
+    {
+      "day": 2,
+      "index": 2,
+      "start": "10:00",
+      "end": "11:00"
+    },
+    {
+      "day": 2,
+      "index": 3,
+      "start": "11:00",
+      "end": "12:00"
+    },
+    {
+      "day": 2,
+      "index": 4,
+      "start": "12:00",
+      "end": "13:00"
+    },
+    {
+      "day": 2,
+      "index": 5,
+      "start": "13:00",
+      "end": "14:00"
+    },
+    {
+      "day": 2,
+      "index": 6,
+      "start": "14:00",
+      "end": "15:00"
+    },
+    {
+      "day": 2,
+      "index": 7,
+      "start": "15:00",
+      "end": "16:00"
+    },
+    {
+      "day": 3,
+      "index": 0,
+      "start": "8:00",
+      "end": "9:00"
+    },
+    {
+      "day": 3,
+      "index": 1,
+      "start": "9:00",
+      "end": "10:00"
+    },
+    {
+      "day": 3,
+      "index": 2,
+      "start": "10:00",
+      "end": "11:00"
+    },
+    {
+      "day": 3,
+      "index": 3,
+      "start": "11:00",
+      "end": "12:00"
+    },
+    {
+      "day": 3,
+      "index": 4,
+      "start": "12:00",
+      "end": "13:00"
+    },
+    {
+      "day": 3,
+      "index": 5,
+      "start": "13:00",
+      "end": "14:00"
+    },
+    {
+      "day": 3,
+      "index": 6,
+      "start": "14:00",
+      "end": "15:00"
+    },
+    {
+      "day": 3,
+      "index": 7,
+      "start": "15:00",
+      "end": "16:00"
+    }
+  ],
+  "entries": [
+    {
+      "class_name": "6A",
+      "day": 3,
+      "slot_index": 5,
+      "subject": "Mathématiques",
+      "teacher_names": [
+        "Prof_Assistant",
+        "Prof_Math"
+      ],
+      "kind": "parallel"
+    },
+    {
+      "class_name": "6B",
+      "day": 3,
+      "slot_index": 5,
+      "subject": "Mathématiques",
+      "teacher_names": [
+        "Prof_Assistant",
+        "Prof_Math"
+      ],
+      "kind": "parallel"
+    },
+    {
+      "class_name": "6A",
+      "day": 3,
+      "slot_index": 6,
+      "subject": "Mathématiques",
+      "teacher_names": [
+        "Prof_Assistant",
+        "Prof_Math"
+      ],
+      "kind": "parallel"
+    },
+    {
+      "class_name": "6B",
+      "day": 3,
+      "slot_index": 6,
+      "subject": "Mathématiques",
+      "teacher_names": [
+        "Prof_Assistant",
+        "Prof_Math"
+      ],
+      "kind": "parallel"
+    },
+    {
+      "class_name": "6A",
+      "day": 1,
+      "slot_index": 7,
+      "subject": "Sciences",
+      "teacher_names": [
+        "Prof_Lab",
+        "Prof_Sciences"
+      ],
+      "kind": "parallel"
+    },
+    {
+      "class_name": "6B",
+      "day": 1,
+      "slot_index": 7,
+      "subject": "Sciences",
+      "teacher_names": [
+        "Prof_Lab",
+        "Prof_Sciences"
+      ],
+      "kind": "parallel"
+    },
+    {
+      "class_name": "6A",
+      "day": 2,
+      "slot_index": 6,
+      "subject": "Sciences",
+      "teacher_names": [
+        "Prof_Lab",
+        "Prof_Sciences"
+      ],
+      "kind": "parallel"
+    },
+    {
+      "class_name": "6B",
+      "day": 2,
+      "slot_index": 6,
+      "subject": "Sciences",
+      "teacher_names": [
+        "Prof_Lab",
+        "Prof_Sciences"
+      ],
+      "kind": "parallel"
+    },
+    {
+      "class_name": "6A",
+      "day": 0,
+      "slot_index": 4,
+      "subject": "Français",
+      "teacher_names": [
+        "Prof_Francais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 0,
+      "slot_index": 5,
+      "subject": "Français",
+      "teacher_names": [
+        "Prof_Francais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 0,
+      "slot_index": 6,
+      "subject": "Français",
+      "teacher_names": [
+        "Prof_Francais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 0,
+      "slot_index": 7,
+      "subject": "Français",
+      "teacher_names": [
+        "Prof_Francais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 1,
+      "slot_index": 4,
+      "subject": "Histoire",
+      "teacher_names": [
+        "Prof_Histoire"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 1,
+      "slot_index": 5,
+      "subject": "Histoire",
+      "teacher_names": [
+        "Prof_Histoire"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 1,
+      "slot_index": 6,
+      "subject": "Histoire",
+      "teacher_names": [
+        "Prof_Histoire"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 1,
+      "slot_index": 0,
+      "subject": "Anglais",
+      "teacher_names": [
+        "Prof_Anglais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 1,
+      "slot_index": 1,
+      "subject": "Anglais",
+      "teacher_names": [
+        "Prof_Anglais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 2,
+      "slot_index": 5,
+      "subject": "Anglais",
+      "teacher_names": [
+        "Prof_Anglais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 1,
+      "slot_index": 2,
+      "subject": "Sport",
+      "teacher_names": [
+        "Prof_Sport"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6A",
+      "day": 1,
+      "slot_index": 3,
+      "subject": "Sport",
+      "teacher_names": [
+        "Prof_Sport"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 0,
+      "slot_index": 4,
+      "subject": "Français",
+      "teacher_names": [
+        "Prof_Francais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 0,
+      "slot_index": 5,
+      "subject": "Français",
+      "teacher_names": [
+        "Prof_Francais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 0,
+      "slot_index": 6,
+      "subject": "Français",
+      "teacher_names": [
+        "Prof_Francais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 0,
+      "slot_index": 7,
+      "subject": "Français",
+      "teacher_names": [
+        "Prof_Francais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 0,
+      "slot_index": 2,
+      "subject": "Histoire",
+      "teacher_names": [
+        "Prof_Histoire"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 1,
+      "slot_index": 4,
+      "subject": "Histoire",
+      "teacher_names": [
+        "Prof_Histoire"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 1,
+      "slot_index": 5,
+      "subject": "Histoire",
+      "teacher_names": [
+        "Prof_Histoire"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 1,
+      "slot_index": 1,
+      "subject": "Anglais",
+      "teacher_names": [
+        "Prof_Anglais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 1,
+      "slot_index": 2,
+      "subject": "Anglais",
+      "teacher_names": [
+        "Prof_Anglais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 1,
+      "slot_index": 3,
+      "subject": "Anglais",
+      "teacher_names": [
+        "Prof_Anglais"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 0,
+      "slot_index": 3,
+      "subject": "Géographie",
+      "teacher_names": [
+        "Prof_Histoire"
+      ],
+      "kind": "single"
+    },
+    {
+      "class_name": "6B",
+      "day": 1,
+      "slot_index": 6,
+      "subject": "Géographie",
+      "teacher_names": [
+        "Prof_Histoire"
+      ],
+      "kind": "single"
+    }
+  ],
+  "meta": {
+    "solve_status": "OPTIMAL",
+    "walltime": 0.27606010000000003,
+    "objective_value": 0.0,
+    "total_teacher_gaps": 0
+  }
+}

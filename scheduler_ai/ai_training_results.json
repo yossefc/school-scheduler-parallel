@@ -1,0 +1,672 @@
+{
+  "timestamp": "2025-08-13T09:47:55.720484",
+  "training_cases": [
+    {
+      "case_id": "case_001_high_conflicts",
+      "problem_pattern": "high_conflict",
+      "context": {
+        "total_entries": 5000,
+        "teacher_conflicts": 150,
+        "room_conflicts": 30,
+        "classes": 20,
+        "teachers": 40,
+        "quality_score": 0.25
+      },
+      "optimal_algorithm": "constraint_programming",
+      "expected_improvement": 0.7,
+      "success_metrics": {
+        "conflict_reduction": 0.9,
+        "quality_improvement": 0.6,
+        "execution_time": 120
+      },
+      "learned_rules": [
+        "Si conflits > 100, utiliser PC en premier",
+        "Activer propagation de contraintes maximale",
+        "Prioriser résolution conflits avant optimisation"
+      ]
+    },
+    {
+      "case_id": "case_002_fragmented",
+      "problem_pattern": "fragmented",
+      "context": {
+        "total_entries": 3000,
+        "fragmentation_index": 0.8,
+        "consecutive_blocks": 0.2,
+        "classes": 15,
+        "teachers": 30,
+        "quality_score": 0.3
+      },
+      "optimal_algorithm": "tabu_search",
+      "expected_improvement": 0.6,
+      "success_metrics": {
+        "fragmentation_reduction": 0.7,
+        "consecutive_blocks_increase": 0.8,
+        "execution_time": 150
+      },
+      "learned_rules": [
+        "Fragmentation > 0.7 nécessite regroupement intensif",
+        "RT avec tenure longue pour éviter re-fragmentation",
+        "Objectif: maximiser blocs consécutifs"
+      ]
+    },
+    {
+      "case_id": "case_003_gaps",
+      "problem_pattern": "gaps_heavy",
+      "context": {
+        "total_entries": 4000,
+        "total_gaps": 500,
+        "avg_gaps_per_class": 25,
+        "classes": 20,
+        "teachers": 35,
+        "quality_score": 0.35
+      },
+      "optimal_algorithm": "simulated_annealing",
+      "expected_improvement": 0.65,
+      "success_metrics": {
+        "gap_reduction": 0.75,
+        "compactness_increase": 0.7,
+        "execution_time": 180
+      },
+      "learned_rules": [
+        "Trous > 20/classe nécessite exploration globale",
+        "RS avec température initiale élevée",
+        "Pénaliser fortement les trous dans fitness"
+      ]
+    },
+    {
+      "case_id": "case_004_unbalanced",
+      "problem_pattern": "unbalanced",
+      "context": {
+        "total_entries": 3500,
+        "load_variance": 0.7,
+        "peak_day_load": 0.35,
+        "min_day_load": 0.05,
+        "classes": 18,
+        "teachers": 32,
+        "quality_score": 0.4
+      },
+      "optimal_algorithm": "multi_objective",
+      "expected_improvement": 0.55,
+      "success_metrics": {
+        "load_balance": 0.8,
+        "variance_reduction": 0.6,
+        "execution_time": 240
+      },
+      "learned_rules": [
+        "Variance > 0.6 nécessite équilibrage multi-critères",
+        "Objectifs: minimiser variance ET maximiser satisfaction",
+        "Pondération adaptative selon déséquilibre"
+      ]
+    },
+    {
+      "case_id": "case_005_morning",
+      "problem_pattern": "morning_violation",
+      "context": {
+        "total_entries": 2500,
+        "important_subjects": [
+          "Math",
+          "Physics",
+          "Hebrew"
+        ],
+        "morning_placement_rate": 0.3,
+        "classes": 12,
+        "teachers": 25,
+        "quality_score": 0.45
+      },
+      "optimal_algorithm": "tabu_search",
+      "expected_improvement": 0.5,
+      "success_metrics": {
+        "morning_placement": 0.85,
+        "cognitive_optimization": 0.7,
+        "execution_time": 150
+      },
+      "learned_rules": [
+        "Placement matinal < 50% nécessite contraintes temporelles",
+        "RT avec mémoire des créneaux matinaux",
+        "Interdire déplacement hors matin pour matières clés"
+      ]
+    },
+    {
+      "case_id": "case_006_pedagogical",
+      "problem_pattern": "pedagogical_poor",
+      "context": {
+        "total_entries": 6000,
+        "pedagogical_score": 0.2,
+        "consecutive_blocks": 0.15,
+        "teacher_satisfaction": 0.3,
+        "classes": 25,
+        "teachers": 50,
+        "quality_score": 0.2
+      },
+      "optimal_algorithm": "hybrid",
+      "expected_improvement": 0.75,
+      "success_metrics": {
+        "pedagogical_improvement": 0.8,
+        "overall_quality": 0.75,
+        "execution_time": 300
+      },
+      "learned_rules": [
+        "Score pédagogique < 0.3 nécessite approche complète",
+        "Hybride: PC + RS + RT en séquence",
+        "Prioriser blocs 2h et minimisation trous"
+      ]
+    },
+    {
+      "case_id": "case_007_religious",
+      "problem_pattern": "religious_constraint",
+      "context": {
+        "total_entries": 4500,
+        "religious_constraints": [
+          "No Friday afternoon",
+          "Prayer times",
+          "Shabbat prep"
+        ],
+        "constraint_violations": 45,
+        "classes": 22,
+        "teachers": 40,
+        "quality_score": 0.35
+      },
+      "optimal_algorithm": "constraint_programming",
+      "expected_improvement": 0.6,
+      "success_metrics": {
+        "constraint_satisfaction": 1.0,
+        "religious_compliance": 1.0,
+        "execution_time": 120
+      },
+      "learned_rules": [
+        "Contraintes religieuses = contraintes dures absolues",
+        "PC avec propagation stricte",
+        "Aucune violation tolérée"
+      ]
+    },
+    {
+      "case_id": "case_008_complex",
+      "problem_pattern": "complex_mixed",
+      "context": {
+        "total_entries": 47373,
+        "teacher_conflicts": 200,
+        "gaps": 400,
+        "pedagogical_score": 0.195,
+        "classes": 31,
+        "teachers": 101,
+        "quality_score": 0.195
+      },
+      "optimal_algorithm": "hybrid",
+      "expected_improvement": 0.7,
+      "success_metrics": {
+        "overall_improvement": 0.7,
+        "conflict_resolution": 0.85,
+        "pedagogical_boost": 0.75,
+        "execution_time": 600
+      },
+      "learned_rules": [
+        "Complexité élevée = approche hybride obligatoire",
+        "Séquence: résoudre conflits -> optimiser pédagogie -> raffiner",
+        "Temps d'exécution proportionnel à la taille"
+      ]
+    }
+  ],
+  "learning_outcomes": [
+    {
+      "pattern": "high_conflict",
+      "algorithm": "constraint_programming",
+      "improvement": 0.7,
+      "success": true,
+      "insights": [
+        "✅ constraint_programming efficace pour high_conflict",
+        "Si conflits > 100, utiliser PC en premier",
+        "Activer propagation de contraintes maximale",
+        "Prioriser résolution conflits avant optimisation"
+      ]
+    },
+    {
+      "pattern": "fragmented",
+      "algorithm": "tabu_search",
+      "improvement": 0.5999999999999999,
+      "success": true,
+      "insights": [
+        "✅ tabu_search efficace pour fragmented",
+        "Fragmentation > 0.7 nécessite regroupement intensif",
+        "RT avec tenure longue pour éviter re-fragmentation",
+        "Objectif: maximiser blocs consécutifs"
+      ]
+    },
+    {
+      "pattern": "gaps_heavy",
+      "algorithm": "simulated_annealing",
+      "improvement": 0.65,
+      "success": true,
+      "insights": [
+        "✅ simulated_annealing efficace pour gaps_heavy",
+        "Trous > 20/classe nécessite exploration globale",
+        "RS avec température initiale élevée",
+        "Pénaliser fortement les trous dans fitness"
+      ]
+    },
+    {
+      "pattern": "unbalanced",
+      "algorithm": "multi_objective",
+      "improvement": 0.55,
+      "success": true,
+      "insights": [
+        "✅ multi_objective efficace pour unbalanced",
+        "Variance > 0.6 nécessite équilibrage multi-critères",
+        "Objectifs: minimiser variance ET maximiser satisfaction",
+        "Pondération adaptative selon déséquilibre"
+      ]
+    },
+    {
+      "pattern": "morning_violation",
+      "algorithm": "tabu_search",
+      "improvement": 0.49999999999999994,
+      "success": true,
+      "insights": [
+        "✅ tabu_search efficace pour morning_violation",
+        "Placement matinal < 50% nécessite contraintes temporelles",
+        "RT avec mémoire des créneaux matinaux",
+        "Interdire déplacement hors matin pour matières clés"
+      ]
+    },
+    {
+      "pattern": "pedagogical_poor",
+      "algorithm": "hybrid",
+      "improvement": 0.75,
+      "success": true,
+      "insights": [
+        "✅ hybrid efficace pour pedagogical_poor",
+        "Score pédagogique < 0.3 nécessite approche complète",
+        "Hybride: PC + RS + RT en séquence",
+        "Prioriser blocs 2h et minimisation trous"
+      ]
+    },
+    {
+      "pattern": "religious_constraint",
+      "algorithm": "constraint_programming",
+      "improvement": 0.6,
+      "success": true,
+      "insights": [
+        "✅ constraint_programming efficace pour religious_constraint",
+        "Contraintes religieuses = contraintes dures absolues",
+        "PC avec propagation stricte",
+        "Aucune violation tolérée"
+      ]
+    },
+    {
+      "pattern": "complex_mixed",
+      "algorithm": "hybrid",
+      "improvement": 0.7,
+      "success": true,
+      "insights": [
+        "✅ hybrid efficace pour complex_mixed",
+        "Complexité élevée = approche hybride obligatoire",
+        "Séquence: résoudre conflits -> optimiser pédagogie -> raffiner",
+        "Temps d'exécution proportionnel à la taille"
+      ]
+    },
+    {
+      "pattern": "high_conflict",
+      "algorithm": "constraint_programming",
+      "improvement": 0.7,
+      "success": true,
+      "insights": [
+        "✅ constraint_programming efficace pour high_conflict",
+        "Si conflits > 100, utiliser PC en premier",
+        "Activer propagation de contraintes maximale",
+        "Prioriser résolution conflits avant optimisation"
+      ]
+    },
+    {
+      "pattern": "fragmented",
+      "algorithm": "tabu_search",
+      "improvement": 0.5999999999999999,
+      "success": true,
+      "insights": [
+        "✅ tabu_search efficace pour fragmented",
+        "Fragmentation > 0.7 nécessite regroupement intensif",
+        "RT avec tenure longue pour éviter re-fragmentation",
+        "Objectif: maximiser blocs consécutifs"
+      ]
+    },
+    {
+      "pattern": "gaps_heavy",
+      "algorithm": "simulated_annealing",
+      "improvement": 0.65,
+      "success": true,
+      "insights": [
+        "✅ simulated_annealing efficace pour gaps_heavy",
+        "Trous > 20/classe nécessite exploration globale",
+        "RS avec température initiale élevée",
+        "Pénaliser fortement les trous dans fitness"
+      ]
+    },
+    {
+      "pattern": "unbalanced",
+      "algorithm": "multi_objective",
+      "improvement": 0.55,
+      "success": true,
+      "insights": [
+        "✅ multi_objective efficace pour unbalanced",
+        "Variance > 0.6 nécessite équilibrage multi-critères",
+        "Objectifs: minimiser variance ET maximiser satisfaction",
+        "Pondération adaptative selon déséquilibre"
+      ]
+    },
+    {
+      "pattern": "morning_violation",
+      "algorithm": "tabu_search",
+      "improvement": 0.49999999999999994,
+      "success": true,
+      "insights": [
+        "✅ tabu_search efficace pour morning_violation",
+        "Placement matinal < 50% nécessite contraintes temporelles",
+        "RT avec mémoire des créneaux matinaux",
+        "Interdire déplacement hors matin pour matières clés"
+      ]
+    },
+    {
+      "pattern": "pedagogical_poor",
+      "algorithm": "hybrid",
+      "improvement": 0.75,
+      "success": true,
+      "insights": [
+        "✅ hybrid efficace pour pedagogical_poor",
+        "Score pédagogique < 0.3 nécessite approche complète",
+        "Hybride: PC + RS + RT en séquence",
+        "Prioriser blocs 2h et minimisation trous"
+      ]
+    },
+    {
+      "pattern": "religious_constraint",
+      "algorithm": "constraint_programming",
+      "improvement": 0.6,
+      "success": true,
+      "insights": [
+        "✅ constraint_programming efficace pour religious_constraint",
+        "Contraintes religieuses = contraintes dures absolues",
+        "PC avec propagation stricte",
+        "Aucune violation tolérée"
+      ]
+    },
+    {
+      "pattern": "complex_mixed",
+      "algorithm": "hybrid",
+      "improvement": 0.7,
+      "success": true,
+      "insights": [
+        "✅ hybrid efficace pour complex_mixed",
+        "Complexité élevée = approche hybride obligatoire",
+        "Séquence: résoudre conflits -> optimiser pédagogie -> raffiner",
+        "Temps d'exécution proportionnel à la taille"
+      ]
+    },
+    {
+      "pattern": "high_conflict",
+      "algorithm": "constraint_programming",
+      "improvement": 0.7,
+      "success": true,
+      "insights": [
+        "✅ constraint_programming efficace pour high_conflict",
+        "Si conflits > 100, utiliser PC en premier",
+        "Activer propagation de contraintes maximale",
+        "Prioriser résolution conflits avant optimisation"
+      ]
+    },
+    {
+      "pattern": "fragmented",
+      "algorithm": "tabu_search",
+      "improvement": 0.5999999999999999,
+      "success": true,
+      "insights": [
+        "✅ tabu_search efficace pour fragmented",
+        "Fragmentation > 0.7 nécessite regroupement intensif",
+        "RT avec tenure longue pour éviter re-fragmentation",
+        "Objectif: maximiser blocs consécutifs"
+      ]
+    },
+    {
+      "pattern": "gaps_heavy",
+      "algorithm": "simulated_annealing",
+      "improvement": 0.65,
+      "success": true,
+      "insights": [
+        "✅ simulated_annealing efficace pour gaps_heavy",
+        "Trous > 20/classe nécessite exploration globale",
+        "RS avec température initiale élevée",
+        "Pénaliser fortement les trous dans fitness"
+      ]
+    },
+    {
+      "pattern": "unbalanced",
+      "algorithm": "multi_objective",
+      "improvement": 0.55,
+      "success": true,
+      "insights": [
+        "✅ multi_objective efficace pour unbalanced",
+        "Variance > 0.6 nécessite équilibrage multi-critères",
+        "Objectifs: minimiser variance ET maximiser satisfaction",
+        "Pondération adaptative selon déséquilibre"
+      ]
+    },
+    {
+      "pattern": "morning_violation",
+      "algorithm": "tabu_search",
+      "improvement": 0.49999999999999994,
+      "success": true,
+      "insights": [
+        "✅ tabu_search efficace pour morning_violation",
+        "Placement matinal < 50% nécessite contraintes temporelles",
+        "RT avec mémoire des créneaux matinaux",
+        "Interdire déplacement hors matin pour matières clés"
+      ]
+    },
+    {
+      "pattern": "pedagogical_poor",
+      "algorithm": "hybrid",
+      "improvement": 0.75,
+      "success": true,
+      "insights": [
+        "✅ hybrid efficace pour pedagogical_poor",
+        "Score pédagogique < 0.3 nécessite approche complète",
+        "Hybride: PC + RS + RT en séquence",
+        "Prioriser blocs 2h et minimisation trous"
+      ]
+    },
+    {
+      "pattern": "religious_constraint",
+      "algorithm": "constraint_programming",
+      "improvement": 0.6,
+      "success": true,
+      "insights": [
+        "✅ constraint_programming efficace pour religious_constraint",
+        "Contraintes religieuses = contraintes dures absolues",
+        "PC avec propagation stricte",
+        "Aucune violation tolérée"
+      ]
+    },
+    {
+      "pattern": "complex_mixed",
+      "algorithm": "hybrid",
+      "improvement": 0.7,
+      "success": true,
+      "insights": [
+        "✅ hybrid efficace pour complex_mixed",
+        "Complexité élevée = approche hybride obligatoire",
+        "Séquence: résoudre conflits -> optimiser pédagogie -> raffiner",
+        "Temps d'exécution proportionnel à la taille"
+      ]
+    },
+    {
+      "pattern": "high_conflict",
+      "algorithm": "constraint_programming",
+      "improvement": 0.7,
+      "success": true,
+      "insights": [
+        "✅ constraint_programming efficace pour high_conflict",
+        "Si conflits > 100, utiliser PC en premier",
+        "Activer propagation de contraintes maximale",
+        "Prioriser résolution conflits avant optimisation"
+      ]
+    },
+    {
+      "pattern": "fragmented",
+      "algorithm": "tabu_search",
+      "improvement": 0.5999999999999999,
+      "success": true,
+      "insights": [
+        "✅ tabu_search efficace pour fragmented",
+        "Fragmentation > 0.7 nécessite regroupement intensif",
+        "RT avec tenure longue pour éviter re-fragmentation",
+        "Objectif: maximiser blocs consécutifs"
+      ]
+    },
+    {
+      "pattern": "gaps_heavy",
+      "algorithm": "simulated_annealing",
+      "improvement": 0.65,
+      "success": true,
+      "insights": [
+        "✅ simulated_annealing efficace pour gaps_heavy",
+        "Trous > 20/classe nécessite exploration globale",
+        "RS avec température initiale élevée",
+        "Pénaliser fortement les trous dans fitness"
+      ]
+    },
+    {
+      "pattern": "unbalanced",
+      "algorithm": "multi_objective",
+      "improvement": 0.55,
+      "success": true,
+      "insights": [
+        "✅ multi_objective efficace pour unbalanced",
+        "Variance > 0.6 nécessite équilibrage multi-critères",
+        "Objectifs: minimiser variance ET maximiser satisfaction",
+        "Pondération adaptative selon déséquilibre"
+      ]
+    },
+    {
+      "pattern": "morning_violation",
+      "algorithm": "tabu_search",
+      "improvement": 0.49999999999999994,
+      "success": true,
+      "insights": [
+        "✅ tabu_search efficace pour morning_violation",
+        "Placement matinal < 50% nécessite contraintes temporelles",
+        "RT avec mémoire des créneaux matinaux",
+        "Interdire déplacement hors matin pour matières clés"
+      ]
+    },
+    {
+      "pattern": "pedagogical_poor",
+      "algorithm": "hybrid",
+      "improvement": 0.75,
+      "success": true,
+      "insights": [
+        "✅ hybrid efficace pour pedagogical_poor",
+        "Score pédagogique < 0.3 nécessite approche complète",
+        "Hybride: PC + RS + RT en séquence",
+        "Prioriser blocs 2h et minimisation trous"
+      ]
+    },
+    {
+      "pattern": "religious_constraint",
+      "algorithm": "constraint_programming",
+      "improvement": 0.6,
+      "success": true,
+      "insights": [
+        "✅ constraint_programming efficace pour religious_constraint",
+        "Contraintes religieuses = contraintes dures absolues",
+        "PC avec propagation stricte",
+        "Aucune violation tolérée"
+      ]
+    },
+    {
+      "pattern": "complex_mixed",
+      "algorithm": "hybrid",
+      "improvement": 0.7,
+      "success": true,
+      "insights": [
+        "✅ hybrid efficace pour complex_mixed",
+        "Complexité élevée = approche hybride obligatoire",
+        "Séquence: résoudre conflits -> optimiser pédagogie -> raffiner",
+        "Temps d'exécution proportionnel à la taille"
+      ]
+    }
+  ],
+  "algorithm_performance": {
+    "constraint_programming": {
+      "success_rate": 0.9354299184999999,
+      "avg_improvement": 0.6269778690000001,
+      "avg_time": 120.0
+    },
+    "simulated_annealing": {
+      "success_rate": 0.8687800000000001,
+      "avg_improvement": 0.6500000000000001,
+      "avg_time": 180.0
+    },
+    "tabu_search": {
+      "success_rate": 0.8923831975,
+      "avg_improvement": 0.5485012295000001,
+      "avg_time": 150.0
+    },
+    "hybrid": {
+      "success_rate": 0.956953279,
+      "avg_improvement": 0.7134889345,
+      "avg_time": 389.92623000000003
+    },
+    "multi_objective": {
+      "success_rate": 0.881902,
+      "avg_improvement": 0.6352930000000003,
+      "avg_time": 240.0
+    }
+  },
+  "pattern_knowledge": {
+    "high_conflict": {
+      "primary_algorithm": "constraint_programming",
+      "fallback": "hybrid",
+      "reasoning": "PC excelle pour résoudre les contraintes dures",
+      "expected_improvement": 0.7
+    },
+    "fragmented": {
+      "primary_algorithm": "tabu_search",
+      "fallback": "simulated_annealing",
+      "reasoning": "RT efficace pour regrouper les fragments",
+      "expected_improvement": 0.6
+    },
+    "gaps_heavy": {
+      "primary_algorithm": "simulated_annealing",
+      "fallback": "hybrid",
+      "reasoning": "RS explore globalement pour minimiser les trous",
+      "expected_improvement": 0.65
+    },
+    "unbalanced": {
+      "primary_algorithm": "multi_objective",
+      "fallback": "hybrid",
+      "reasoning": "Multi-objectifs équilibre plusieurs critères",
+      "expected_improvement": 0.55
+    },
+    "morning_violation": {
+      "primary_algorithm": "tabu_search",
+      "fallback": "constraint_programming",
+      "reasoning": "RT avec contraintes temporelles spécifiques",
+      "expected_improvement": 0.5
+    },
+    "pedagogical_poor": {
+      "primary_algorithm": "hybrid",
+      "fallback": "multi_objective",
+      "reasoning": "Hybride combine faisabilité et qualité pédagogique",
+      "expected_improvement": 0.75
+    },
+    "religious_constraint": {
+      "primary_algorithm": "constraint_programming",
+      "fallback": "hybrid",
+      "reasoning": "PC pour contraintes strictes religieuses",
+      "expected_improvement": 0.6
+    },
+    "complex_mixed": {
+      "primary_algorithm": "hybrid",
+      "fallback": "multi_objective",
+      "reasoning": "Hybride gère la complexité multi-facettes",
+      "expected_improvement": 0.7
+    }
+  }
+}

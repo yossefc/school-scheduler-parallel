@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Agent Conseiller</title>
+</head>
+<body>
+    <h1>Test de l'Agent Conseiller</h1>
+    
+    <div>
+        <input type="text" id="messageInput" value="כיתה ז-1 יש חור ביום חמישי" placeholder="Tapez votre message">
+        <button onclick="testAgent()">Tester</button>
+    </div>
+    
+    <div id="response" style="margin-top: 20px; padding: 20px; border: 1px solid #ccc;"></div>
+
+    <script>
+        async function testAgent() {
+            const input = document.getElementById('messageInput');
+            const response = document.getElementById('response');
+            
+            response.innerHTML = "🔄 Test en cours...";
+            
+            try {
+                // Test 1: Vérifier le status
+                console.log('Test 1: Status API');
+                const statusResponse = await fetch('http://localhost:5002/api/advisor/status');
+                const statusData = await statusResponse.json();
+                console.log('Status:', statusData);
+                
+                // Test 2: Envoyer le message
+                console.log('Test 2: Message chat');
+                const chatResponse = await fetch('http://localhost:5002/api/advisor/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json; charset=utf-8',
+                    },
+                    body: JSON.stringify({
+                        message: input.value,
+                        context: {
+                            session_id: 'test_web',
+                            user_name: 'Test Web'
+                        }
+                    })
+                });
+                
+                const chatData = await chatResponse.json();
+                console.log('Chat response:', chatData);
+                
+                // Afficher le résultat
+                response.innerHTML = `
+                    <h3>✅ Succès !</h3>
+                    <p><strong>Status API:</strong> ${statusData.status}</p>
+                    <p><strong>Message envoyé:</strong> ${input.value}</p>
+                    <p><strong>Réponse de l'agent:</strong></p>
+                    <div style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
+                        ${chatData.message || 'Pas de message'}
+                    </div>
+                    <p><strong>Propositions:</strong> ${chatData.proposals ? chatData.proposals.length : 0}</p>
+                `;
+                
+            } catch (error) {
+                console.error('Erreur:', error);
+                response.innerHTML = `
+                    <h3>❌ Erreur</h3>
+                    <p><strong>Type:</strong> ${error.name}</p>
+                    <p><strong>Message:</strong> ${error.message}</p>
+                    <p><strong>Détail:</strong> Impossible de contacter l'agent sur http://localhost:5002</p>
+                    <p><strong>Suggestions:</strong></p>
+                    <ul>
+                        <li>Vérifier que l'agent est actif: <code>docker-compose ps advisor_agent</code></li>
+                        <li>Vérifier les logs: <code>docker logs school_advisor_agent</code></li>
+                        <li>Tester l'API directement: <code>curl http://localhost:5002/api/advisor/status</code></li>
+                    </ul>
+                `;
+            }
+        }
+        
+        // Test automatique au chargement
+        window.onload = function() {
+            console.log('Page chargée, test automatique...');
+            testAgent();
+        }
+    </script>
+</body>
+</html>

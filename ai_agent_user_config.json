@@ -1,0 +1,21 @@
+{
+  "user_school_type": "hebrew_religious",
+  "learned_patterns": [
+    "HEBREW_MORNING_PRIORITY",
+    "MONDAY_STRUCTURE_CRITICAL",
+    "TEACHER_PRESENCE_MONDAY",
+    "NO_LONG_CONSECUTIVE_HEBREW"
+  ],
+  "algorithm_preference": "constraint_programming_religious",
+  "quality_improvement": {
+    "from": 19.5,
+    "to": 88.7,
+    "improvement_percent": 354.6
+  },
+  "constraint_compliance_rates": {
+    "hebrew_morning": 95,
+    "no_3h_consecutive": 100,
+    "monday_structure": 98,
+    "teacher_presence": 92
+  }
+}

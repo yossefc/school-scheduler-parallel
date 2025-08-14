@@ -1,2542 +1,799 @@
-<!DOCTYPE html>
-<html lang="fr">
+<!doctype html>
+<html lang="fr" data-locale="fr" dir="ltr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestionnaire de contraintes - Emploi du temps scolaire</title>
-    
-    <!-- Socket.IO pour la connexion WebSocket avec l'IA -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    
-    <style>
-        :root {
-            --primary: #2c3e50;
-            --secondary: #3498db;
-            --success: #27ae60;
-            --warning: #f39c12;
-            --danger: #e74c3c;
-            --light: #ecf0f1;
-            --dark: #34495e;
-            --border: #bdc3c7;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: #f5f6fa;
-            color: var(--dark);
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .header {
-            background: var(--primary);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .header h1 {
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .status-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 5px 15px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 20px;
-            font-size: 14px;
-        }
-
-        .status-indicator.connected {
-            background: var(--success);
-        }
-
-        .status-indicator.error {
-            background: var(--danger);
-        }
-
-        .ai-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 5px 15px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 20px;
-            font-size: 14px;
-            margin-left: 10px;
-        }
-
-        .ai-status.connected {
-            background: #7b1fa2;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        @media (max-width: 768px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid var(--light);
-        }
-
-        .card-header h2 {
-            color: var(--primary);
-            font-size: 20px;
-        }
-
-        .badge {
-            padding: 4px 12px;
-            border-radius: 15px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .badge.success {
-            background: var(--success);
-            color: white;
-        }
-
-        .badge.warning {
-            background: var(--warning);
-            color: white;
-        }
-
-        .badge.danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .badge.info {
-            background: var(--secondary);
-            color: white;
-        }
-
-        .badge.secondary {
-            background: var(--light);
-            color: var(--dark);
-        }
-
-        .constraint-form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .form-group label {
-            font-weight: 600;
-            color: var(--dark);
-            font-size: 14px;
-        }
-
-        .form-control {
-            padding: 10px 15px;
-            border: 1px solid var(--border);
-            border-radius: 5px;
-            font-size: 16px;
-            transition: border-color 0.2s;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--secondary);
-        }
-
-        textarea.form-control {
-            resize: vertical;
-            min-height: 100px;
-            font-family: inherit;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-primary {
-            background: var(--secondary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #2980b9;
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-warning {
-            background: var(--warning);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: var(--light);
-            color: var(--dark);
-        }
-
-        .btn-info {
-            background: #17a2b8;
-            color: white;
-        }
-
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 14px;
-        }
-
-        .constraint-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .constraint-item {
-            padding: 15px;
-            margin-bottom: 10px;
-            background: #f8f9fa;
-            border-radius: 5px;
-            border-left: 4px solid var(--secondary);
-            transition: all 0.2s;
-        }
-
-        .constraint-item:hover {
-            background: #e9ecef;
-        }
-
-        .constraint-item.inactive {
-            opacity: 0.6;
-            border-left-color: var(--border);
-        }
-
-        .constraint-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 10px;
-        }
-
-        .constraint-title {
-            font-weight: 600;
-            color: var(--dark);
-        }
-
-        .constraint-details {
-            font-size: 14px;
-            color: #666;
-            margin-top: 5px;
-        }
-
-        .constraint-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .info-panel {
-            background: #e3f2fd;
-            border: 1px solid #90caf9;
-            border-radius: 5px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-
-        .info-panel h3 {
-            color: #1976d2;
-            margin-bottom: 10px;
-        }
-
-        .info-panel.ai-analysis {
-            background: #f3e5f5;
-            border-color: #ce93d8;
-        }
-
-        .info-panel.ai-analysis h3 {
-            color: #7b1fa2;
-        }
-
-        .info-list {
-            list-style: none;
-            padding-left: 0;
-        }
-
-        .info-list li {
-            padding: 5px 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .icon {
-            width: 20px;
-            height: 20px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .loading {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            color: var(--secondary);
-            gap: 15px;
-        }
-
-        .spinner-border {
-            width: 30px;
-            height: 30px;
-            border: 3px solid var(--light);
-            border-top-color: var(--secondary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .alert {
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateY(-20px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .alert-danger {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .alert-warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
-
-        .alert-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid var(--light);
-        }
-
-        .tab {
-            padding: 10px 20px;
-            background: none;
-            border: none;
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--dark);
-            cursor: pointer;
-            position: relative;
-            transition: color 0.2s;
-        }
-
-        .tab:hover {
-            color: var(--secondary);
-        }
-
-        .tab.active {
-            color: var(--secondary);
-        }
-
-        .tab.active::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: var(--secondary);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: var(--secondary);
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            font-size: 14px;
-            color: #666;
-            text-transform: uppercase;
-        }
-
-        .debug-panel {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: white;
-            border: 2px solid var(--primary);
-            border-radius: 10px;
-            padding: 15px;
-            max-width: 300px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            display: none;
-        }
-
-        .debug-panel.active {
-            display: block;
-        }
-
-        .debug-panel h4 {
-            margin-bottom: 10px;
-            color: var(--primary);
-        }
-
-        .debug-log {
-            font-size: 12px;
-            color: #666;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .debug-toggle {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            font-size: 20px;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            z-index: 1000;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎯 Générateur ULTIME d'Emploi du Temps - École Hébraïque</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      color: #1f2937;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(10px);
+    }
+    h1 {
+      text-align: center;
+      color: #4a5568;
+      margin-bottom: 40px;
+      font-size: 2.5rem;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .main-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+    .control-section {
+      background: #f8fafc;
+      border-radius: 16px;
+      padding: 30px;
+      border: 2px solid #e2e8f0;
+    }
+    .control-section h2 {
+      color: #2d3748;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .algorithms-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .algorithm-card {
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    .algorithm-card:hover {
+      border-color: #667eea;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    .algorithm-card.selected {
+      border-color: #667eea;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+    .algorithm-card h3 {
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+    }
+    .algorithm-card p {
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+    .option-group {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      border: 1px solid #e2e8f0;
+    }
+    .option-group h4 {
+      color: #4a5568;
+      margin-bottom: 10px;
+      font-size: 1rem;
+    }
+    .checkbox-option {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+      cursor: pointer;
+    }
+    .checkbox-option input[type="checkbox"] {
+      margin-right: 8px;
+      transform: scale(1.2);
+    }
+    .checkbox-option label {
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .slider-option {
+      margin: 10px 0;
+    }
+    .slider-option label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.9rem;
+      color: #4a5568;
+    }
+    .slider-option input[type="range"] {
+      width: 100%;
+      margin-bottom: 5px;
+    }
+    .slider-value {
+      text-align: center;
+      font-weight: bold;
+      color: #667eea;
+    }
+    .generation-controls {
+      text-align: center;
+      margin: 40px 0;
+    }
+    .generate-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 20px 60px;
+      border-radius: 50px;
+      font-size: 1.3rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 10px 25px -5px rgba(102, 126, 234, 0.4);
+    }
+    .generate-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 20px 40px -5px rgba(102, 126, 234, 0.6);
+    }
+    .generate-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .status-section {
+      background: #f0fdf4;
+      border: 2px solid #10b981;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+      display: none;
+    }
+    .status-section.error {
+      background: #fef2f2;
+      border-color: #ef4444;
+    }
+    .status-section.info {
+      background: #eff6ff;
+      border-color: #3b82f6;
+    }
+    .progress-container {
+      margin: 20px 0;
+      display: none;
+    }
+    .progress-bar {
+      height: 30px;
+      background: #e2e8f0;
+      border-radius: 15px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+      width: 0%;
+      transition: width 0.5s ease;
+      animation: shimmer 2s infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 1; }
+    }
+    .progress-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-weight: bold;
+      color: #2d3748;
+      z-index: 1;
+    }
+    .results-section {
+      display: none;
+      margin-top: 30px;
+      background: #f8fafc;
+      border-radius: 16px;
+      padding: 30px;
+    }
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .result-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #e2e8f0;
+      text-align: center;
+    }
+    .result-value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 5px;
+    }
+    .result-label {
+      color: #6b7280;
+      font-size: 0.9rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin: 2px;
+    }
+    .badge.success { background: #10b981; color: white; }
+    .badge.warning { background: #f59e0b; color: white; }
+    .badge.info { background: #3b82f6; color: white; }
+    .badge.error { background: #ef4444; color: white; }
+    .advanced-options {
+      display: none;
+      margin-top: 20px;
+      background: #f1f5f9;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .toggle-advanced {
+      background: none;
+      border: 2px solid #667eea;
+      color: #667eea;
+      padding: 10px 20px;
+      border-radius: 25px;
+      cursor: pointer;
+      margin-bottom: 20px;
+      transition: all 0.3s;
+    }
+    .toggle-advanced:hover {
+      background: #667eea;
+      color: white;
+    }
+    .schedule-grid {
+      margin-top: 20px;
+      overflow-x: auto;
+    }
+    .schedule-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .schedule-table th, .schedule-table td {
+      border: 1px solid #e2e8f0;
+      padding: 8px;
+      text-align: center;
+      vertical-align: top;
+    }
+    .schedule-table th {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      font-weight: bold;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .schedule-table th:first-child {
+      background: #4a5568;
+    }
+    .schedule-cell {
+      min-height: 60px;
+      background: #f8fafc;
+      position: relative;
+    }
+    .lesson-block {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      margin: 2px;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 10px;
+      line-height: 1.2;
+    }
+    .lesson-block.parallel {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    }
+    .lesson-class {
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    .lesson-subject {
+      font-style: italic;
+    }
+    .lesson-teacher {
+      font-size: 9px;
+      opacity: 0.9;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>
-                📅 Gestionnaire de contraintes
-                <span class="status-indicator" id="status">
-                    <span class="icon">●</span> Vérification...
-                </span>
-                <span class="ai-status" id="ai-status">
-                    <span class="icon">🤖</span> IA
-                </span>
-            </h1>
-            <p>Système de planification d'emploi du temps scolaire israélien avec assistant IA</p>
-        </div>
+  <div class="container">
+    <h1>🎯 Générateur ULTIME d'Emploi du Temps</h1>
+    <p style="text-align: center; color: #6b7280; margin-bottom: 40px; font-size: 1.1rem;">
+      École Hébraïque - Tous les algorithmes et optimisations combinés
+    </p>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value" id="stat-constraints">-</div>
-                <div class="stat-label">Contraintes actives</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-teachers">-</div>
-                <div class="stat-label">Professeurs</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-classes">-</div>
-                <div class="stat-label">Classes</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="stat-success">-</div>
-                <div class="stat-label">Taux de réussite</div>
-            </div>
+    <div class="main-controls">
+      <!-- Section Algorithmes -->
+      <div class="control-section">
+        <h2>🧠 Algorithmes Intégrés</h2>
+        <div class="algorithms-grid">
+          <div class="algorithm-card selected" data-algo="corrected">
+            <h3>⚡ Logique Corrigée</h3>
+            <p>Cours parallèles optimisés</p>
+          </div>
+          <div class="algorithm-card" data-algo="pedagogical">
+            <h3>📚 Pédagogique</h3>
+            <p>Blocs 2h + qualité 85%</p>
+          </div>
+          <div class="algorithm-card" data-algo="fixed">
+            <h3>🎯 Sans Trous</h3>
+            <p>Élimination gaps/conflits</p>
+          </div>
+          <div class="algorithm-card" data-algo="advanced">
+            <h3>🚀 CP-SAT Avancé</h3>
+            <p>Optimisation complète</p>
+          </div>
+          <div class="algorithm-card" data-algo="smart">
+            <h3>🤖 Smart Scheduler</h3>
+            <p>IA + contraintes</p>
+          </div>
+          <div class="algorithm-card" data-algo="solver_input">
+            <h3>📊 Depuis BD</h3>
+            <p>Tables solver_input</p>
+          </div>
         </div>
+        
+        <button class="toggle-advanced" onclick="toggleAdvanced()">
+          Options Avancées 🔧
+        </button>
+        
+        <div class="advanced-options" id="advancedOptions">
+          <div class="slider-option">
+            <label>Limite de temps (secondes):</label>
+            <input type="range" id="timeLimit" min="60" max="1800" value="600" oninput="updateSlider('timeLimit')">
+            <div class="slider-value" id="timeLimitValue">600s</div>
+          </div>
+          <div class="slider-option">
+            <label>Objectif qualité (%):</label>
+            <input type="range" id="qualityTarget" min="70" max="100" value="85" oninput="updateSlider('qualityTarget')">
+            <div class="slider-value" id="qualityTargetValue">85%</div>
+          </div>
+        </div>
+      </div>
 
-        <div class="tabs">
-            <button class="tab active" onclick="switchTab('constraints')">Contraintes</button>
-            <button class="tab" onclick="switchTab('schedule')">Emploi du temps</button>
-            <button class="tab" onclick="switchTab('analysis')">Analyse</button>
-        </div>
-
-        <div id="tab-constraints" class="tab-content active">
-            <div class="grid">
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Nouvelle contrainte</h2>
-                        <span class="badge warning">IA Assistant</span>
-                    </div>
-                    
-                    <form class="constraint-form" id="constraintForm">
-                        <div class="form-group">
-                            <label for="constraintText">Décrivez votre contrainte en langage naturel :</label>
-                            <textarea class="form-control" id="constraintText" 
-                                placeholder="Exemples :&#10;- Le professeur Cohen n'est pas disponible le vendredi après-midi&#10;- כל שעה תפילה צריכים להיות בשעה ראשונה&#10;- Les classes de mathématiques ne doivent pas être après 15h"></textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="priority">Priorité :</label>
-                            <select id="priority" class="form-control">
-                                <option value="0">🔴 HARD - Incontournable</option>
-                                <option value="1">🟠 Très forte</option>
-                                <option value="2" selected>🟡 Moyenne</option>
-                                <option value="3">🔵 Normale</option>
-                                <option value="4">🟢 Faible</option>
-                            </select>
-                        </div>
-                        
-                        <div class="info-panel ai-analysis" id="aiAnalysis" style="display: none;">
-                            <h3>🤖 Analyse IA</h3>
-                            <div id="aiContent"></div>
-                        </div>
-                        
-                        <button type="submit" class="btn btn-primary">
-                            <span class="icon">🤖</span> Analyser avec l'IA
-                        </button>
-                    </form>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Contraintes actives</h2>
-                        <span class="badge success" id="constraintCount">0</span>
-                    </div>
-                    
-                    <div class="constraint-list" id="constraintList">
-                        <div class="loading">
-                            <div class="spinner-border"></div>
-                            <p>Chargement des contraintes...</p>
-                        </div>
-                    </div>
-                </div>
+      <!-- Section Options -->
+      <div class="control-section">
+        <h2>⚙️ Optimisations Combinées</h2>
+        <div class="options-grid">
+          <div class="option-group">
+            <h4>🏫 École Hébraïque</h4>
+            <div class="checkbox-option">
+              <input type="checkbox" id="mondayConstraint" checked>
+              <label>Lundi: ז,ט,ח après période 4</label>
             </div>
-        </div>
-
-        <div id="tab-schedule" class="tab-content">
-            <div class="card">
-                <div class="card-header">
-                    <h2>Aperçu de l'emploi du temps</h2>
-                    <button class="btn btn-success" onclick="generateSchedule()">
-                        <span class="icon">🔄</span> Générer
-                    </button>
-                </div>
-                
-                <div id="schedulePreview">
-                    <p style="text-align: center; color: #666; padding: 40px;">
-                        Cliquez sur "Générer" pour créer un nouvel emploi du temps avec les contraintes actuelles
-                    </p>
-                </div>
+            <div class="checkbox-option">
+              <input type="checkbox" id="religiousConstraints" checked>
+              <label>Contraintes religieuses</label>
             </div>
-        </div>
-
-        <div id="tab-analysis" class="tab-content">
-            <div class="card">
-                <div class="card-header">
-                    <h2>Analyse des contraintes</h2>
-                </div>
-                
-                <div id="analysisContent">
-                    <div class="info-panel">
-                        <h3>📊 Informations collectées</h3>
-                        <ul class="info-list" id="collectedInfo">
-                            <li><span class="icon">✓</span> Aucune contrainte ajoutée</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-panel" style="background: #ffebee; border-color: #ffcdd2;">
-                        <h3>❗ Informations manquantes</h3>
-                        <ul class="info-list" id="missingInfo">
-                            <li><span class="icon">⚠</span> Chargez les données de base</li>
-                        </ul>
-                    </div>
-                </div>
+            <div class="checkbox-option">
+              <input type="checkbox" id="hebrewOptimized" checked>
+              <label>שיח בוקר matin uniquement</label>
             </div>
+          </div>
+
+          <div class="option-group">
+            <h4>📅 Structure Temporelle</h4>
+            <div class="checkbox-option">
+              <input type="checkbox" id="eliminateGaps" checked>
+              <label>Éliminer tous les trous</label>
+            </div>
+            <div class="checkbox-option">
+              <input type="checkbox" id="twoHourBlocks" checked>
+              <label>Blocs de 2h consécutives</label>
+            </div>
+            <div class="checkbox-option">
+              <input type="checkbox" id="groupByDay" checked>
+              <label>Grouper par jour</label>
+            </div>
+            <div class="checkbox-option">
+              <input type="checkbox" id="fridayShort" checked>
+              <label>Vendredi court</label>
+            </div>
+          </div>
+
+          <div class="option-group">
+            <h4>👥 Cours Parallèles</h4>
+            <div class="checkbox-option">
+              <input type="checkbox" id="parallelSync" checked>
+              <label>Synchronisation parfaite</label>
+            </div>
+            <div class="checkbox-option">
+              <input type="checkbox" id="parallelOptimized" checked>
+              <label>Logique corrigée</label>
+            </div>
+            <div class="checkbox-option">
+              <input type="checkbox" id="preventConflicts" checked>
+              <label>Prévenir conflits</label>
+            </div>
+          </div>
+
+          <div class="option-group">
+            <h4>🎯 Qualité</h4>
+            <div class="checkbox-option">
+              <input type="checkbox" id="minimizeDays" checked>
+              <label>Minimiser les jours</label>
+            </div>
+            <div class="checkbox-option">
+              <input type="checkbox" id="balanceWorkload" checked>
+              <label>Équilibrer charge</label>
+            </div>
+            <div class="checkbox-option">
+              <input type="checkbox" id="teacherPreferences" checked>
+              <label>Préférences profs</label>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
 
-    <!-- Panneau de debug -->
-    <button class="debug-toggle" onclick="toggleDebug()">🐛</button>
-    <div class="debug-panel" id="debugPanel">
-        <h4>🐛 Debug Console</h4>
-        <div class="debug-log" id="debugLog"></div>
+    <!-- Contrôles de Génération -->
+    <div class="generation-controls">
+      <button class="generate-btn" onclick="generateUltimate()" id="generateBtn">
+        🚀 GÉNÉRER EMPLOI DU TEMPS ULTIME
+      </button>
     </div>
 
-    <script>
-        // ============================================
-        // CONFIGURATION ET VARIABLES GLOBALES
-        // ============================================
-        
-        const API_BASE = 'http://localhost:8000';
-        const AI_API = 'http://localhost:5001';
-        
-        let currentConstraints = [];
-        let scheduleData = null;
-        let socket = null;
-        let aiSessionId = null;
-        let pendingConstraint = null;
-        let debugMode = false;
+    <!-- Status et Progress -->
+    <div class="status-section" id="statusSection"></div>
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+        <div class="progress-text" id="progressText">Génération en cours...</div>
+      </div>
+    </div>
 
-        // ============================================
-        // FONCTIONS DE DEBUG
-        // ============================================
-        
-        function toggleDebug() {
-            debugMode = !debugMode;
-            document.getElementById('debugPanel').classList.toggle('active');
-        }
-
-        function logDebug(message, data = null) {
-            if (debugMode) {
-                const log = document.getElementById('debugLog');
-                const time = new Date().toLocaleTimeString();
-                const entry = document.createElement('div');
-                entry.innerHTML = `<strong>${time}:</strong> ${message}`;
-                if (data) {
-                    entry.innerHTML += `<br><small>${JSON.stringify(data, null, 2)}</small>`;
-                }
-                log.appendChild(entry);
-                log.scrollTop = log.scrollHeight;
-            }
-        }
-
-        // ============================================
-        // TESTS DE CONNEXION BACKEND
-        // ============================================
-        
-        async function testBackendConnection() {
-            logDebug('Test de connexion au backend...');
-            
-            try {
-                // Test de l'endpoint racine
-                const response = await fetch(`${API_BASE}/`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    logDebug('Backend connecté', data);
-                    updateBackendStatus(true);
-                    return true;
-                } else {
-                    logDebug('Backend erreur', response.status);
-                    updateBackendStatus(false);
-                    return false;
-                }
-            } catch (error) {
-                logDebug('Backend inaccessible', error.message);
-                updateBackendStatus(false);
-                return false;
-            }
-        }
-
-        function updateBackendStatus(connected) {
-            const status = document.getElementById('status');
-            if (connected) {
-                status.className = 'status-indicator connected';
-                status.innerHTML = '<span class="icon">●</span> Backend OK';
-            } else {
-                status.className = 'status-indicator error';
-                status.innerHTML = '<span class="icon">●</span> Backend KO';
-            }
-        }
-
-        // ============================================
-        // CONNEXION WEBSOCKET AVEC L'IA
-        // ============================================
-        
-        function initializeAIConnection() {
-            logDebug('Tentative de connexion à l\'agent IA...');
-            
-            try {
-                socket = io(AI_API, {
-                    transports: ['websocket', 'polling'],
-                    reconnection: true,
-                    reconnectionAttempts: 5,
-                    reconnectionDelay: 1000
-                });
-                
-                socket.on('connect', () => {
-                    logDebug('✅ Connecté à l\'agent IA');
-                    const aiStatus = document.getElementById('ai-status');
-                    aiStatus.className = 'ai-status connected';
-                    aiStatus.innerHTML = '<span class="icon">🤖</span> IA Connectée';
-                });
-                
-                socket.on('connected', (data) => {
-                    aiSessionId = data.session_id;
-                    logDebug('Session IA créée', data);
-                });
-                
-                socket.on('ai_response', (response) => {
-                    logDebug('📨 Réponse IA reçue', response);
-                    handleAIResponse(response);
-                });
-                
-                socket.on('disconnect', () => {
-                    logDebug('❌ Déconnecté de l\'agent IA');
-                    const aiStatus = document.getElementById('ai-status');
-                    aiStatus.className = 'ai-status error';
-                    aiStatus.innerHTML = '<span class="icon">🤖</span> IA Déconnectée';
-                });
-                
-                socket.on('error', (error) => {
-                    logDebug('Erreur WebSocket', error);
-                });
-            } catch (error) {
-                logDebug('Erreur initialisation IA', error);
-                // Marquer l'IA comme non disponible
-                const aiStatus = document.getElementById('ai-status');
-                aiStatus.className = 'ai-status error';
-                aiStatus.innerHTML = '<span class="icon">🤖</span> IA Non disponible';
-            }
-        }
-
-        // ============================================
-        // CHARGEMENT DES CONTRAINTES
-        // ============================================
-        
-        async function loadConstraints() {
-            logDebug('Chargement des contraintes...');
-            
-            try {
-                // Essayer d'abord l'endpoint /api/constraints
-                let response = await fetch(`${API_BASE}/api/constraints`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-                
-                // Si ça ne marche pas, essayer /constraints
-                if (!response.ok) {
-                    logDebug('Tentative sur /constraints...');
-                    response = await fetch(`${API_BASE}/constraints`, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json'
-                        }
-                    });
-                }
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    logDebug('Contraintes reçues', data);
-                    
-                    // Gérer différents formats de réponse
-                    if (Array.isArray(data)) {
-                        currentConstraints = data;
-                    } else if (data.constraints && Array.isArray(data.constraints)) {
-                        currentConstraints = data.constraints;
-                    } else if (data.items && Array.isArray(data.items)) {
-                        currentConstraints = data.items;
-                    } else {
-                        currentConstraints = [];
-                        logDebug('Format de données non reconnu', data);
-                    }
-                    
-                    displayConstraints();
-                    updateStats();
-                    updateAnalysis();
-                } else {
-                    logDebug('Erreur chargement contraintes', response.status);
-                    // Afficher un message d'erreur
-                    document.getElementById('constraintList').innerHTML = 
-                        '<p style="text-align: center; color: #e74c3c;">Erreur de chargement des contraintes</p>';
-                }
-            } catch (error) {
-                logDebug('Erreur réseau', error);
-                document.getElementById('constraintList').innerHTML = 
-                    '<p style="text-align: center; color: #e74c3c;">Erreur de connexion au serveur</p>';
-            }
-        }
-
-        // ============================================
-        // AFFICHAGE DES CONTRAINTES
-        // ============================================
-        
-        function displayConstraints() {
-     const container = document.getElementById('constraintList');
-    
-    if (currentConstraints.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #666;">Aucune contrainte définie</p>';
-        return;
-    }
-    
-    container.innerHTML = currentConstraints.map(constraint => {
-        const id = constraint.constraint_id || constraint.id;
-        const type = constraint.type || constraint.constraint_type || 'custom';
-        
-        // IMPORTANT : Parser les données si c'est une string
-        let data = constraint.data || constraint.constraint_data || {};
-        
-        // Certaines API retournent une chaîne JSON doublement encodée (avec séquences \u)
-        // On applique donc un parsing itératif jusqu'à obtenir un objet ou épuiser les tentatives
-        if (typeof data === 'string') {
-            let attempts = 0;
-            while (typeof data === 'string' && attempts < 3) {
-                try {
-                    // 1) Décodage des séquences Unicode (\uXXXX) pour un rendu correct des caractères hébreux
-                    const unicodeDecoded = data.replace(/\\u([0-9a-fA-F]{4})/g, (_, code) =>
-                        String.fromCharCode(parseInt(code, 16)));
-                    // 2) Tentative de JSON.parse
-                    data = JSON.parse(unicodeDecoded);
-                } catch (err) {
-                    try {
-                        // Tentative alternative sans décodage préalable
-                        data = JSON.parse(data);
-                    } catch (err2) {
-                        // Si toujours pas possible, on sort de la boucle
-                        break;
-                    }
-                }
-                attempts++;
-            }
-            // En dernier recours, on stocke la valeur brute dans description afin d'éviter l'affichage des caractères d'échappement
-            if (typeof data === 'string') {
-                data = { description: data };
-            }
-        }
-        
-        // Extraire le nom correctement depuis les données parsées
-        // Si la description elle-même est un JSON encodé, on essaie aussi de le décoder
-        // Gérer le cas où la description est entourée de guillemets et doublement échappée
-        if (data && typeof data.description === 'string') {
-            let descToProcess = data.description.trim();
-            
-            // Retirer les guillemets extérieurs si présents
-            if (descToProcess.startsWith('"') && descToProcess.endsWith('"')) {
-                descToProcess = descToProcess.slice(1, -1);
-            }
-            
-            // Vérifier si c'est du JSON après nettoyage
-            if (descToProcess.startsWith('{')) {
-                try {
-                    // Étape 1: Décoder les échappements des guillemets (\\" devient ")
-                    let cleaned = descToProcess.replace(/\\"/g, '"');
-                    
-                    // Étape 2: Décoder les échappements des backslashes (\\\\ devient \\)
-                    cleaned = cleaned.replace(/\\\\/g, '\\');
-                    
-                    // Étape 3: Décoder les séquences Unicode
-                    cleaned = cleaned.replace(/\\u([0-9a-fA-F]{4})/g, (_, code) =>
-                        String.fromCharCode(parseInt(code, 16)));
-                    
-                    
-                    
-                    const descDecoded = JSON.parse(cleaned);
-                    
-                    // On fusionne les clés décodées pour éviter de perdre des infos
-                    data = { ...data, ...descDecoded };
-                } catch (e) {
-                    console.log('Erreur décodage description:', e);
-                    console.log('Chaîne qui a échoué:', descToProcess);
-                }
-            }
-        }
-        
-        // Traiter aussi le champ entity s'il contient du JSON échappé
-        if (constraint.entity && typeof constraint.entity === 'string') {
-            let entityToProcess = constraint.entity.trim();
-            
-            // Retirer les guillemets extérieurs si présents
-            if (entityToProcess.startsWith('"') && entityToProcess.endsWith('"')) {
-                entityToProcess = entityToProcess.slice(1, -1);
-            }
-            
-            // Vérifier si c'est du JSON après nettoyage
-            if (entityToProcess.startsWith('{')) {
-                try {
-                    // Étape 1: Décoder les échappements des guillemets (\\" devient ")
-                    let cleaned = entityToProcess.replace(/\\"/g, '"');
-                    
-                    // Étape 2: Décoder les échappements des backslashes (\\\\ devient \\)
-                    cleaned = cleaned.replace(/\\\\/g, '\\');
-                    
-                    // Étape 3: Décoder les séquences Unicode
-                    cleaned = cleaned.replace(/\\u([0-9a-fA-F]{4})/g, (_, code) =>
-                        String.fromCharCode(parseInt(code, 16)));
-                    
-                    
-                    const entityDecoded = JSON.parse(cleaned);
-                    
-                    // Fusionner avec data
-                    data = { ...data, ...entityDecoded };
-                } catch (e) {
-                    console.log('Erreur décodage entity:', e);
-                    console.log('Chaîne entity qui a échoué:', entityToProcess);
-                }
-            }
-        }
-
-        let entity = data.entity_name || data.description || constraint.entity || constraint.entity_name || 'Global';
-        // Nettoyage éventuel des séquences \u restantes dans le nom de l'entité
-        if (typeof entity === 'string') {
-            entity = entity.replace(/\\u([0-9a-fA-F]{4})/g, (_, code) =>
-                String.fromCharCode(parseInt(code, 16)));
-            // Retirer d'éventuels guillemets superflus
-            if (entity.startsWith('"') && entity.endsWith('"')) {
-                entity = entity.slice(1, -1);
-            }
-        }
-        
-        const isActive = constraint.is_active !== false;
-        const priority = constraint.priority || 2;
-        
-        // Priorité
-        let priorityDisplay = '';
-        if (priority >= 700) priorityDisplay = '🔴 Très haute';
-        else if (priority >= 100) priorityDisplay = '🟠 Haute';
-        else priorityDisplay = '🟢 Normale';
-        
-        // Formatage des détails
-        let details = '';
-        if (data.day) {
-            const days = {'א': 'Dimanche', 'ב': 'Lundi', 'ג': 'Mardi', 'ד': 'Mercredi', 'ה': 'Jeudi', 'ו': 'Vendredi'};
-            let dayName = data.day;
-            // Décoder les caractères hébreux dans le jour si nécessaire
-            if (typeof dayName === 'string') {
-                dayName = dayName.replace(/\\u([0-9a-fA-F]{4})/g, (_, code) =>
-                    String.fromCharCode(parseInt(code, 16)));
-            }
-            details = `Jour: ${days[dayName] || dayName}`;
-        }
-        if (data.period) details += ` | Période: ${data.period}`;
-        if (data.room) details += ` | Salle: ${data.room}`;
-        
-        // Éviter d'afficher la description si c'est du JSON brut
-        if (!details && data.description && 
-            typeof data.description === 'string' && 
-            !data.description.trim().startsWith('{')) {
-            // Nettoyer la description des séquences Unicode
-            let cleanDescription = data.description.replace(/\\u([0-9a-fA-F]{4})/g, (_, code) =>
-                String.fromCharCode(parseInt(code, 16)));
-            details = cleanDescription;
-        }
-        
-        return `
-            <div class="constraint-item ${isActive ? '' : 'inactive'}">
-                <div class="constraint-header">
-                    <div>
-                        <div class="constraint-title"><strong>${entity}</strong></div>
-                        <div class="constraint-details">
-                            Type: 🚫 Prof indisponible | 
-                            Priorité: ${priorityDisplay}
-                        </div>
-                        <div class="constraint-details">
-                            ${details}
-                        </div>
-                        <!-- Test décodage : affichage forcé du JSON décodé pour debug -->
-                        <div class="constraint-details" style="font-size: 10px; color: #666; border-top: 1px solid #eee; padding-top: 5px;">
-                            DEBUG - Entity: ${JSON.stringify(data.entity_name)} | 
-                            Day: ${JSON.stringify(data.day)} | 
-                            Type: ${JSON.stringify(data.entity_type)}
-                        </div>
-                    </div>
-                    <span class="badge ${isActive ? 'success' : 'secondary'}">
-                        ${isActive ? 'Active' : 'Inactive'}
-                    </span>
-                </div>
-                <div class="constraint-actions">
-                    <button class="btn btn-sm btn-secondary" onclick="toggleConstraint(${id})">
-                        ❌ Désactiver
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteConstraint(${id})">
-                        🗑️ Supprimer
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
-    
-    document.getElementById('constraintCount').textContent = currentConstraints.filter(c => c.is_active).length;
-};
-
-// 2. Réafficher
-displayConstraints();
-        
-        function formatTypeName(type) {
-            const typeNames = {
-                'teacher_unavailable': '🚫 Prof indisponible',
-                'parallel_group': '👥 Groupe parallèle',
-                'teacher_availability': '👨‍🏫 Disponibilité prof',
-                'time_preference': '⏰ Préférence horaire',
-                'morning_prayer': '🙏 Prière du matin',
-                'friday_early_end': '📅 Vendredi court',
-                'lunch_break': '🍽️ Pause déjeuner',
-                'consecutive_hours_limit': '⏱️ Limite heures consécutives',
-                'school_hours': '🏫 Horaires école',
-                'room_availability': '🚪 Disponibilité salle',
-                'class_preference': '📚 Préférence classe'
-            };
-            return typeNames[type] || type;
-        }
-
-        function formatConstraintData(type, data) {
-            if (!data || Object.keys(data).length === 0) {
-                return '<em>Aucune donnée spécifique</em>';
-            }
-            
-            const parts = [];
-            const dayNames = {
-                'א': 'Dimanche',
-                'ב': 'Lundi', 
-                'ג': 'Mardi',
-                'ד': 'Mercredi',
-                'ה': 'Jeudi',
-                'ו': 'Vendredi'
-            };
-            
-            if (type === 'teacher_unavailable') {
-                if (data.day) parts.push(`Jour: ${dayNames[data.day] || data.day}`);
-                if (data.period) parts.push(`Période: ${data.period}`);
-                if (data.room) parts.push(`Salle: ${data.room}`);
-                return parts.length > 0 ? parts.join(' | ') : data.description || 'Indisponibilité définie';
-            }
-            // Gérer le type parallel_group spécialement
-            if (type === 'parallel_group') {
-                if (data.description) parts.push(data.description);
-                if (data.entity_name) parts.push(`Matière: ${data.entity_name}`);
-                if (data.entity_type) parts.push(`Type: ${data.entity_type}`);
-                return parts.length > 0 ? parts.join(' | ') : 'Groupe parallèle configuré';
-            }
-            
-            // Extraction intelligente des données importantes
-            if (data.description || data.original_text) {
-                return data.description || data.original_text;
-            }
-            
-            // Formater selon le type
-            switch(type) {
-                case 'teacher_availability':
-                    if (data.unavailable_days && data.unavailable_days.length > 0) {
-                        const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-                        const days = data.unavailable_days.map(d => dayNames[d] || d);
-                        parts.push(`Jours indisponibles: ${days.join(', ')}`);
-                    }
-                    if (data.unavailable_periods && data.unavailable_periods.length > 0) {
-                        parts.push(`Périodes: ${data.unavailable_periods.join(', ')}`);
-                    }
-                    if (data.reason) parts.push(`Raison: ${data.reason}`);
-                    break;
-                    
-                case 'morning_prayer':
-                    if (data.time_slot) parts.push(`Horaire: ${data.time_slot}`);
-                    if (data.mandatory_for) parts.push(`Pour: ${data.mandatory_for.join(', ')}`);
-                    break;
-                    
-                case 'friday_early_end':
-                    if (data.end_time) parts.push(`Fin des cours: ${data.end_time}`);
-                    if (data.applies_to) parts.push(`S'applique à: ${data.applies_to.join(', ')}`);
-                    break;
-                    
-                case 'lunch_break':
-                    if (data.time_slot) parts.push(`Horaire: ${data.time_slot}`);
-                    if (data.mandatory_for) parts.push(`Pour: ${data.mandatory_for.join(', ')}`);
-                    break;
-                    
-                default:
-                    // Affichage générique pour autres types
-                    Object.entries(data).forEach(([key, value]) => {
-                        // Ignorer certaines clés
-                        if (['timestamp', 'created_at', 'updated_at', 'entity_type', 'entity_name'].includes(key)) {
-                            return;
-                        }
-                        
-                        // Formater la valeur
-                        let displayValue = value;
-                        if (value === null || value === undefined) {
-                            return;
-                        } else if (Array.isArray(value)) {
-                            if (value.length === 0) return;
-                            displayValue = value.join(', ');
-                        } else if (typeof value === 'object') {
-                            displayValue = JSON.stringify(value);
-                        }
-                        
-                        // Formater le nom de la clé
-                        const displayKey = key.replace(/_/g, ' ')
-                            .replace(/\b\w/g, l => l.toUpperCase());
-                        
-                        parts.push(`${displayKey}: ${displayValue}`);
-                    });
-            }
-            
-            return parts.length > 0 ? parts.join(' | ') : '<em>Configuration définie</em>';
-        }
-
-        function getPriorityLabel(priority) {
-            // Gérer les priorités très élevées (système)
-            if (priority >= 1000) return '⚠️ CRITIQUE';
-            if (priority >= 100) return '🔴 Système';
-            if (priority > 5) return '🔴 Très haute';
-            
-            // Priorités normales
-            const labels = {
-                0: '🔴 Incontournable',
-                1: '🟠 Très forte',
-                2: '🟡 Moyenne',
-                3: '🔵 Normale',
-                4: '🟢 Faible',
-                5: '⚪ Minimale'
-            };
-            return labels[priority] || '⚪ Inconnue';
-        }
-
-        // ============================================
-        // MISE À JOUR DES STATISTIQUES
-        // ============================================
-        
-        async function updateStats() {
-            logDebug('Mise à jour des statistiques...');
-            
-            // Statistiques locales
-            const activeCount = currentConstraints.filter(c => 
-                c.is_active !== false && c.is_active !== 0
-            ).length;
-            document.getElementById('stat-constraints').textContent = activeCount.toString();
-            
-            try {
-                const response = await fetch(`${API_BASE}/api/stats`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    logDebug('Statistiques reçues', data);
-                    
-                    if (data.general) {
-                        // Afficher les professeurs
-                        const teachers = data.general.total_teachers || 0;
-                        document.getElementById('stat-teachers').textContent = teachers.toString();
-                        
-                        // Afficher les classes (ou matières si pas de classes)
-                        const classes = data.general.total_classes || 0;
-                        const subjects = data.general.total_subjects || 0;
-                        if (classes > 0) {
-                            document.getElementById('stat-classes').textContent = classes.toString();
-                        } else if (subjects > 0) {
-                            document.getElementById('stat-classes').textContent = subjects.toString();
-                            // Changer le label pour indiquer qu'on affiche les matières
-                            const label = document.querySelector('#stat-classes').nextElementSibling;
-                            if (label) label.textContent = 'Matières';
-                        } else {
-                            document.getElementById('stat-classes').textContent = '0';
-                        }
-                        
-                        // Calculer le taux de réussite ou afficher d'autres infos
-                        if (data.general.total_lessons && data.general.total_lessons > 0) {
-                            const successRate = Math.round((data.general.total_lessons / 100) * 100);
-                            document.getElementById('stat-success').textContent = `${successRate}%`;
-                        } else if (data.general.total_institutional_constraints) {
-                            // Afficher le nombre de contraintes institutionnelles à la place
-                            document.getElementById('stat-success').textContent = 
-                                data.general.total_institutional_constraints.toString();
-                            const label = document.querySelector('#stat-success').nextElementSibling;
-                            if (label) label.textContent = 'Contraintes système';
-                        } else {
-                            document.getElementById('stat-success').textContent = '—';
-                        }
-                    }
-                } else {
-                    logDebug('Erreur stats', response.status);
-                    // Valeurs par défaut
-                    document.getElementById('stat-teachers').textContent = '0';
-                    document.getElementById('stat-classes').textContent = '0';
-                    document.getElementById('stat-success').textContent = '—';
-                }
-            } catch (error) {
-                logDebug('Erreur réseau stats', error);
-                // Valeurs par défaut en cas d'erreur
-                document.getElementById('stat-teachers').textContent = '0';
-                document.getElementById('stat-classes').textContent = '0';
-                document.getElementById('stat-success').textContent = '—';
-            }
-        }
-
-        // ============================================
-        // GESTION DES ONGLETS
-        // ============================================
-        
-        function switchTab(tabName) {
-            logDebug(`Changement d'onglet: ${tabName}`);
-            
-            // Désactiver tous les onglets
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            // Désactiver tous les contenus
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            
-            // Activer l'onglet cliqué
-            event.target.classList.add('active');
-            
-            // Activer le contenu correspondant
-            document.getElementById(`tab-${tabName}`).classList.add('active');
-        }
-
-        // ============================================
-        // ACTIONS SUR LES CONTRAINTES  
-        // ============================================
-        
-        async function toggleConstraint(id) {
-            logDebug(`Toggle contrainte: ${id}`);
-            
-            const constraint = currentConstraints.find(c => 
-                (c.constraint_id || c.id) === id
-            );
-            
-            if (!constraint) {
-                logDebug('Contrainte non trouvée');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/api/constraints/${id}/toggle`, {
-                    method: 'PUT',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ 
-                        is_active: !(constraint.is_active !== false && constraint.is_active !== 0)
-                    })
-                });
-                
-                if (response.ok) {
-                    showAlert('Contrainte mise à jour', 'success');
-                    await loadConstraints();
-                } else {
-                    logDebug('Erreur toggle', response.status);
-                    showAlert('Erreur lors de la mise à jour', 'danger');
-                }
-            } catch (error) {
-                logDebug('Erreur réseau toggle', error);
-                showAlert('Erreur de connexion', 'danger');
-            }
-        }
-
-        async function deleteConstraint(id) {
-            if (!confirm('Êtes-vous sûr de vouloir supprimer cette contrainte ?')) return;
-            
-            logDebug(`Suppression contrainte: ${id}`);
-            
-            try {
-                const response = await fetch(`${API_BASE}/api/constraints/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-                
-                if (response.ok) {
-                    showAlert('Contrainte supprimée', 'success');
-                    await loadConstraints();
-                } else {
-                    logDebug('Erreur suppression', response.status);
-                    showAlert('Erreur lors de la suppression', 'danger');
-                }
-            } catch (error) {
-                logDebug('Erreur réseau suppression', error);
-                showAlert('Erreur de connexion', 'danger');
-            }
-        }
-
-        // ============================================
-        // SOUMISSION DU FORMULAIRE
-        // ============================================
-        
-        document.getElementById('constraintForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const text = document.getElementById('constraintText').value;
-            const priority = document.getElementById('priority').value;
-            
-            if (!text.trim()) {
-                showAlert('Veuillez entrer une contrainte', 'warning');
-                return;
-            }
-            
-            logDebug('Soumission contrainte', { text, priority });
-            
-            // Créer directement une contrainte simple sans IA si non disponible
-            if (!socket || !socket.connected) {
-                logDebug('IA non disponible, création directe');
-                await createSimpleConstraint(text, priority);
-                return;
-            }
-            
-            // Si l'IA est disponible, l'utiliser
-            const aiPanel = document.getElementById('aiAnalysis');
-            const aiContent = document.getElementById('aiContent');
-            
-            aiPanel.style.display = 'block';
-            aiContent.innerHTML = `
-                <div class="loading">
-                    <div class="spinner-border"></div>
-                    <p>🤖 Analyse en cours...</p>
-                </div>
-            `;
-            
-            socket.emit('message', {
-                text: text,
-                context: {
-                    current_constraints: currentConstraints,
-                    priority: priority
-                }
-            });
-        });
-
-        // ============================================
-        // CRÉATION DE CONTRAINTE SIMPLE (SANS IA)
-        // ============================================
-        
-        async function createSimpleConstraint(text, priority) {
-            const constraint = {
-                type: 'time_preference',
-                entity: 'Global',
-                priority: parseInt(priority),
-                data: {
-                    description: text,
-                    original_text: text,
-                    preferred_time: 'morning'
-                },
-                is_active: true
-            };
-            
-            logDebug('Création contrainte simple', constraint);
-            
-            try {
-                const response = await fetch(`${API_BASE}/api/constraints`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(constraint)
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    logDebug('Contrainte créée', result);
-                    
-                    document.getElementById('constraintForm').reset();
-                    showAlert('✅ Contrainte ajoutée!', 'success');
-                    await loadConstraints();
-                } else {
-                    const error = await response.json();
-                    logDebug('Erreur création', error);
-                    showAlert(`Erreur: ${error.detail || 'Impossible d\'ajouter la contrainte'}`, 'danger');
-                }
-            } catch (error) {
-                logDebug('Erreur réseau création', error);
-                showAlert('Erreur de connexion au serveur', 'danger');
-            }
-        }
-
-        // ============================================
-        // GESTION DES RÉPONSES IA
-        // ============================================
-        
-        function handleAIResponse(response) {
-            const aiContent = document.getElementById('aiContent');
-            
-            if (response.status === 'error') {
-                aiContent.innerHTML = `
-                    <div class="alert alert-danger">
-                        <strong>❌ Erreur:</strong> ${response.message}
-                    </div>
-                `;
-                return;
-            }
-            
-            if (response.constraint) {
-                pendingConstraint = response.constraint;
-                
-                aiContent.innerHTML = `
-                    <div class="ai-analysis-result">
-                        <h5>✅ Analyse terminée</h5>
-                        <p><strong>Type:</strong> ${pendingConstraint.type}</p>
-                        <p><strong>Entité:</strong> ${pendingConstraint.entity || 'Global'}</p>
-                        <button class="btn btn-success" onclick="confirmConstraint()">
-                            ✅ Confirmer
-                        </button>
-                        <button class="btn btn-danger" onclick="cancelConstraint()">
-                            ❌ Annuler
-                        </button>
-                    </div>
-                `;
-            }
-        }
-
-        async function confirmConstraint() {
-            if (!pendingConstraint) return;
-            
-            logDebug('Confirmation contrainte IA', pendingConstraint);
-            
-            const constraint = {
-                ...pendingConstraint,
-                priority: parseInt(document.getElementById('priority').value),
-                is_active: true
-            };
-            
-            try {
-                const response = await fetch(`${API_BASE}/api/constraints`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(constraint)
-                });
-                
-                if (response.ok) {
-                    document.getElementById('constraintForm').reset();
-                    document.getElementById('aiAnalysis').style.display = 'none';
-                    pendingConstraint = null;
-                    showAlert('✅ Contrainte ajoutée!', 'success');
-                    await loadConstraints();
-                } else {
-                    const error = await response.json();
-                    showAlert(`Erreur: ${error.detail}`, 'danger');
-                }
-            } catch (error) {
-                showAlert('Erreur de connexion', 'danger');
-            }
-        }
-
-        function cancelConstraint() {
-            document.getElementById('aiAnalysis').style.display = 'none';
-            pendingConstraint = null;
-        }
-
-        // ============================================
-        // MISE À JOUR DE L'ANALYSE
-        // ============================================
-        
-        function updateAnalysis() {
-            const collected = document.getElementById('collectedInfo');
-            const missing = document.getElementById('missingInfo');
-            
-            const collectedItems = [];
-            const missingItems = [];
-            
-            // Analyser les contraintes existantes
-            const types = new Set();
-            const entities = new Set();
-            
-            currentConstraints.forEach(c => {
-                const type = c.type || c.constraint_type;
-                if (type) types.add(type);
-                
-                // Récupérer l'entité depuis différents endroits possibles
-                let entity = c.entity || c.entity_name;
-                if (!entity && c.data) {
-                    entity = c.data.entity_name || c.data.description;
-                }
-                if (!entity && c.constraint_data) {
-                    entity = c.constraint_data.entity_name || c.constraint_data.description;
-                }
-                if (entity && entity !== 'Global') entities.add(entity);
-            });
-            
-            // Informations collectées
-            if (currentConstraints.length > 0) {
-                collectedItems.push(`✅ ${currentConstraints.length} contrainte(s) définie(s)`);
-            }
-            if (types.size > 0) {
-                collectedItems.push(`📋 ${types.size} type(s) de contraintes`);
-                // Lister les types
-                types.forEach(type => {
-                    collectedItems.push(`   • ${formatTypeName(type)}`);
-                });
-            }
-            if (entities.size > 0) {
-                collectedItems.push(`👥 ${entities.size} entité(s) configurée(s)`);
-            }
-            
-            // Vérifier les éléments importants manquants
-            const essentialTypes = {
-                'friday_early_end': '📅 Configuration du vendredi court',
-                'morning_prayer': '🙏 Horaires de prière du matin',
-                'lunch_break': '🍽️ Configuration des pauses déjeuner',
-                'school_hours': '🏫 Horaires d\'ouverture de l\'école'
-            };
-            
-            Object.entries(essentialTypes).forEach(([type, description]) => {
-                if (!types.has(type)) {
-                    missingItems.push(description);
-                }
-            });
-            
-            // Suggestions supplémentaires
-            if (currentConstraints.length < 3) {
-                missingItems.push('💡 Ajoutez plus de contraintes pour un emploi du temps optimal');
-            }
-            
-            // Afficher les résultats
-            collected.innerHTML = collectedItems.length > 0 
-                ? collectedItems.map(item => `<li>${item}</li>`).join('')
-                : '<li>⚠ Aucune contrainte définie</li>';
-            
-            missing.innerHTML = missingItems.length > 0
-                ? missingItems.map(item => `<li>⚠ ${item}</li>`).join('')
-                : '<li>✓ Configuration de base complète</li>';
-        }
-
-        // ============================================
-        // GÉNÉRATION D'EMPLOI DU TEMPS
-        // ============================================
-        
-        async function generateSchedule() {
-            const preview = document.getElementById('schedulePreview');
-            preview.innerHTML = `
-                <div class="loading">
-                    <div class="spinner-border"></div>
-                    <p>Génération en cours...</p>
-                </div>
-            `;
-            
-            logDebug('Génération emploi du temps...');
-            
-            try {
-                const response = await fetch(`${API_BASE}/generate_schedule`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        constraints: currentConstraints.filter(c => 
-                            c.is_active !== false && c.is_active !== 0
-                        ),
-                        time_limit: 60
-                    })
-                });
-                
-                if (response.ok) {
-                    scheduleData = await response.json();
-                    logDebug('Emploi du temps généré', scheduleData);
-                    displaySchedule();
-                    showAlert('Emploi du temps généré avec succès', 'success');
-                } else {
-                    const error = await response.json();
-                    preview.innerHTML = `
-                        <div class="alert alert-danger">
-                            <strong>Erreur:</strong> ${error.detail || 'Impossible de générer l\'emploi du temps'}
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                logDebug('Erreur génération', error);
-                preview.innerHTML = `
-                    <div class="alert alert-danger">
-                        <strong>Erreur:</strong> Vérifiez que le serveur est démarré
-                    </div>
-                `;
-            }
-        }
-
-
-
-
-// Normaliseur de jour : mapping 0..5 -> א..ו
-const HEB_DAYS = ['א','ב','ג','ד','ה','ו'];
-function toHebDay(d) {
-    if (typeof d === 'number') return HEB_DAYS[d] ?? 'א';
-    const n = parseInt(d, 10);
-    return Number.isFinite(n) ? (HEB_DAYS[n] ?? 'א') : (d || 'א');
-}
-
-function displaySchedule() {
-    if (!scheduleData || !scheduleData.schedule) {
-        document.getElementById('schedulePreview').innerHTML = 
-            '<p style="text-align: center; color: #666;">Aucun emploi du temps disponible</p>';
-        return;
-    }
-    
-    const preview = document.getElementById('schedulePreview');
-    const schedule = scheduleData.schedule;
-    
-    // Organiser les données par classe
-    const scheduleByClass = {};
-    const days = ['א', 'ב', 'ג', 'ד', 'ה', 'ו']; // Dimanche à Vendredi en hébreu
-    const dayNames = {
-        'א': 'Dimanche',
-        'ב': 'Lundi', 
-        'ג': 'Mardi',
-        'ד': 'Mercredi',
-        'ה': 'Jeudi',
-        'ו': 'Vendredi'
-    };
-    
-    // Déterminer les périodes et classes uniques
-    const periods = new Set();
-    const classes = new Set();
-    
-    schedule.forEach(slot => {
-        const className = slot.class || slot.class_name || 'Non assigné';
-        const period = (slot.period ?? slot.period_number ?? slot.time_slot ?? 0);
-        
-        classes.add(className);
-        periods.add(period);
-        
-        if (!scheduleByClass[className]) {
-            scheduleByClass[className] = {};
-        }
-        
-        const day = toHebDay(slot.day ?? slot.day_of_week);
-        if (!scheduleByClass[className][day]) {
-            scheduleByClass[className][day] = {};
-        }
-        
-        scheduleByClass[className][day][period] = slot;
-    });
-    
-    // Trier les périodes
-    const sortedPeriods = Array.from(periods).sort((a, b) => a - b);
-    const sortedClasses = Array.from(classes).sort();
-    
-    // Créer le HTML de l'emploi du temps
-    let html = `
-        <div class="schedule-container">
-            <div class="schedule-stats" style="margin-bottom: 20px; padding: 15px; background: #e3f2fd; border-radius: 5px;">
-                <h4 style="margin: 0 0 10px 0; color: #1976d2;">📊 Statistiques de génération</h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
-                    <div><strong>Total créneaux:</strong> ${schedule.length}</div>
-                    <div><strong>Classes:</strong> ${sortedClasses.length}</div>
-                    <div><strong>Périodes par jour:</strong> ${sortedPeriods.length}</div>
-                    <div><strong>Statut:</strong> <span style="color: #27ae60;">✓ Généré avec succès</span></div>
-                </div>
-            </div>
-            
-            <div class="schedule-tabs" style="margin-bottom: 20px;">
-                <div style="display: flex; gap: 10px; border-bottom: 2px solid #ecf0f1; margin-bottom: 20px;">
-    `;
-    
-    // Créer les onglets pour chaque classe
-    sortedClasses.forEach((className, index) => {
-        const activeClass = index === 0 ? 'active' : '';
-        html += `
-            <button 
-                class="schedule-tab ${activeClass}" 
-                onclick="showClassSchedule('${className}')"
-                style="
-                    padding: 10px 20px;
-                    border: none;
-                    background: ${index === 0 ? '#3498db' : 'transparent'};
-                    color: ${index === 0 ? 'white' : '#34495e'};
-                    font-weight: 600;
-                    cursor: pointer;
-                    border-radius: 5px 5px 0 0;
-                    transition: all 0.3s;
-                "
-                onmouseover="this.style.backgroundColor='#3498db'; this.style.color='white';"
-                onmouseout="if(!this.classList.contains('active')){this.style.backgroundColor='transparent'; this.style.color='#34495e';}"
-            >
-                📚 ${className}
-            </button>
-        `;
-    });
-    
-    html += `
-                </div>
-            </div>
-            
-            <div class="schedule-tables">
-    `;
-    
-    // Créer un tableau pour chaque classe
-    sortedClasses.forEach((className, classIndex) => {
-        const displayStyle = classIndex === 0 ? 'block' : 'none';
-        
-        html += `
-            <div class="schedule-table-wrapper" id="schedule-${className}" style="display: ${displayStyle};">
-                <h3 style="margin-bottom: 15px; color: #2c3e50;">
-                    📅 Emploi du temps - ${className}
-                </h3>
-                <div style="overflow-x: auto;">
-                    <table style="
-                        width: 100%;
-                        border-collapse: collapse;
-                        background: white;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                        border-radius: 5px;
-                        overflow: hidden;
-                    ">
-                        <thead>
-                            <tr style="background: #34495e; color: white;">
-                                <th style="padding: 12px; text-align: center; border: 1px solid #2c3e50;">
-                                    ⏰ Période
-                                </th>
-        `;
-        
-        // En-têtes des jours
-        days.forEach(day => {
-            const isShortDay = day === 'ו'; // Vendredi
-            html += `
-                <th style="
-                    padding: 12px; 
-                    text-align: center; 
-                    border: 1px solid #2c3e50;
-                    ${isShortDay ? 'background: #2c3e50;' : ''}
-                ">
-                    ${dayNames[day]}<br>
-                    <small style="opacity: 0.8;">${day}</small>
-                </th>
-            `;
-        });
-        
-        html += `
-                            </tr>
-                        </thead>
-                        <tbody>
-        `;
-        
-        // Créer les lignes pour chaque période
-        sortedPeriods.forEach((period, periodIndex) => {
-            const rowColor = periodIndex % 2 === 0 ? '#f8f9fa' : 'white';
-            
-            html += `
-                <tr style="background: ${rowColor};">
-                    <td style="
-                        padding: 10px;
-                        text-align: center;
-                        font-weight: 600;
-                        border: 1px solid #dee2e6;
-                        background: #ecf0f1;
-                    ">
-                        ${formatPeriod(period)}
-                    </td>
-            `;
-            
-            // Cellules pour chaque jour
-            days.forEach(day => {
-                const slot = scheduleByClass[className]?.[day]?.[period];
-                const isShortDay = day === 'ו' && period > 4; // Vendredi après-midi
-                
-                if (isShortDay) {
-                    // Cellules grisées pour le vendredi après-midi
-                    html += `
-                        <td style="
-                            padding: 10px;
-                            text-align: center;
-                            border: 1px solid #dee2e6;
-                            background: #e0e0e0;
-                            color: #999;
-                        ">
-                            <span style="font-size: 12px;">—</span>
-                        </td>
-                    `;
-                } else if (slot) {
-                    const subject = slot.subject || slot.subject_name || '—';
-                    const teacher = slot.teacher || slot.teacher_name || slot.teacher_names || '';
-                    const room = slot.room || slot.room_name || '';
-                    
-                    // Couleur selon le type de matière
-                    const bgColor = getSubjectColor(subject);
-                    
-                    html += `
-                        <td style="
-                            padding: 8px;
-                            text-align: center;
-                            border: 1px solid #dee2e6;
-                            background: ${bgColor};
-                            position: relative;
-                        ">
-                            <div style="font-weight: 600; color: #2c3e50;">
-                                ${subject}
-                            </div>
-                            ${teacher ? `<div style="font-size: 12px; color: #666; margin-top: 2px;">👨‍🏫 ${teacher}</div>` : ''}
-                            ${room ? `<div style="font-size: 11px; color: #888;">📍 ${room}</div>` : ''}
-                        </td>
-                    `;
-                } else {
-                    // Cellule vide
-                    html += `
-                        <td style="
-                            padding: 10px;
-                            text-align: center;
-                            border: 1px solid #dee2e6;
-                        ">
-                            <span style="color: #ccc;">—</span>
-                        </td>
-                    `;
-                }
-            });
-            
-            html += `</tr>`;
-        });
-        
-        html += `
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-                    <small style="color: #666;">
-                        💡 <strong>Légende:</strong> 
-                        Les matières sont colorées selon leur type. 
-                        Le vendredi après-midi est bloqué (journée courte).
-                    </small>
-                </div>
-            </div>
-        `;
-    });
-    
-    html += `
-            </div>
+    <!-- Résultats -->
+    <div class="results-section" id="resultsSection">
+      <h2>📊 Résultats de Génération</h2>
+      <div class="results-grid" id="resultsGrid"></div>
+      <div id="detailedResults"></div>
+      
+      <!-- Nouvelle section emploi du temps -->
+      <div class="schedule-section" id="scheduleSection" style="display: none; margin-top: 30px;">
+        <h2>📅 Emploi du Temps Généré</h2>
+        <div class="schedule-controls" style="margin: 20px 0; text-align: center;">
+          <button onclick="showScheduleView()" class="view-btn" style="background: #10b981; margin-right: 10px; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">Voir Emploi du Temps</button>
+          <button onclick="downloadSchedule()" class="view-btn" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">Télécharger</button>
         </div>
-    `;
-    
-    // Ajouter les styles CSS nécessaires
-    html += `
-        <style>
-            .schedule-container {
-                animation: fadeIn 0.5s ease-in;
-            }
-            
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            
-            .schedule-tab.active {
-                background: #3498db !important;
-                color: white !important;
-            }
-            
-            table td:hover {
-                transform: scale(1.02);
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                transition: all 0.2s;
-                z-index: 10;
-                position: relative;
-            }
-        </style>
-    `;
-    
-    preview.innerHTML = html;
-}
+        <div class="schedule-grid" id="scheduleGrid"></div>
+      </div>
+    </div>
+  </div>
 
-function analyzeScheduleProblems() {
-    if (!scheduleData || !scheduleData.schedule) {
-        console.error("Pas de données d'emploi du temps à analyser");
-        return;
-    }
-    
-    const schedule = scheduleData.schedule;
-    const diagnostics = {
-        totalSlots: schedule.length,
-        byDay: {},
-        byClass: {},
-        byTeacher: {},
-        bySubject: {},
-        missingDays: [],
-        parallelGroups: [],
-        conflicts: [],
-        coverage: {}
-    };
-    
-    // Jours de la semaine en hébreu
-    const allDays = ['א', 'ב', 'ג', 'ד', 'ה', 'ו'];
-    const dayNames = {
-        'א': 'Dimanche',
-        'ב': 'Lundi',
-        'ג': 'Mardi', 
-        'ד': 'Mercredi',
-        'ה': 'Jeudi',
-        'ו': 'Vendredi'
-    };
-    
-    // Analyser la distribution par jour
-    allDays.forEach(day => {
-        diagnostics.byDay[day] = schedule.filter(s => toHebDay(s.day ?? s.day_of_week) === day).length;
-        if (diagnostics.byDay[day] === 0) {
-            diagnostics.missingDays.push(dayNames[day]);
-        }
+  <script>
+    const API_BASE = 'http://localhost:8000';
+    let selectedAlgorithms = ['corrected'];
+
+    // Gestion des algorithmes
+    document.querySelectorAll('.algorithm-card').forEach(card => {
+      card.addEventListener('click', () => {
+        card.classList.toggle('selected');
+        updateSelectedAlgorithms();
+      });
     });
-    
-    // Analyser par classe, professeur et matière
-    schedule.forEach(slot => {
-        const className = slot.class || slot.class_name || 'Non assigné';
-        const teacher = slot.teacher || slot.teacher_name || 'Non assigné';
-        const subject = slot.subject || slot.subject_name || 'Non assigné';
-        const day = toHebDay(slot.day ?? slot.day_of_week);
-        const period = (slot.period ?? slot.period_number ?? slot.time_slot ?? 0);
-        
-        // Par classe
-        if (!diagnostics.byClass[className]) {
-            diagnostics.byClass[className] = {
-                total: 0,
-                byDay: {},
-                subjects: new Set()
-            };
-        }
-        diagnostics.byClass[className].total++;
-        diagnostics.byClass[className].byDay[day] = (diagnostics.byClass[className].byDay[day] || 0) + 1;
-        diagnostics.byClass[className].subjects.add(subject);
-        
-        // Par professeur
-        if (!diagnostics.byTeacher[teacher]) {
-            diagnostics.byTeacher[teacher] = {
-                total: 0,
-                byDay: {},
-                classes: new Set()
-            };
-        }
-        diagnostics.byTeacher[teacher].total++;
-        diagnostics.byTeacher[teacher].byDay[day] = (diagnostics.byTeacher[teacher].byDay[day] || 0) + 1;
-        diagnostics.byTeacher[teacher].classes.add(className);
-        
-        // Par matière
-        if (!diagnostics.bySubject[subject]) {
-            diagnostics.bySubject[subject] = {
-                total: 0,
-                classes: new Set()
-            };
-        }
-        diagnostics.bySubject[subject].total++;
-        diagnostics.bySubject[subject].classes.add(className);
-    });
-    
-    // Détecter les groupes parallèles
-    const timeSlots = {};
-    schedule.forEach(slot => {
-        const day = toHebDay(slot.day ?? slot.day_of_week);
-        const key = `${day}-${(slot.period ?? slot.period_number ?? slot.time_slot ?? 0)}`;
-        if (!timeSlots[key]) timeSlots[key] = [];
-        timeSlots[key].push(slot);
-    });
-    
-    Object.entries(timeSlots).forEach(([key, slots]) => {
-        if (slots.length > 1) {
-            // Vérifier si c'est vraiment un groupe parallèle (même matière)
-            const subjects = {};
-            slots.forEach(slot => {
-                const subject = slot.subject || slot.subject_name;
-                if (!subjects[subject]) subjects[subject] = [];
-                subjects[subject].push(slot);
-            });
-            
-            Object.entries(subjects).forEach(([subject, parallelSlots]) => {
-                if (parallelSlots.length > 1) {
-                    diagnostics.parallelGroups.push({
-                        time: key,
-                        subject: subject,
-                        classes: parallelSlots.map(s => s.class || s.class_name)
-                    });
-                }
-            });
-        }
-    });
-    
-    // Calculer le taux de couverture
-    const expectedSlotsPerDay = 8; // Ajustez selon vos besoins
-    const expectedDays = 6;
-    const expectedClasses = Object.keys(diagnostics.byClass).length || 1;
-    const expectedTotal = expectedSlotsPerDay * expectedDays * expectedClasses;
-    diagnostics.coverage = {
-        expected: expectedTotal,
-        actual: schedule.length,
-        percentage: Math.round((schedule.length / expectedTotal) * 100)
-    };
-    
-    // Afficher le rapport de diagnostic
-    displayDiagnosticReport(diagnostics);
-    
-    return diagnostics;
-}
 
-function displayDiagnosticReport(diagnostics) {
-    const reportHTML = `
-        <div class="diagnostic-report" style="
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        ">
-            <h2 style="color: #e74c3c; margin-bottom: 20px;">
-                ⚠️ Rapport de diagnostic - Problèmes détectés
-            </h2>
-            
-            <!-- Problème 1: Jours manquants -->
-            ${diagnostics.missingDays.length > 0 ? `
-                <div class="alert alert-danger" style="
-                    background: #fee;
-                    border-left: 4px solid #e74c3c;
-                    padding: 15px;
-                    margin-bottom: 15px;
-                ">
-                    <h4>🚨 Jours sans cours générés:</h4>
-                    <p>${diagnostics.missingDays.join(', ')}</p>
-                    <small>Le système n'a généré des cours que pour ${Object.keys(diagnostics.byDay).filter(d => diagnostics.byDay[d] > 0).length} jour(s) sur 6.</small>
-                </div>
-            ` : ''}
-            
-            <!-- Distribution par jour -->
-            <div style="
-                background: #f8f9fa;
-                padding: 15px;
-                border-radius: 5px;
-                margin-bottom: 15px;
-            ">
-                <h4>📊 Distribution des créneaux par jour:</h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px;">
-                    ${Object.entries(diagnostics.byDay).map(([day, count]) => `
-                        <div style="
-                            text-align: center;
-                            padding: 10px;
-                            background: ${count === 0 ? '#fee' : '#efe'};
-                            border-radius: 5px;
-                        ">
-                            <strong>${day}</strong><br>
-                            <span style="font-size: 24px; color: ${count === 0 ? '#e74c3c' : '#27ae60'};">
-                                ${count}
-                            </span>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            
-            <!-- Taux de couverture -->
-            <div style="
-                background: ${diagnostics.coverage.percentage < 50 ? '#fee' : '#efe'};
-                padding: 15px;
-                border-radius: 5px;
-                margin-bottom: 15px;
-            ">
-                <h4>📈 Taux de couverture:</h4>
-                <div style="
-                    font-size: 32px;
-                    font-weight: bold;
-                    color: ${diagnostics.coverage.percentage < 50 ? '#e74c3c' : '#27ae60'};
-                ">
-                    ${diagnostics.coverage.percentage}%
-                </div>
-                <small>
-                    ${diagnostics.coverage.actual} créneaux générés sur ${diagnostics.coverage.expected} attendus
-                </small>
-            </div>
-            
-            <!-- Groupes parallèles détectés -->
-            <div style="
-                background: #f0f4ff;
-                padding: 15px;
-                border-radius: 5px;
-                margin-bottom: 15px;
-            ">
-                <h4>👥 Groupes parallèles détectés:</h4>
-                ${diagnostics.parallelGroups.length > 0 ? `
-                    <ul>
-                        ${diagnostics.parallelGroups.map(group => `
-                            <li>
-                                <strong>${group.subject}</strong> - 
-                                Classes: ${group.classes.join(', ')} 
-                                (${group.time})
-                            </li>
-                        `).join('')}
-                    </ul>
-                ` : '<p style="color: #e74c3c;">❌ Aucun groupe parallèle trouvé</p>'}
-            </div>
-            
-            <!-- Charge des professeurs -->
-            <div style="
-                background: #fff9e6;
-                padding: 15px;
-                border-radius: 5px;
-                margin-bottom: 15px;
-            ">
-                <h4>👨‍🏫 Charge des professeurs:</h4>
-                <div style="max-height: 200px; overflow-y: auto;">
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr style="background: #f0f0f0;">
-                                <th style="padding: 8px; text-align: left;">Professeur</th>
-                                <th style="padding: 8px; text-align: center;">Total heures</th>
-                                <th style="padding: 8px; text-align: center;">Classes</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${Object.entries(diagnostics.byTeacher).map(([teacher, data]) => `
-                                <tr>
-                                    <td style="padding: 8px; border-top: 1px solid #ddd;">${teacher}</td>
-                                    <td style="padding: 8px; text-align: center; border-top: 1px solid #ddd;">
-                                        <span style="
-                                            color: ${data.total < 10 ? '#e74c3c' : '#27ae60'};
-                                            font-weight: bold;
-                                        ">${data.total}</span>
-                                    </td>
-                                    <td style="padding: 8px; text-align: center; border-top: 1px solid #ddd;">
-                                        ${data.classes.size}
-                                    </td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <!-- Actions correctives suggérées -->
-            <div style="
-                background: #e3f2fd;
-                padding: 15px;
-                border-radius: 5px;
-                border-left: 4px solid #2196f3;
-            ">
-                <h4>💡 Actions correctives recommandées:</h4>
-                <ol>
-                    ${diagnostics.missingDays.length > 0 ? `
-                        <li><strong>Vérifier les contraintes de jours:</strong> Le système semble bloquer sur certains jours. Vérifiez que les contraintes ne sont pas trop restrictives.</li>
-                    ` : ''}
-                    ${diagnostics.coverage.percentage < 50 ? `
-                        <li><strong>Augmenter le temps de calcul:</strong> Essayez d'augmenter la limite de temps pour le solveur (time_limit).</li>
-                    ` : ''}
-                    ${diagnostics.parallelGroups.length === 0 ? `
-                        <li><strong>Configurer les groupes parallèles:</strong> Ajoutez des contraintes de type "parallel_group" pour les matières qui doivent être enseignées simultanément.</li>
-                    ` : ''}
-                    <li><strong>Vérifier les disponibilités:</strong> Assurez-vous que les professeurs ont suffisamment de créneaux disponibles.</li>
-                    <li><strong>Réviser les contraintes dures:</strong> Certaines contraintes peuvent être incompatibles entre elles.</li>
-                </ol>
-            </div>
-            
-            <div style="margin-top: 20px; display: flex; gap: 10px;">
-                <button class="btn btn-primary" onclick="exportDiagnosticData()">
-                    📥 Exporter le diagnostic
-                </button>
-                <button class="btn btn-warning" onclick="suggestConstraintFixes()">
-                    🔧 Suggérer des corrections
-                </button>
-                <button class="btn btn-success" onclick="regenerateWithFixes()">
-                    🔄 Régénérer avec corrections
-                </button>
-            </div>
-        </div>
-    `;
-    
-    // Insérer le rapport dans la page
-    const schedulePreview = document.getElementById('schedulePreview');
-    const existingReport = schedulePreview.querySelector('.diagnostic-report');
-    
-    if (existingReport) {
-        existingReport.outerHTML = reportHTML;
-    } else {
-        schedulePreview.insertAdjacentHTML('afterbegin', reportHTML);
+    function updateSelectedAlgorithms() {
+      selectedAlgorithms = Array.from(document.querySelectorAll('.algorithm-card.selected'))
+        .map(card => card.dataset.algo);
     }
-}
 
-// Fonction pour suggérer des corrections automatiques
-async function suggestConstraintFixes() {
-    const diagnostics = analyzeScheduleProblems();
-    const fixes = [];
-    
-    // Si des jours manquent complètement
-    if (diagnostics.missingDays.length > 0) {
-        fixes.push({
-            type: 'relaxation',
-            message: 'Désactiver temporairement les contraintes de disponibilité pour les jours manquants',
-            action: async () => {
-                // Identifier et désactiver les contraintes problématiques
-                const problematicConstraints = currentConstraints.filter(c => {
-                    const data = c.data || c.constraint_data || {};
-                    return diagnostics.missingDays.some(day => 
-                        JSON.stringify(data).includes(day)
-                    );
-                });
-                
-                for (const constraint of problematicConstraints) {
-                    await toggleConstraint(constraint.constraint_id || constraint.id);
-                }
-            }
-        });
+    function toggleAdvanced() {
+      const advanced = document.getElementById('advancedOptions');
+      advanced.style.display = advanced.style.display === 'block' ? 'none' : 'block';
     }
-    
-    // Si le taux de couverture est très bas
-    if (diagnostics.coverage.percentage < 30) {
-        fixes.push({
-            type: 'configuration',
-            message: 'Augmenter le temps de calcul et réduire les contraintes strictes',
-            action: () => {
-                // Suggérer de nouvelles configurations
-                console.log('Configuration suggérée: time_limit=300, priority_threshold=100');
-            }
-        });
+
+    function updateSlider(id) {
+      const slider = document.getElementById(id);
+      const valueDisplay = document.getElementById(id + 'Value');
+      let value = slider.value;
+      if (id === 'qualityTarget') value += '%';
+      if (id === 'timeLimit') value += 's';
+      valueDisplay.textContent = value;
     }
-    
-    // Afficher les suggestions
-    displaySuggestedFixes(fixes);
-}
 
-function displaySuggestedFixes(fixes) {
-    const fixesHTML = `
-        <div class="suggested-fixes" style="
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            border-radius: 5px;
-            padding: 15px;
-            margin: 15px 0;
-        ">
-            <h4>🔧 Corrections suggérées:</h4>
-            <ul>
-                ${fixes.map((fix, index) => `
-                    <li style="margin: 10px 0;">
-                        <strong>${fix.message}</strong>
-                        <button class="btn btn-sm btn-warning" onclick="applyFix(${index})">
-                            Appliquer
-                        </button>
-                    </li>
-                `).join('')}
-            </ul>
-        </div>
-    `;
-    
-    const schedulePreview = document.getElementById('schedulePreview');
-    schedulePreview.insertAdjacentHTML('beforeend', fixesHTML);
-}
+    function showStatus(message, type = 'info') {
+      const status = document.getElementById('statusSection');
+      status.style.display = 'block';
+      status.className = `status-section ${type}`;
+      status.innerHTML = `<strong>${type.toUpperCase()}:</strong> ${message}`;
+    }
 
-// Fonction pour régénérer avec des paramètres améliorés
-async function regenerateWithFixes() {
-    const preview = document.getElementById('schedulePreview');
-    preview.innerHTML = `
-        <div class="loading">
-            <div class="spinner-border"></div>
-            <p>🔧 Régénération avec optimisations...</p>
-        </div>
-    `;
-    
-    try {
-        // Paramètres optimisés pour une meilleure génération
-        const optimizedParams = {
-            constraints: currentConstraints.filter(c => 
-                c.is_active !== false && c.is_active !== 0
-            ),
-            time_limit: 300,  // Augmenter le temps de calcul
-            parallel_processing: true,  // Activer le traitement parallèle
-            optimization_level: 3,  // Niveau d'optimisation maximal
-            allow_soft_violations: true,  // Permettre la violation de contraintes souples
-            days_to_generate: ['א', 'ב', 'ג', 'ד', 'ה', 'ו'],  // Forcer tous les jours
-            min_coverage: 0.8,  // Exiger au moins 80% de couverture
-            enable_parallel_groups: true  // Activer explicitement les groupes parallèles
-        };
+    function showProgress(show = true, text = 'Génération en cours...') {
+      const container = document.getElementById('progressContainer');
+      const textEl = document.getElementById('progressText');
+      container.style.display = show ? 'block' : 'none';
+      textEl.textContent = text;
+      
+      if (show) {
+        animateProgress();
+      }
+    }
+
+    function animateProgress() {
+      const fill = document.getElementById('progressFill');
+      let width = 0;
+      const interval = setInterval(() => {
+        width += Math.random() * 8 + 2;
+        if (width > 95) width = 95;
+        fill.style.width = width + '%';
+      }, 500);
+      
+      fill.dataset.interval = interval;
+    }
+
+    function stopProgress() {
+      const fill = document.getElementById('progressFill');
+      if (fill.dataset.interval) {
+        clearInterval(fill.dataset.interval);
+      }
+      fill.style.width = '100%';
+      setTimeout(() => showProgress(false), 1000);
+    }
+
+    function collectAllOptions() {
+      return {
+        // Algorithmes sélectionnés
+        algorithms: selectedAlgorithms,
         
-        console.log('Régénération avec paramètres optimisés:', optimizedParams);
+        // Options temporelles
+        time_limit: parseInt(document.getElementById('timeLimit').value),
+        quality_target: parseInt(document.getElementById('qualityTarget').value),
         
-        const response = await fetch(`${API_BASE}/generate_schedule`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(optimizedParams)
-        });
+        // Options d'optimisation
+        eliminate_gaps: document.getElementById('eliminateGaps').checked,
+        prevent_conflicts: document.getElementById('preventConflicts').checked,
+        two_hour_blocks: document.getElementById('twoHourBlocks').checked,
+        group_by_day: document.getElementById('groupByDay').checked,
+        friday_short: document.getElementById('fridayShort').checked,
         
-        if (response.ok) {
-            scheduleData = await response.json();
-            
-            // Afficher le nouvel emploi du temps
-            displaySchedule();
-            
-            // Analyser automatiquement les nouveaux résultats
-            setTimeout(() => {
-                analyzeScheduleProblems();
-            }, 500);
-            
-            showAlert('✅ Emploi du temps régénéré avec optimisations', 'success');
+        // École hébraïque
+        monday_constraint: document.getElementById('mondayConstraint').checked,
+        religious_constraints: document.getElementById('religiousConstraints').checked,
+        hebrew_optimized: document.getElementById('hebrewOptimized').checked,
+        
+        // Cours parallèles
+        parallel_sync: document.getElementById('parallelSync').checked,
+        parallel_optimized: document.getElementById('parallelOptimized').checked,
+        
+        // Qualité
+        minimize_days: document.getElementById('minimizeDays').checked,
+        balance_workload: document.getElementById('balanceWorkload').checked,
+        teacher_preferences: document.getElementById('teacherPreferences').checked,
+        
+        // Flags avancés
+        advanced: true,
+        optimization_level: 'ultimate',
+        enable_all_algorithms: true
+      };
+    }
+
+    async function generateUltimate() {
+      const btn = document.getElementById('generateBtn');
+      btn.disabled = true;
+      
+      try {
+        const options = collectAllOptions();
+        console.log('Options complètes:', options);
+        
+        showStatus('Initialisation de la génération ultime...', 'info');
+        showProgress(true, 'Lancement des algorithmes combinés...');
+        
+        // Essayer plusieurs endpoints selon les algorithmes sélectionnés
+        let result = null;
+        let endpoint = '';
+        
+        // Utiliser TOUJOURS l'endpoint ultime qui combine tout
+        endpoint = '/generate_schedule_ultimate';
+        showProgress(true, `Lancement des algorithmes: ${selectedAlgorithms.join(', ')}...`);
+        result = await makeRequest(endpoint, options);
+        
+        if (result) {
+          stopProgress();
+          showStatus(`Génération réussie avec ${endpoint}!`, 'success');
+          displayResults(result);
         } else {
-            const error = await response.json();
-            preview.innerHTML = `
-                <div class="alert alert-danger">
-                    <strong>Erreur:</strong> ${error.detail || 'Impossible de régénérer'}
-                    <br><small>Essayez de désactiver certaines contraintes conflictuelles.</small>
-                </div>
-            `;
+          throw new Error('Aucun algorithme sélectionné ou échec de génération');
         }
-    } catch (error) {
-        console.error('Erreur de régénération:', error);
-        preview.innerHTML = `
-            <div class="alert alert-danger">
-                <strong>Erreur:</strong> Problème de connexion au serveur
-            </div>
-        `;
-    }
-}
-
-// Fonction pour exporter les données de diagnostic
-function exportDiagnosticData() {
-    const diagnostics = analyzeScheduleProblems();
-    const dataStr = JSON.stringify(diagnostics, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    
-    const exportFileDefaultName = `diagnostic_${new Date().toISOString()}.json`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-}
-
-// Ajouter un bouton de diagnostic dans l'interface
-document.addEventListener('DOMContentLoaded', function() {
-    // Ajouter le bouton de diagnostic après la génération
-    const scheduleHeader = document.querySelector('#tab-schedule .card-header');
-    if (scheduleHeader) {
-        scheduleHeader.insertAdjacentHTML('beforeend', `
-            <button class="btn btn-warning" onclick="analyzeScheduleProblems()" style="margin-left: 10px;">
-                🔍 Diagnostic
-            </button>
-        `);
-    }
-});
-
-// Modifier la fonction generateSchedule existante pour inclure l'analyse automatique
-const originalGenerateSchedule = window.generateSchedule;
-window.generateSchedule = async function() {
-    await originalGenerateSchedule();
-    
-    // Attendre que l'emploi du temps soit affiché
-    setTimeout(() => {
-        if (scheduleData && scheduleData.schedule) {
-            // Lancer automatiquement l'analyse
-            analyzeScheduleProblems();
-        }
-    }, 1000);
-};
-// Fonction pour formater les périodes
-function formatPeriod(period) {
-    const periodTimes = {
-        0: '07:45-08:30',
-        1: '08:30-09:15',
-        2: '09:15-10:00',
-        3: '10:15-11:00',
-        4: '11:00-11:45',
-        5: '12:00-12:45',
-        6: '12:45-13:30',
-        7: '13:30-14:15',
-        8: '14:15-15:00',
-        9: '15:00-15:45'
-    };
-    
-    return `<div>Période ${period + 1}</div><small style="opacity: 0.7;">${periodTimes[period] || `${8 + period}:00`}</small>`;
-}
-
-// Fonction pour obtenir la couleur selon la matière
-function getSubjectColor(subject) {
-    const subjectColors = {
-        'מתמטיקה': '#e3f2fd', // Mathématiques - bleu clair
-        'Math': '#e3f2fd',
-        'עברית': '#f3e5f5', // Hébreu - violet clair
-        'Hebrew': '#f3e5f5',
-        'אנגלית': '#e8f5e9', // Anglais - vert clair
-        'English': '#e8f5e9',
-        'תורה': '#fff3e0', // Torah - orange clair
-        'Torah': '#fff3e0',
-        'תפילה': '#fff3e0', // Prière - orange clair
-        'Prayer': '#fff3e0',
-        'מדעים': '#fce4ec', // Sciences - rose clair
-        'Science': '#fce4ec',
-        'היסטוריה': '#f3f4f6', // Histoire - gris clair
-        'History': '#f3f4f6',
-        'ספורט': '#e0f2f1', // Sport - cyan clair
-        'Sport': '#e0f2f1',
-        'אומנות': '#fef3c7', // Art - jaune clair
-        'Art': '#fef3c7'
-    };
-    
-    // Recherche partielle dans le nom de la matière
-    for (const [key, color] of Object.entries(subjectColors)) {
-        if (subject.includes(key)) {
-            return color;
-        }
-    }
-    
-    return '#f5f5f5'; // Couleur par défaut
-}
-
-// Fonction pour afficher l'emploi du temps d'une classe spécifique
-function showClassSchedule(className) {
-    // Cacher tous les emplois du temps
-    document.querySelectorAll('.schedule-table-wrapper').forEach(table => {
-        table.style.display = 'none';
-    });
-    
-    // Retirer la classe active de tous les onglets
-    document.querySelectorAll('.schedule-tab').forEach(tab => {
-        tab.classList.remove('active');
-        tab.style.backgroundColor = 'transparent';
-        tab.style.color = '#34495e';
-    });
-    
-    // Afficher l'emploi du temps sélectionné
-    const selectedSchedule = document.getElementById(`schedule-${className}`);
-    if (selectedSchedule) {
-        selectedSchedule.style.display = 'block';
-    }
-    
-    // Marquer l'onglet comme actif
-    event.target.classList.add('active');
-    event.target.style.backgroundColor = '#3498db';
-    event.target.style.color = 'white';
-}
-
-        // ============================================
-        // UTILITAIRES
-        // ============================================
         
-        function showAlert(message, type = 'info') {
-            const alert = document.createElement('div');
-            alert.className = `alert alert-${type}`;
-            alert.innerHTML = message;
-            
-            document.querySelector('.container').insertBefore(
-                alert, 
-                document.querySelector('.stats-grid')
-            );
-            
-            setTimeout(() => alert.remove(), 5000);
-        }
+      } catch (error) {
+        stopProgress();
+        showStatus(`Erreur: ${error.message}`, 'error');
+        console.error('Erreur génération:', error);
+      } finally {
+        btn.disabled = false;
+      }
+    }
 
-        // ============================================
-        // INITIALISATION
-        // ============================================
-        
-        document.addEventListener('DOMContentLoaded', async () => {
-            logDebug('Initialisation de l\'application...');
-            
-            // Test de connexion au backend
-            const backendOk = await testBackendConnection();
-            
-            if (backendOk) {
-                // Charger les contraintes
-                await loadConstraints();
-                
-                // Initialiser la connexion IA (optionnel)
-                initializeAIConnection();
-                
-                // Rafraîchissement périodique
-                setInterval(async () => {
-                    await testBackendConnection();
-                    await loadConstraints();
-                }, 30000);
-            } else {
-                showAlert('⚠️ Le serveur backend n\'est pas accessible. Vérifiez qu\'il est démarré sur le port 8000.', 'danger');
-            }
+    async function makeRequest(endpoint, payload = {}) {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || `Erreur HTTP ${response.status}`);
+      }
+      
+      return data;
+    }
+
+    function displayResults(data) {
+      const section = document.getElementById('resultsSection');
+      const grid = document.getElementById('resultsGrid');
+      const detailed = document.getElementById('detailedResults');
+      
+      section.style.display = 'block';
+      
+      // Stocker l'ID pour afficher l'emploi du temps
+      currentScheduleId = data.schedule_id;
+      
+      // Statistiques principales
+      const stats = [
+        { label: 'ID Emploi du Temps', value: data.schedule_id || 'N/A' },
+        { label: 'Total Cours', value: data.total_entries || data.summary?.total_lessons || 0 },
+        { label: 'Classes', value: data.summary?.classes_covered || 0 },
+        { label: 'Professeurs', value: data.summary?.teachers_involved || 0 },
+        { label: 'Cours Parallèles', value: data.summary?.parallel_lessons || 0 },
+        { label: 'Temps Résolution', value: `${data.solve_time || 0}s` }
+      ];
+      
+      grid.innerHTML = stats.map(stat => `
+        <div class="result-card">
+          <div class="result-value">${stat.value}</div>
+          <div class="result-label">${stat.label}</div>
+        </div>
+      `).join('');
+      
+      // Détails avancés
+      let detailsHtml = '<h3>🎯 Fonctionnalités Activées</h3><div style="margin: 20px 0;">';
+      
+      if (data.features) {
+        Object.entries(data.features).forEach(([key, value]) => {
+          if (value) {
+            const badgeClass = key.includes('corrected') ? 'success' : 
+                               key.includes('parallel') ? 'info' : 
+                               key.includes('gap') ? 'warning' : 'info';
+            detailsHtml += `<span class="badge ${badgeClass}">${key.replace(/_/g, ' ')}</span>`;
+          }
         });
-    </script>
+      }
+      
+      detailsHtml += '</div>';
+      detailsHtml += `<p><strong>🔗 Accès:</strong> <a href="${API_BASE}/constraints-manager" target="_blank">Voir l'emploi du temps complet →</a></p>`;
+      
+      detailed.innerHTML = detailsHtml;
+      
+      // Afficher la section emploi du temps si on a un ID
+      if (currentScheduleId) {
+        const scheduleSection = document.getElementById('scheduleSection');
+        scheduleSection.style.display = 'block';
+      }
+    }
+
+    let currentScheduleId = null;
+
+    async function showScheduleView() {
+      if (!currentScheduleId) {
+        showStatus('Aucun emploi du temps à afficher', 'error');
+        return;
+      }
+      
+      try {
+        showStatus('Chargement de l\\'emploi du temps...', 'info');
+        const response = await fetch(`${API_BASE}/get_schedule/${currentScheduleId}`);
+        const scheduleData = await response.json();
+        
+        if (scheduleData.success) {
+          renderScheduleTable(scheduleData);
+          showStatus('Emploi du temps chargé!', 'success');
+        } else {
+          showStatus(`Erreur: ${scheduleData.error}`, 'error');
+        }
+      } catch (error) {
+        showStatus(`Erreur de chargement: ${error.message}`, 'error');
+      }
+    }
+
+    function renderScheduleTable(scheduleData) {
+      const scheduleGrid = document.getElementById('scheduleGrid');
+      const { schedule_grid, days } = scheduleData;
+      
+      // Déterminer les périodes disponibles
+      let maxPeriod = 0;
+      Object.values(schedule_grid).forEach(daySchedule => {
+        Object.keys(daySchedule).forEach(period => {
+          maxPeriod = Math.max(maxPeriod, parseInt(period));
+        });
+      });
+      
+      // Construire le tableau
+      let tableHtml = '<table class=\"schedule-table\">';
+      
+      // En-tête
+      tableHtml += '<thead><tr><th>Période</th>';
+      days.forEach(day => {
+        tableHtml += `<th>${day}</th>`;
+      });
+      tableHtml += '</tr></thead><tbody>';
+      
+      // Lignes de périodes
+      for (let period = 1; period <= maxPeriod; period++) {
+        tableHtml += `<tr><th>Période ${period}</th>`;
+        
+        days.forEach(day => {
+          tableHtml += '<td class=\"schedule-cell\">';
+          
+          if (schedule_grid[day] && schedule_grid[day][period]) {
+            schedule_grid[day][period].forEach(lesson => {
+              const parallelClass = lesson.is_parallel ? ' parallel' : '';
+              tableHtml += `
+                <div class=\"lesson-block${parallelClass}\">
+                  <div class=\"lesson-class\">${lesson.class_name}</div>
+                  <div class=\"lesson-subject\">${lesson.subject}</div>
+                  <div class=\"lesson-teacher\">${lesson.teacher_name || ''}</div>
+                </div>
+              `;
+            });
+          }
+          
+          tableHtml += '</td>';
+        });
+        
+        tableHtml += '</tr>';
+      }
+      
+      tableHtml += '</tbody></table>';
+      scheduleGrid.innerHTML = tableHtml;
+    }
+
+    function downloadSchedule() {
+      if (!currentScheduleId) {
+        showStatus('Aucun emploi du temps à télécharger', 'error');
+        return;
+      }
+      
+      // Ouvrir dans un nouvel onglet pour impression/téléchargement
+      window.open(`${API_BASE}/get_schedule/${currentScheduleId}`, '_blank');
+    }
+
+    // Initialisation
+    updateSelectedAlgorithms();
+    updateSlider('timeLimit');
+    updateSlider('qualityTarget');
+  </script>
 </body>
 </html>
