@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Interface - Emploi du Temps</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .error { color: red; }
+        .success { color: green; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Interface Emploi du Temps</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Génération Emploi du Temps</h2>
+        <button onclick="testGeneration()">Générer Emploi du Temps Simple</button>
+        <div id="generationResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Affichage par Classe</h2>
+        <button onclick="testViewByClass()">Voir par Classe (Schedule ID 103)</button>
+        <div id="classByResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Affichage par Professeur</h2>
+        <button onclick="testViewByTeacher()">Voir par Professeur (Schedule ID 103)</button>
+        <div id="teacherByResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Test Encodage Hébreu</h2>
+        <button onclick="testHebrewEncoding()">Test Caractères Hébreux</button>
+        <div id="hebrewResult"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        // Test 1: Génération
+        async function testGeneration() {
+            const result = document.getElementById('generationResult');
+            result.innerHTML = '<p>⏳ Génération en cours...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/generate_schedule_simple`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ time_limit: 30 })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.innerHTML = `
+                        <div class="success">
+                            ✅ Génération réussie!<br>
+                            Schedule ID: ${data.schedule_id}<br>
+                            Qualité: ${data.quality_score}/100<br>
+                            Trous: ${data.gaps_count}<br>
+                            Temps: ${data.solve_time.toFixed(2)}s
+                        </div>
+                    `;
+                    window.lastScheduleId = data.schedule_id;
+                } else {
+                    result.innerHTML = '<div class="error">❌ Échec de génération</div>';
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Erreur: ${error.message}</div>`;
+            }
+        }
+
+        // Test 2: Vue par classe
+        async function testViewByClass() {
+            const result = document.getElementById('classByResult');
+            const scheduleId = window.lastScheduleId || 103;
+            
+            result.innerHTML = '<p>⏳ Chargement vue par classe...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/schedule_by_class/${scheduleId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const firstClass = Object.keys(data.classes)[0];
+                    const firstClassData = data.classes[firstClass];
+                    
+                    result.innerHTML = `
+                        <div class="success">
+                            ✅ Vue par classe réussie!<br>
+                            Total classes: ${data.total_classes}<br>
+                            Première classe: ${firstClass}<br>
+                            Heures: ${firstClassData.stats.total_hours}<br>
+                            Matières: ${firstClassData.stats.subjects_count}<br>
+                            Professeurs: ${firstClassData.stats.teachers_count}
+                        </div>
+                        <button onclick="testJSONSafety('classes', ${JSON.stringify(JSON.stringify(data.classes))})">
+                            Test Sécurité JSON Classes
+                        </button>
+                    `;
+                } else {
+                    result.innerHTML = '<div class="error">❌ Échec vue par classe</div>';
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Erreur: ${error.message}</div>`;
+            }
+        }
+
+        // Test 3: Vue par professeur
+        async function testViewByTeacher() {
+            const result = document.getElementById('teacherByResult');
+            const scheduleId = window.lastScheduleId || 103;
+            
+            result.innerHTML = '<p>⏳ Chargement vue par professeur...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/schedule_by_teacher/${scheduleId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const firstTeacher = Object.keys(data.teachers)[0];
+                    const firstTeacherData = data.teachers[firstTeacher];
+                    
+                    result.innerHTML = `
+                        <div class="success">
+                            ✅ Vue par professeur réussie!<br>
+                            Total professeurs: ${data.total_teachers}<br>
+                            Premier professeur: ${firstTeacher}<br>
+                            Heures: ${firstTeacherData.stats.total_hours}<br>
+                            Matières: ${firstTeacherData.stats.subjects_count}<br>
+                            Classes: ${firstTeacherData.stats.classes_count}
+                        </div>
+                        <button onclick="testJSONSafety('teachers', ${JSON.stringify(JSON.stringify(data.teachers))})">
+                            Test Sécurité JSON Professeurs
+                        </button>
+                    `;
+                } else {
+                    result.innerHTML = '<div class="error">❌ Échec vue par professeur</div>';
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Erreur: ${error.message}</div>`;
+            }
+        }
+
+        // Test 4: Test hébreu
+        function testHebrewEncoding() {
+            const result = document.getElementById('hebrewResult');
+            
+            try {
+                // Test avec caractères hébreux
+                const hebrewData = {
+                    "ז-1": {
+                        days: {
+                            "Dimanche": { hebrew_name: "ראשון" },
+                            "Lundi": { hebrew_name: "שני" },
+                            "Mardi": { hebrew_name: "שלישי" }
+                        },
+                        subjects: ["שיח בוקר", "חינוך", "מתמטיקה"]
+                    }
+                };
+
+                // Tester l'encodage sécurisé
+                const safeSerialization = JSON.stringify(hebrewData).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                
+                // Créer un élément caché
+                const testDiv = document.createElement('div');
+                testDiv.style.display = 'none';
+                testDiv.innerHTML = safeSerialization;
+                document.body.appendChild(testDiv);
+                
+                // Tester la désérialisation
+                const parsed = JSON.parse(testDiv.textContent);
+                
+                result.innerHTML = `
+                    <div class="success">
+                        ✅ Test hébreu réussi!<br>
+                        Classe: ${Object.keys(parsed)[0]}<br>
+                        Jour hébreu: ${parsed["ז-1"].days.Dimanche.hebrew_name}<br>
+                        Matière hébreu: ${parsed["ז-1"].subjects[0]}
+                    </div>
+                `;
+                
+                // Nettoyer
+                document.body.removeChild(testDiv);
+                
+            } catch (error) {
+                result.innerHTML = `<div class="error">❌ Erreur hébreu: ${error.message}</div>`;
+            }
+        }
+
+        // Test sécurité JSON
+        function testJSONSafety(type, jsonString) {
+            try {
+                // Créer un élément caché pour tester
+                const testDiv = document.createElement('div');
+                testDiv.style.display = 'none';
+                testDiv.innerHTML = jsonString.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                document.body.appendChild(testDiv);
+                
+                // Tester la désérialisation
+                const parsed = JSON.parse(testDiv.textContent);
+                const count = Object.keys(parsed).length;
+                
+                alert(`✅ Test sécurité JSON ${type} réussi! ${count} éléments parsed sans erreur.`);
+                
+                // Nettoyer
+                document.body.removeChild(testDiv);
+                
+            } catch (error) {
+                alert(`❌ Test sécurité JSON ${type} échoué: ${error.message}`);
+            }
+        }
+
+        // Initialisation
+        window.lastScheduleId = 103; // Schedule par défaut pour les tests
+        
+        // Message de démarrage
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🧪 Page de test chargée. Vous pouvez tester les corrections d\'encodage JSON.');
+        });
+    </script>
+</body>
+</html>

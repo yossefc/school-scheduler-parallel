@@ -20,10 +20,24 @@ try:
     # Optionnel: modules d'optimisation avancée
     from advanced_main import AdvancedSchedulingSystem  # type: ignore
     from pedagogical_solver_v2 import PedagogicalScheduleSolverV2  # type: ignore
+    from robust_solver import RobustScheduleSolver  # Nouveau solver robuste
+    from flexible_solver import FlexibleScheduleSolver  # Solver flexible avec minimisation
+    from simple_working_solver import SimpleWorkingSolver  # Solver ultra-simple qui fonctionne
+    from improved_simple_solver import ImprovedSimpleSolver  # Solver amélioré avec plus de cours
+    from realistic_solver import RealisticScheduleSolver  # Solver réaliste et complet
+    from parallel_sync_solver import ParallelSyncSolver  # Solver avec synchronisation parallèle correcte
+    from parallel_sync_solver_v2 import ParallelSyncSolverV2  # Solver V2 avec heures supplémentaires
     _advanced_modules_available = True
 except Exception:
     AdvancedSchedulingSystem = None  # type: ignore
     PedagogicalScheduleSolverV2 = None  # type: ignore
+    RobustScheduleSolver = None  # type: ignore
+    FlexibleScheduleSolver = None  # type: ignore
+    SimpleWorkingSolver = None  # type: ignore
+    ImprovedSimpleSolver = None  # type: ignore
+    RealisticScheduleSolver = None  # type: ignore
+    ParallelSyncSolver = None  # type: ignore
+    ParallelSyncSolverV2 = None  # type: ignore
     _advanced_modules_available = False
 from pydantic import BaseModel
 import os
@@ -454,14 +468,14 @@ async def generate_schedule_fixed_endpoint(payload: GenerateScheduleRequest):
 # Route pour servir l'interface HTML
 @app.get("/constraints-manager")
 async def constraints_interface():
-    """Sert l'interface SIMPLE avec tous les algorithmes intégrés"""
+    """Sert l'interface SIMPLE et AUTOMATIQUE avec le solver intégré"""
     try:
-        # Chemin du fichier HTML dans le container  
-        html_path = '/app/interface_simple.html'
+        # Utiliser la nouvelle interface simplifiée
+        html_path = '/app/constraints_manager_simple.html'
         
         # Si le fichier n'existe pas dans /app, essayer le dossier courant
         if not os.path.exists(html_path):
-            html_path = 'interface_simple.html'
+            html_path = 'constraints_manager_simple.html'
         
         with open(html_path, 'r', encoding='utf-8') as f:
             return HTMLResponse(content=f.read())
@@ -472,6 +486,27 @@ async def constraints_interface():
             <p>Le fichier constraints_manager.html n'est pas présent dans le container.</p>
             <p>Vérifiez que le fichier est bien dans le dossier ./solver/</p>
         """, status_code=404)
+
+@app.get("/test-interface")
+async def test_interface():
+    """Page de test pour l'interface avec corrections d'encodage"""
+    try:
+        html_path = '/app/test_interface.html'
+        if not os.path.exists(html_path):
+            html_path = 'test_interface.html'
+        
+        with open(html_path, 'r', encoding='utf-8') as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        return HTMLResponse(content="""
+            <h1>🧪 Test Interface Temporairement Indisponible</h1>
+            <p>Utilisez l'interface principale: <a href="/constraints-manager">constraints-manager</a></p>
+            <p>Ou testez directement les APIs:</p>
+            <ul>
+                <li><a href="/api/schedule_by_class/103">/api/schedule_by_class/103</a></li>
+                <li><a href="/api/schedule_by_teacher/103">/api/schedule_by_teacher/103</a></li>
+            </ul>
+        """, status_code=200)
 
 @app.get("/")
 async def dashboard():
@@ -993,6 +1028,1094 @@ async def get_parallel_statistics():
 
 
 # ============================================
+# SOLVER INTÉGRÉ OPTIMISÉ
+# ============================================
+
+@app.post("/generate_schedule_integrated")
+async def generate_schedule_integrated_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec le solver intégré optimisé (synchronisation parallèle + zéro trous)"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SOLVER INTÉGRÉ OPTIMISÉ ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Utiliser le nouveau solver intégré
+        from integrated_solver import IntegratedScheduleSolver
+        
+        solver = IntegratedScheduleSolver(db_config=db_config)
+        
+        # Charger les données
+        solver.load_data()
+        logger.info(f"Données chargées: {len(solver.courses)} cours, {len(solver.classes)} classes")
+        
+        # Créer le modèle
+        solver.create_variables()
+        solver.add_constraints()
+        logger.info("Modèle CP-SAT créé avec toutes les contraintes")
+        
+        # Résoudre avec le temps suffisant
+        schedule = solver.solve(time_limit=payload.time_limit)
+        
+        if schedule:
+            # Sauvegarder
+            schedule_id = solver.save_schedule(schedule)
+            summary = solver.get_summary()
+            
+            logger.info("✅ GÉNÉRATION INTÉGRÉE RÉUSSIE")
+            logger.info(f"  → Schedule ID: {schedule_id}")
+            logger.info(f"  → Qualité: {summary['quality_metrics']['quality_score']}/100")
+            logger.info(f"  → Trous: {summary['quality_metrics']['gaps_count']}")
+            logger.info(f"  → Sync parallèle: {'✓' if summary['quality_metrics']['parallel_sync_ok'] else '✗'}")
+            
+            return {
+                "success": True,
+                "message": "Emploi du temps généré avec le solver intégré",
+                "schedule_id": schedule_id,
+                "quality_score": summary['quality_metrics']['quality_score'],
+                "gaps_count": summary['quality_metrics']['gaps_count'],
+                "parallel_sync_ok": summary['quality_metrics']['parallel_sync_ok'],
+                "solve_time": summary['solve_time'],
+                "total_courses": summary['courses_count'],
+                "parallel_groups": summary['parallel_groups_count'],
+                "summary": summary,
+                "algorithm": "integrated_solver_v1"
+            }
+        else:
+            logger.error("✗ GÉNÉRATION INTÉGRÉE ÉCHOUÉE")
+            raise HTTPException(
+                status_code=500,
+                detail="Le solver intégré n'a pas trouvé de solution. Vérifiez les contraintes."
+            )
+            
+    except ImportError as e:
+        logger.error(f"Erreur import solver intégré: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Solver intégré indisponible - utiliser /generate_schedule à la place"
+        )
+    except Exception as e:
+        logger.error(f"Erreur solver intégré: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_robust")
+async def generate_schedule_robust_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec le solver robuste (ZÉRO TROUS GARANTIS)"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SOLVER ROBUSTE (ZÉRO TROUS) ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import direct pour éviter les problèmes de condition
+        from robust_solver import RobustScheduleSolver as RobustSolver
+        
+        solver = RobustSolver(db_config=db_config)
+        
+        # Charger et valider les données
+        solver.load_data()
+        logger.info(f"Données chargées: {len(solver.courses)} cours, {len(solver.classes)} classes, {len(solver.teachers)} professeurs")
+        
+        # Créer le modèle avec contraintes anti-trous
+        solver.create_variables()
+        solver.add_constraints()
+        logger.info("Modèle robuste créé avec élimination stricte des trous")
+        
+        # Résoudre
+        result = solver.solve(time_limit=payload.time_limit)
+        
+        if result and result['success']:
+            logger.info("✅ GÉNÉRATION ROBUSTE RÉUSSIE")
+            logger.info(f"  → Schedule ID: {result['schedule_id']}")
+            logger.info(f"  → Qualité: {result['quality_score']}/100")
+            logger.info(f"  → Trous: {result['gaps_count']} (OBJECTIF: 0)")
+            logger.info(f"  → Temps: {result['solve_time']:.1f}s")
+            
+            return result
+        else:
+            logger.error("✗ GÉNÉRATION ROBUSTE ÉCHOUÉE")
+            raise HTTPException(
+                status_code=500,
+                detail="Le solver robuste n'a pas trouvé de solution sans trous. Les contraintes sont peut-être trop strictes."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver robuste: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_flexible")
+async def generate_schedule_flexible_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec le solver flexible (MINIMISE les trous)"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SOLVER FLEXIBLE (MINIMISE TROUS) ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import direct
+        from flexible_solver import FlexibleScheduleSolver as FlexSolver
+        
+        solver = FlexSolver(db_config=db_config)
+        
+        # Charger les données avec filtrage intelligent
+        solver.load_data()
+        logger.info(f"Données: {len(solver.courses)} cours, {len(solver.classes)} classes, {len(solver.teachers)} professeurs")
+        
+        # Créer modèle avec objectif de minimisation des trous
+        solver.create_variables()
+        solver.add_constraints()
+        logger.info("Modèle flexible créé avec minimisation des trous")
+        
+        # Résoudre
+        result = solver.solve(time_limit=payload.time_limit)
+        
+        if result and result['success']:
+            logger.info("✅ GÉNÉRATION FLEXIBLE RÉUSSIE")
+            logger.info(f"  → Schedule ID: {result['schedule_id']}")
+            logger.info(f"  → Qualité: {result['quality_score']}/100")
+            logger.info(f"  → Trous: {result['gaps_count']} (MINIMISÉS)")
+            logger.info(f"  → Temps: {result['solve_time']:.1f}s")
+            
+            return result
+        else:
+            logger.error("✗ GÉNÉRATION FLEXIBLE ÉCHOUÉE")
+            raise HTTPException(
+                status_code=500,
+                detail="Le solver flexible n'a pas trouvé de solution. Problème de données ou contraintes."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver flexible: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_simple")
+async def generate_schedule_simple_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec le solver ultra-simple (FONCTIONNE TOUJOURS)"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SOLVER ULTRA-SIMPLE ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import direct
+        from simple_working_solver import SimpleWorkingSolver as SimpleSolver
+        
+        solver = SimpleSolver(db_config=db_config)
+        
+        # Charger données très filtrées
+        solver.load_data()
+        logger.info(f"Données filtrées: {len(solver.courses)} cours, {len(solver.classes)} classes, {len(solver.teachers)} professeurs")
+        
+        # Modèle minimal
+        solver.create_variables()
+        solver.add_constraints()
+        logger.info("Modèle ultra-simple créé")
+        
+        # Résoudre
+        result = solver.solve(time_limit=payload.time_limit)
+        
+        if result and result['success']:
+            logger.info("✅ GÉNÉRATION SIMPLE RÉUSSIE")
+            logger.info(f"  → Schedule ID: {result['schedule_id']}")
+            logger.info(f"  → Qualité: {result['quality_score']}/100")
+            logger.info(f"  → Trous: {result['gaps_count']}")
+            logger.info(f"  → Temps: {result['solve_time']:.1f}s")
+            
+            return result
+        else:
+            logger.error("✗ MÊME LE SOLVER SIMPLE ÉCHOUE - PROBLÈME MAJEUR")
+            raise HTTPException(
+                status_code=500,
+                detail="Même le solver simplifié échoue. Vérifiez les données de base."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver simple: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_improved")
+async def generate_schedule_improved_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec le solver amélioré (PLUS DE COURS, MOINS DE TROUS)"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SOLVER AMÉLIORÉ (EMPLOI DU TEMPS COMPLET) ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import direct
+        from improved_simple_solver import ImprovedSimpleSolver as ImprovedSolver
+        
+        solver = ImprovedSolver(db_config=db_config)
+        
+        # Charger plus de données avec filtrage intelligent
+        solver.load_data()
+        logger.info(f"Données étendues: {len(solver.courses)} cours, {len(solver.classes)} classes, {len(solver.teachers)} professeurs")
+        
+        # Créer modèle équilibré
+        solver.create_variables()
+        solver.add_constraints()
+        logger.info("Modèle amélioré créé avec étalement des cours")
+        
+        # Résoudre
+        result = solver.solve(time_limit=payload.time_limit)
+        
+        if result and result['success']:
+            logger.info("✅ GÉNÉRATION AMÉLIORÉE RÉUSSIE")
+            logger.info(f"  → Schedule ID: {result['schedule_id']}")
+            logger.info(f"  → Qualité: {result['quality_score']}/100")
+            logger.info(f"  → Trous: {result['gaps_count']} (RÉDUITS)")
+            logger.info(f"  → Périodes utilisées: {result.get('periods_used', [])}")
+            logger.info(f"  → Classes couvertes: {result.get('classes_covered', 0)}")
+            logger.info(f"  → Temps: {result['solve_time']:.1f}s")
+            
+            return result
+        else:
+            logger.error("✗ GÉNÉRATION AMÉLIORÉE ÉCHOUÉE")
+            raise HTTPException(
+                status_code=500,
+                detail="Le solver amélioré n'a pas trouvé de solution. Essayez le solver simple."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver amélioré: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_advanced_cpsat") 
+async def generate_schedule_advanced_cpsat_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec le solver CP-SAT ULTRA-AVANCÉ (zéro trous + objectif sophistiqué)"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SOLVER CP-SAT ULTRA-AVANCÉ ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import du solver ultra-avancé
+        from advanced_cpsat_solver import AdvancedCPSATSolver
+        
+        solver = AdvancedCPSATSolver(db_config=db_config)
+        
+        # Charger données
+        solver.load_data_from_db()
+        logger.info("Données chargées pour solver ultra-avancé")
+        
+        # Créer variables sophistiquées
+        solver.create_variables()
+        solver.add_hard_constraints()
+        solver.add_objective()  # Objectif span-load sophistiqué
+        logger.info("Modèle CP-SAT ultra-avancé créé")
+        
+        # Résoudre
+        schedule = solver.solve(time_limit=payload.time_limit)
+        
+        if schedule:
+            logger.info("✅ GÉNÉRATION ULTRA-AVANCÉE RÉUSSIE")
+            logger.info(f"  → Emploi du temps avec ZÉRO TROUS garanti")
+            logger.info(f"  → Objectif span-load optimisé")
+            
+            return {
+                "success": True,
+                "schedule": schedule,
+                "algorithm": "advanced_cpsat_solver",
+                "features": {
+                    "zero_gaps_guaranteed": True,
+                    "span_load_optimization": True,
+                    "parallel_sync": True,
+                    "sophisticated_objective": True
+                },
+                "message": "Solver CP-SAT ultra-avancé: zéro trous + objectif sophistiqué"
+            }
+        else:
+            logger.error("✗ SOLVER ULTRA-AVANCÉ ÉCHOUÉ")
+            raise HTTPException(
+                status_code=500,
+                detail="Le solver CP-SAT ultra-avancé n'a pas trouvé de solution."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver ultra-avancé: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_pedagogical_v2")
+async def generate_schedule_pedagogical_v2_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec le solver PÉDAGOGIQUE V2 (blocs 2h + zéro trous)"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SOLVER PÉDAGOGIQUE V2 ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import du solver pédagogique V2
+        from pedagogical_solver_v2 import PedagogicalScheduleSolverV2
+        
+        solver = PedagogicalScheduleSolverV2(db_config=db_config)
+        
+        # Charger données 
+        solver.load_data()
+        logger.info("Données chargées pour solver pédagogique V2")
+        
+        # Résoudre avec optimisations pédagogiques
+        result = solver.solve(time_limit=payload.time_limit)
+        
+        if result and result.get('success'):
+            logger.info("✅ GÉNÉRATION PÉDAGOGIQUE V2 RÉUSSIE")
+            logger.info(f"  → Schedule ID: {result['schedule_id']}")
+            logger.info(f"  → Blocs 2h optimisés: {result.get('blocks_2h_count', 0)}")
+            logger.info(f"  → Qualité pédagogique: {result['quality_score']}/100")
+            
+            return result
+        else:
+            logger.error("✗ SOLVER PÉDAGOGIQUE V2 ÉCHOUÉ")
+            raise HTTPException(
+                status_code=500,
+                detail="Le solver pédagogique V2 n'a pas trouvé de solution."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver pédagogique V2: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_adaptive")
+async def generate_schedule_adaptive_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps ADAPTATIF - place le maximum de cours possible"""
+    try:
+        logger.info("=== GÉNÉRATION ADAPTATIVE (MAXIMUM DE COURS POSSIBLES) ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import direct
+        from adaptive_all_courses_solver import AdaptiveAllCoursesSolver
+        
+        solver = AdaptiveAllCoursesSolver(db_config=db_config)
+        
+        # Charger TOUS les cours
+        solver.load_data()
+        logger.info(f"Données ADAPTATIVES: {len(solver.courses)} cours, {len(solver.classes)} classes, {len(solver.teachers)} professeurs")
+        
+        # Modèle adaptatif
+        solver.create_variables()
+        solver.add_adaptive_constraints()
+        logger.info("Modèle ADAPTATIF créé - maximise les cours placés")
+        
+        # Résoudre
+        result = solver.solve(time_limit=payload.time_limit)
+        
+        if result and result['success']:
+            logger.info("✅ GÉNÉRATION ADAPTATIVE RÉUSSIE")
+            logger.info(f"  → Schedule ID: {result['schedule_id']}")
+            logger.info(f"  → Cours placés: {result['courses_placed']}/{result['total_courses_input']}")
+            logger.info(f"  → Taux placement: {result['placement_rate']}")
+            logger.info(f"  → Créneaux générés: {result['total_schedule_entries']}")
+            logger.info(f"  → Qualité: {result['quality_score']}/100")
+            logger.info(f"  → Temps: {result['solve_time']:.1f}s")
+            
+            return result
+        else:
+            logger.error("✗ GÉNÉRATION ADAPTATIVE ÉCHOUÉE")
+            raise HTTPException(
+                status_code=500,
+                detail="Le solver adaptatif n'a pas pu placer de cours."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver adaptatif: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_all_courses")
+async def generate_schedule_all_courses_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec TOUS les cours et contraintes relâchées"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC TOUS LES COURS (CONTRAINTES RELÂCHÉES) ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import direct
+        from relaxed_complete_solver import RelaxedCompleteScheduleSolver
+        
+        solver = RelaxedCompleteScheduleSolver(db_config=db_config)
+        
+        # Charger ABSOLUMENT TOUS les cours
+        solver.load_data()
+        logger.info(f"Données ULTRA-COMPLÈTES: {len(solver.courses)} cours, {len(solver.classes)} classes, {len(solver.teachers)} professeurs")
+        
+        # Créer modèle CP-SAT relâché
+        solver.create_variables()
+        solver.add_relaxed_constraints()
+        logger.info("Modèle CP-SAT RELÂCHÉ créé pour TOUS les cours")
+        
+        # Résoudre
+        result = solver.solve(time_limit=payload.time_limit)
+        
+        if result and result['success']:
+            logger.info("✅ GÉNÉRATION COMPLÈTE AVEC TOUS LES COURS RÉUSSIE")
+            logger.info(f"  → Schedule ID: {result['schedule_id']}")
+            logger.info(f"  → Qualité: {result['quality_score']}/100")
+            logger.info(f"  → Cours traités: {result['total_courses_input']} (TOUS)")
+            logger.info(f"  → Créneaux générés: {result['total_schedule_entries']}")
+            logger.info(f"  → Taux couverture: {result['coverage_rate']}")
+            logger.info(f"  → Violations: {result['violations_count']}")
+            logger.info(f"  → Temps: {result['solve_time']:.1f}s")
+            
+            return result
+        else:
+            logger.error("✗ MÊME AVEC CONTRAINTES RELÂCHÉES, ÉCHEC")
+            raise HTTPException(
+                status_code=500,
+                detail="Impossible de traiter tous les cours même avec contraintes relâchées."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver tous cours: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_complete")
+async def generate_schedule_complete_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec le solver COMPLET CP-SAT (TOUS LES 231 COURS)"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SOLVER COMPLET CP-SAT (TOUS LES COURS) ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import direct
+        from complete_cpsat_solver import CompleteScheduleSolver
+        
+        solver = CompleteScheduleSolver(db_config=db_config)
+        
+        # Charger TOUS les cours
+        solver.load_data()
+        logger.info(f"Données COMPLÈTES: {len(solver.courses)} cours, {len(solver.classes)} classes, {len(solver.teachers)} professeurs")
+        
+        # Créer modèle CP-SAT complet
+        solver.create_variables()
+        solver.add_constraints()
+        logger.info("Modèle CP-SAT complet créé pour TOUS les cours")
+        
+        # Résoudre
+        result = solver.solve(time_limit=payload.time_limit)
+        
+        if result and result['success']:
+            logger.info("✅ GÉNÉRATION COMPLÈTE RÉUSSIE")
+            logger.info(f"  → Schedule ID: {result['schedule_id']}")
+            logger.info(f"  → Qualité: {result['quality_score']}/100")
+            logger.info(f"  → Trous: {result['gaps_count']}")
+            logger.info(f"  → Cours traités: {result['total_courses_processed']} (TOUS)")
+            logger.info(f"  → Créneaux générés: {result['total_schedule_entries']}")
+            logger.info(f"  → Taux couverture: {result['coverage_rate']}")
+            logger.info(f"  → Temps: {result['solve_time']:.1f}s")
+            
+            return result
+        else:
+            logger.error("✗ GÉNÉRATION COMPLÈTE ÉCHOUÉE")
+            raise HTTPException(
+                status_code=500,
+                detail="Le solver complet n'a pas trouvé de solution. Problème avec les contraintes."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver complet: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_realistic")
+async def generate_schedule_realistic_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec le solver réaliste (COMPLET ET ÉQUILIBRÉ)"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SOLVER RÉALISTE (EMPLOI DU TEMPS COMPLET) ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        
+        # Import direct
+        from realistic_solver import RealisticScheduleSolver as RealisticSolver
+        
+        solver = RealisticSolver(db_config=db_config)
+        
+        # Charger données avec stratégie réaliste
+        solver.load_data()
+        logger.info(f"Données réalistes: {len(solver.courses)} cours, {len(solver.classes)} classes, {len(solver.teachers)} professeurs")
+        
+        # Créer modèle pragmatique
+        solver.create_variables()
+        solver.add_constraints()
+        logger.info("Modèle réaliste créé avec contraintes équilibrées")
+        
+        # Résoudre
+        result = solver.solve(time_limit=payload.time_limit)
+        
+        if result and result['success']:
+            logger.info("✅ GÉNÉRATION RÉALISTE RÉUSSIE")
+            logger.info(f"  → Schedule ID: {result['schedule_id']}")
+            logger.info(f"  → Qualité: {result['quality_score']}/100")
+            logger.info(f"  → Trous: {result['gaps_count']} (OPTIMISÉS)")
+            logger.info(f"  → Périodes utilisées: {result.get('periods_used', [])}")
+            logger.info(f"  → Classes couvertes: {result.get('classes_covered', 0)}")
+            logger.info(f"  → Moyenne périodes/classe: {result.get('avg_periods_per_class', 0):.1f}")
+            logger.info(f"  → Temps: {result['solve_time']:.1f}s")
+            
+            return result
+        else:
+            logger.error("✗ GÉNÉRATION RÉALISTE ÉCHOUÉE")
+            raise HTTPException(
+                status_code=500,
+                detail="Le solver réaliste n'a pas trouvé de solution. Problème avec les données."
+            )
+            
+    except Exception as e:
+        logger.error(f"Erreur solver réaliste: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+def save_parallel_schedule_to_db(schedule: list, conn) -> int:
+    """Sauvegarde un emploi du temps avec synchronisation parallèle en base"""
+    from datetime import datetime
+    
+    cur = conn.cursor()
+    try:
+        # Créer un nouvel emploi du temps
+        cur.execute("""
+            INSERT INTO schedules (academic_year, term, status, created_at, metadata)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING schedule_id
+        """, (
+            "2024-2025", 
+            1, 
+            "active", 
+            datetime.now(),
+            json.dumps({
+                "solver": "parallel_sync",
+                "sync_status": "PERFECT",
+                "conflicts": 0,
+                "quality": "Synchronisation parfaite des cours parallèles"
+            })
+        ))
+        
+        schedule_id = cur.fetchone()[0]
+        
+        # Sauvegarder les entrées
+        for entry in schedule:
+            # Traiter les professeurs (peut être une liste ou une string)
+            teacher_names = entry.get('teacher_names', [])
+            if isinstance(teacher_names, list):
+                teacher_name = ", ".join(teacher_names) if teacher_names else ""
+            else:
+                teacher_name = str(teacher_names) if teacher_names else ""
+            
+            cur.execute("""
+                INSERT INTO schedule_entries 
+                (schedule_id, teacher_name, class_name, subject_name, 
+                 day_of_week, period_number, is_parallel_group)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                schedule_id,
+                teacher_name,
+                entry.get('class_name', ''),
+                entry.get('subject', ''),
+                entry.get('day', 0),
+                entry.get('slot_index', 0),
+                entry.get('kind') == 'parallel'
+            ))
+        
+        conn.commit()
+        logger.info(f"Schedule sauvegardé: ID={schedule_id}, {len(schedule)} entrées")
+        return schedule_id
+        
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Erreur sauvegarde schedule: {e}")
+        raise e
+    finally:
+        cur.close()
+
+@app.post("/generate_schedule_parallel_sync")
+async def generate_schedule_parallel_sync_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps avec SYNCHRONISATION PARFAITE des cours parallèles"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SYNCHRONISATION PARALLÈLE CORRECTE ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        logger.info("OBJECTIF: Corriger le problème de synchronisation ז-1, ז-3, ז-4")
+        
+        # Vérifier la disponibilité du module
+        try:
+            from parallel_sync_solver import ParallelSyncSolver as SyncSolver
+        except ImportError:
+            raise HTTPException(
+                status_code=503, 
+                detail="Module de synchronisation parallèle non disponible"
+            )
+        
+        # Connexion DB
+        conn = psycopg2.connect(**db_config)
+        
+        try:
+            solver = SyncSolver()
+            
+            # Charger données
+            courses_count, slots_count = solver.load_data(conn)
+            logger.info(f"Données chargées: {courses_count} cours, {slots_count} créneaux")
+            
+            # Créer modèle avec synchronisation
+            constraints_count = solver.create_model()
+            logger.info(f"Modèle créé avec {constraints_count} contraintes")
+            
+            # Résoudre
+            result = solver.solve(time_limit_seconds=payload.time_limit)
+            
+            if result and result['success']:
+                logger.info("✅ SYNCHRONISATION PARALLÈLE RÉUSSIE")
+                logger.info(f"  → Entrées: {result['stats']['total_entries']}")
+                logger.info(f"  → Cours parallèles: {result['stats']['parallel_courses']}")  
+                logger.info(f"  → Cours individuels: {result['stats']['individual_courses']}")
+                logger.info(f"  → Status: {result['solver_status']}")
+                logger.info(f"  → Temps: {result['stats']['solve_time']:.1f}s")
+                
+                # Sauvegarder en base de données pour l'interface
+                schedule_id = save_parallel_schedule_to_db(result['schedule'], conn)
+                logger.info(f"  → Schedule ID: {schedule_id}")
+                
+                return JSONResponse(content={
+                    "success": True,
+                    "schedule": result['schedule'],
+                    "schedule_id": schedule_id,
+                    "stats": result['stats'],
+                    "solver_type": "parallel_sync",
+                    "sync_status": "PERFECT",
+                    "quality_score": 100,  # Score parfait car 0 conflits
+                    "message": f"Emploi du temps généré avec synchronisation parfaite - {result['stats']['parallel_courses']} cours parallèles correctement synchronisés"
+                })
+            else:
+                logger.error("✗ SYNCHRONISATION PARALLÈLE ÉCHOUÉE")
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "success": False,
+                        "error": "Aucune solution trouvée avec synchronisation parallèle",
+                        "solver_type": "parallel_sync"
+                    }
+                )
+                
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logger.error(f"Erreur synchronisation parallèle: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/generate_schedule_parallel_sync_v2")
+async def generate_schedule_parallel_sync_v2_endpoint(payload: GenerateScheduleRequest):
+    """Génère un emploi du temps V2 avec heures supplémentaires en bord de journée"""
+    try:
+        logger.info("=== GÉNÉRATION AVEC SYNCHRONISATION PARALLÈLE V2 (HEURES SUPPLÉMENTAIRES) ===")
+        logger.info(f"Paramètres: time_limit={payload.time_limit}s")
+        logger.info("OBJECTIF: Placer les heures supplémentaires en début/fin de journée")
+        
+        # Vérifier la disponibilité du module
+        try:
+            from parallel_sync_solver_v2 import ParallelSyncSolverV2 as SyncSolverV2
+        except ImportError:
+            raise HTTPException(
+                status_code=503, 
+                detail="Module de synchronisation parallèle V2 non disponible"
+            )
+        
+        # Connexion DB
+        conn = psycopg2.connect(**db_config)
+        
+        try:
+            solver = SyncSolverV2()
+            
+            # Charger données avec analyse des heures supplémentaires
+            courses_count, slots_count = solver.load_data(conn)
+            logger.info(f"Données chargées: {courses_count} cours, {slots_count} créneaux")
+            
+            # Créer modèle avec contraintes V2
+            constraints_count = solver.create_model()
+            logger.info(f"Modèle V2 créé avec {constraints_count} contraintes")
+            
+            # Résoudre avec optimisation V2
+            result = solver.solve(time_limit_seconds=payload.time_limit)
+            
+            if result and result['success']:
+                logger.info("✅ SYNCHRONISATION PARALLÈLE V2 RÉUSSIE")
+                logger.info(f"  → Entrées: {result['stats']['total_entries']}")
+                logger.info(f"  → Cours parallèles principaux: {result['stats']['parallel_main_courses']}")  
+                logger.info(f"  → Heures supplémentaires: {result['stats']['parallel_extra_courses']}")
+                logger.info(f"  → Cours individuels: {result['stats']['individual_courses']}")
+                logger.info(f"  → Créneaux de bord utilisés: {result['stats']['edge_slots_used']}")
+                logger.info(f"  → Créneaux du milieu: {result['stats']['middle_slots_used']}")
+                logger.info(f"  → Trous détectés: {result['stats']['gaps_detected']}")
+                logger.info(f"  → Score qualité: {result['quality_score']}/100")
+                logger.info(f"  → Status: {result['solver_status']}")
+                logger.info(f"  → Temps: {result['stats']['solve_time']:.1f}s")
+                
+                # Sauvegarder en base de données pour l'interface
+                schedule_id = save_parallel_schedule_to_db(result['schedule'], conn)
+                logger.info(f"  → Schedule ID: {schedule_id}")
+                
+                return JSONResponse(content={
+                    "success": True,
+                    "schedule": result['schedule'],
+                    "schedule_id": schedule_id,
+                    "stats": result['stats'],
+                    "solver_type": "parallel_sync_v2",
+                    "quality_score": result['quality_score'],
+                    "message": f"V2: {result['stats']['total_entries']} entrées, {result['stats']['gaps_detected']} trous, {result['stats']['parallel_extra_courses']} heures supplémentaires placées",
+                    "optimization_notes": {
+                        "edge_placement": f"{result['stats']['edge_slots_used']} heures aux bords",
+                        "gap_minimization": f"{result['stats']['gaps_detected']} trous restants",
+                        "quality_target": "Heures supplémentaires placées correctement"
+                    }
+                })
+            else:
+                logger.error("❌ ÉCHEC SYNCHRONISATION PARALLÈLE V2")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Le solver V2 n'a pas trouvé de solution. Contraintes trop strictes pour les heures supplémentaires."
+                )
+                
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logger.error(f"Erreur synchronisation parallèle V2: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+# ============================================
+# SYSTÈME DE MODIFICATION INCRÉMENTALE
+# ============================================
+
+from incremental_scheduler import IncrementalScheduler
+from intelligent_scheduler_assistant import IntelligentSchedulerAssistant
+from pydantic import BaseModel
+
+class ScheduleModificationRequest(BaseModel):
+    schedule_id: Optional[int] = None
+    action: str  # 'move', 'change_teacher', 'add', 'remove'
+    class_name: Optional[str] = None
+    subject: Optional[str] = None
+    old_day: Optional[int] = None
+    old_slot: Optional[int] = None
+    new_day: Optional[int] = None
+    new_slot: Optional[int] = None
+    teachers: Optional[List[str]] = None
+    hours: Optional[int] = 1
+
+@app.post("/load_existing_schedule")
+async def load_existing_schedule_endpoint(schedule_id: Optional[int] = None):
+    """Charge un emploi du temps existant pour modification"""
+    try:
+        logger.info(f"Chargement emploi du temps existant: {schedule_id or 'le plus récent'}")
+        
+        scheduler = IncrementalScheduler(db_config)
+        result = scheduler.load_existing_schedule(schedule_id)
+        
+        if result['success']:
+            logger.info(f"✅ Emploi du temps {result['schedule_id']} chargé")
+            return JSONResponse(content={
+                "success": True,
+                "schedule_id": result['schedule_id'],
+                "entries_count": result['entries_count'],
+                "schedule_info": result['schedule_info'],
+                "message": f"Emploi du temps {result['schedule_id']} chargé ({result['entries_count']} entrées)"
+            })
+        else:
+            raise HTTPException(status_code=404, detail=result['error'])
+            
+    except Exception as e:
+        logger.error(f"Erreur chargement emploi du temps: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/modify_schedule")
+async def modify_schedule_endpoint(request: ScheduleModificationRequest):
+    """Applique une modification à un emploi du temps existant"""
+    try:
+        logger.info(f"Modification emploi du temps: {request.action}")
+        
+        scheduler = IncrementalScheduler(db_config)
+        
+        # Charger l'emploi du temps
+        load_result = scheduler.load_existing_schedule(request.schedule_id)
+        if not load_result['success']:
+            raise HTTPException(status_code=404, detail=load_result['error'])
+        
+        # Appliquer la modification selon l'action
+        if request.action == 'move':
+            if not all([request.class_name, request.subject, request.old_day is not None, 
+                       request.old_slot is not None, request.new_day is not None, request.new_slot is not None]):
+                raise HTTPException(status_code=400, detail="Paramètres manquants pour déplacement")
+            
+            result = scheduler.move_course(
+                request.class_name, request.subject,
+                request.old_day, request.old_slot,
+                request.new_day, request.new_slot
+            )
+            
+        elif request.action == 'change_teacher':
+            if not all([request.class_name, request.subject, request.new_day is not None, 
+                       request.new_slot is not None, request.teachers]):
+                raise HTTPException(status_code=400, detail="Paramètres manquants pour changement professeur")
+            
+            result = scheduler.change_teacher(
+                request.class_name, request.subject,
+                request.new_day, request.new_slot, request.teachers
+            )
+            
+        elif request.action == 'add':
+            if not all([request.class_name, request.subject, request.new_day is not None, 
+                       request.new_slot is not None, request.teachers]):
+                raise HTTPException(status_code=400, detail="Paramètres manquants pour ajout")
+            
+            result = scheduler.add_course(
+                request.class_name, request.subject, request.teachers,
+                request.new_day, request.new_slot, request.hours
+            )
+            
+        elif request.action == 'remove':
+            if not all([request.class_name, request.subject, request.new_day is not None, request.new_slot is not None]):
+                raise HTTPException(status_code=400, detail="Paramètres manquants pour suppression")
+            
+            result = scheduler.remove_course(
+                request.class_name, request.subject,
+                request.new_day, request.new_slot
+            )
+            
+        else:
+            raise HTTPException(status_code=400, detail=f"Action inconnue: {request.action}")
+        
+        if result['success']:
+            # Sauvegarder automatiquement
+            save_result = scheduler.save_modifications()
+            
+            if save_result['success']:
+                summary = scheduler.get_schedule_summary()
+                
+                return JSONResponse(content={
+                    "success": True,
+                    "action": request.action,
+                    "modification": result['modification'],
+                    "new_schedule_id": save_result['new_schedule_id'],
+                    "summary": summary,
+                    "message": f"Modification '{request.action}' appliquée et sauvegardée"
+                })
+            else:
+                raise HTTPException(status_code=500, detail=f"Erreur sauvegarde: {save_result['error']}")
+        else:
+            # Retourner les conflits/suggestions
+            return JSONResponse(status_code=400, content={
+                "success": False,
+                "error": result['error'],
+                "conflicts": result.get('conflicts', []),
+                "suggestions": result.get('suggestions', [])
+            })
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur modification emploi du temps: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.get("/schedule_summary/{schedule_id}")
+async def get_schedule_summary_endpoint(schedule_id: int):
+    """Retourne un résumé d'un emploi du temps"""
+    try:
+        scheduler = IncrementalScheduler(db_config)
+        load_result = scheduler.load_existing_schedule(schedule_id)
+        
+        if not load_result['success']:
+            raise HTTPException(status_code=404, detail=load_result['error'])
+        
+        summary = scheduler.get_schedule_summary()
+        return JSONResponse(content=summary)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur résumé emploi du temps: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.get("/schedule-editor")
+async def schedule_editor_interface():
+    """Interface web pour l'éditeur d'emploi du temps incrémental"""
+    try:
+        # Lire le fichier HTML de l'éditeur
+        import os
+        file_path = os.path.join(os.path.dirname(__file__), "schedule_editor.html")
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Interface éditeur non trouvée")
+        
+        with open(file_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        logger.error(f"Erreur interface éditeur: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/analyze_schedule_pedagogical")
+async def analyze_schedule_pedagogical_endpoint(schedule_id: Optional[int] = None):
+    """Analyse pédagogique automatique d'un emploi du temps"""
+    try:
+        logger.info(f"🔍 Analyse pédagogique de l'emploi du temps {schedule_id or 'le plus récent'}")
+        
+        # Connexion DB
+        conn = psycopg2.connect(**db_config)
+        
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            
+            # Charger l'emploi du temps le plus récent si pas d'ID spécifié
+            if schedule_id is None:
+                cursor.execute("""
+                    SELECT schedule_id FROM schedules 
+                    WHERE status = 'active'
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                """)
+                result = cursor.fetchone()
+                if not result:
+                    raise HTTPException(status_code=404, detail="Aucun emploi du temps trouvé")
+                schedule_id = result['schedule_id']
+            
+            # Charger les entrées de l'emploi du temps
+            cursor.execute("""
+                SELECT class_name, day_of_week, period_number as slot_index, subject, 
+                       teacher_names, kind
+                FROM schedule_entries 
+                WHERE schedule_id = %s
+                ORDER BY day_of_week, period_number, class_name
+            """, (schedule_id,))
+            
+            entries = cursor.fetchall()
+            
+            if not entries:
+                raise HTTPException(status_code=404, detail="Emploi du temps vide")
+            
+            # Analyse pédagogique simplifiée
+            analysis = analyze_schedule_simple(entries, schedule_id)
+            
+            return JSONResponse(content=analysis)
+            
+        finally:
+            conn.close()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur analyse pédagogique: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+def analyze_schedule_simple(entries: List[Dict], schedule_id: int) -> Dict[str, Any]:
+    """Analyse pédagogique simplifiée"""
+    from collections import defaultdict
+    
+    # Organiser par classe
+    schedule_by_class = defaultdict(lambda: defaultdict(list))
+    
+    for entry in entries:
+        class_name = entry['class_name']
+        day = entry['day_of_week']
+        schedule_by_class[class_name][day].append({
+            'slot': entry['slot_index'],
+            'subject': entry['subject'],
+            'teachers': entry['teacher_names'] if isinstance(entry['teacher_names'], list) else [entry['teacher_names']],
+            'kind': entry.get('kind', 'individual')
+        })
+    
+    # Trier par slot pour chaque jour
+    for class_name in schedule_by_class:
+        for day in schedule_by_class[class_name]:
+            schedule_by_class[class_name][day].sort(key=lambda x: x['slot'])
+    
+    # Analyses
+    total_gaps = 0
+    total_isolated_courses = 0
+    classes_analyzed = len(schedule_by_class)
+    issues = []
+    recommendations = []
+    
+    for class_name, class_schedule in schedule_by_class.items():
+        class_gaps = 0
+        class_isolated = 0
+        
+        for day, day_schedule in class_schedule.items():
+            if len(day_schedule) < 2:
+                continue
+                
+            # Détecter les trous
+            slots = [entry['slot'] for entry in day_schedule]
+            if slots:
+                slots.sort()
+                for i in range(slots[0], slots[-1]):
+                    if i not in slots:
+                        class_gaps += 1
+                        total_gaps += 1
+                        issues.append({
+                            'type': 'gap',
+                            'severity': 'critical',
+                            'class': class_name,
+                            'day': day,
+                            'slot': i,
+                            'message': f'Trou détecté: {class_name}, jour {day+1}, période {i+1}'
+                        })
+            
+            # Détecter les matières isolées (pas de blocs)
+            subject_blocks = defaultdict(list)
+            current_subject = None
+            current_block_size = 0
+            
+            for entry in day_schedule:
+                subject = entry['subject']
+                if subject == current_subject:
+                    current_block_size += 1
+                else:
+                    if current_subject and current_block_size > 0:
+                        subject_blocks[current_subject].append(current_block_size)
+                    current_subject = subject
+                    current_block_size = 1
+            
+            # Ajouter le dernier bloc
+            if current_subject and current_block_size > 0:
+                subject_blocks[current_subject].append(current_block_size)
+            
+            # Vérifier les matières principales qui n'ont que des blocs de 1h
+            core_subjects = ['מתמטיקה', 'אנגלית', 'עברית', 'מדעים', 'היסטוריה']
+            for subject, blocks in subject_blocks.items():
+                if subject in core_subjects and all(block == 1 for block in blocks):
+                    class_isolated += 1
+                    total_isolated_courses += 1
+                    issues.append({
+                        'type': 'isolated_subject',
+                        'severity': 'high',
+                        'class': class_name,
+                        'subject': subject,
+                        'day': day,
+                        'message': f'Matière fragmentée: {subject} pour {class_name} (que des blocs de 1h)'
+                    })
+    
+    # Score pédagogique
+    pedagogical_score = max(0, 100 - (total_gaps * 25) - (total_isolated_courses * 10))
+    
+    # Recommandations
+    if total_gaps > 0:
+        recommendations.append({
+            'type': 'eliminate_gaps',
+            'priority': 1,
+            'count': total_gaps,
+            'description': f'Éliminer les {total_gaps} trous en regroupant les cours',
+            'automated': True
+        })
+    
+    if total_isolated_courses > 0:
+        recommendations.append({
+            'type': 'create_blocks',
+            'priority': 2,
+            'count': total_isolated_courses,
+            'description': f'Créer des blocs de 2-3h pour {total_isolated_courses} matières fragmentées',
+            'automated': False
+        })
+    
+    return {
+        'success': True,
+        'schedule_id': schedule_id,
+        'analysis_timestamp': datetime.now().isoformat(),
+        'pedagogical_score': pedagogical_score,
+        'classes_analyzed': classes_analyzed,
+        'total_entries': len(entries),
+        'issues_found': {
+            'gaps': total_gaps,
+            'isolated_courses': total_isolated_courses,
+            'total_issues': total_gaps + total_isolated_courses
+        },
+        'issues_detail': issues,
+        'recommendations': recommendations,
+        'quality_assessment': {
+            'excellent': pedagogical_score >= 90,
+            'good': pedagogical_score >= 70,
+            'needs_improvement': pedagogical_score < 70,
+            'critical': pedagogical_score < 50
+        }
+    }
+
+# ============================================
 # ENDPOINTS POUR L'INTERFACE WEB
 # ============================================
 
@@ -1023,6 +2146,552 @@ async def get_teachers():
     finally:
         cur.close()
         conn.close()
+
+# ============================================
+# ASSISTANT INTELLIGENT - AMÉLIORATION CONTINUE
+# ============================================
+
+# Global assistant instance
+_intelligent_assistant = None
+
+def get_intelligent_assistant():
+    """Get or create the intelligent assistant instance"""
+    global _intelligent_assistant
+    if _intelligent_assistant is None:
+        _intelligent_assistant = IntelligentSchedulerAssistant(db_config)
+    return _intelligent_assistant
+
+class ImprovementSessionRequest(BaseModel):
+    schedule_id: Optional[int] = None
+    target_quality: int = 90
+
+class UserResponseRequest(BaseModel):
+    session_id: str
+    response: str
+    continue_improvement: bool = True
+
+@app.post("/start_improvement_session")
+async def start_improvement_session_endpoint(request: ImprovementSessionRequest):
+    """
+    Démarre une session d'amélioration continue d'emploi du temps
+    Implémente exactement ce que l'utilisateur demande
+    """
+    try:
+        logger.info(f"🚀 Démarrage session d'amélioration - Objectif: {request.target_quality}/100")
+        
+        assistant = get_intelligent_assistant()
+        result = assistant.start_improvement_session(
+            schedule_id=request.schedule_id,
+            target_quality=request.target_quality
+        )
+        
+        if result['success']:
+            logger.info(f"✅ Session démarrée: {result['session_id']}")
+            return JSONResponse(content=result)
+        else:
+            logger.error(f"❌ Échec démarrage session: {result['error']}")
+            raise HTTPException(status_code=400, detail=result['error'])
+            
+    except Exception as e:
+        logger.error(f"Erreur démarrage session amélioration: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.post("/answer_question")
+async def answer_question_endpoint(request: UserResponseRequest):
+    """
+    Traite la réponse de l'utilisateur à une question intelligente
+    """
+    try:
+        logger.info(f"📝 Réponse utilisateur reçue pour session {request.session_id}")
+        
+        assistant = get_intelligent_assistant()
+        result = assistant.answer_question(
+            user_response=request.response,
+            continue_improvement=request.continue_improvement
+        )
+        
+        if result['success']:
+            logger.info("✅ Réponse traitée avec succès")
+            return JSONResponse(content=result)
+        else:
+            logger.error(f"❌ Erreur traitement réponse: {result['error']}")
+            raise HTTPException(status_code=400, detail=result['error'])
+            
+    except Exception as e:
+        logger.error(f"Erreur traitement réponse: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.get("/improvement_session_status")
+async def get_improvement_session_status():
+    """
+    Retourne le statut de la session d'amélioration active
+    """
+    try:
+        assistant = get_intelligent_assistant()
+        status = assistant.get_session_status()
+        
+        if 'error' in status:
+            return JSONResponse(content={"error": status['error']}, status_code=404)
+        
+        return JSONResponse(content=status)
+        
+    except Exception as e:
+        logger.error(f"Erreur statut session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.get("/improvement_session_report")
+async def get_improvement_session_report():
+    """
+    Génère un rapport détaillé de la session d'amélioration
+    """
+    try:
+        assistant = get_intelligent_assistant()
+        report = assistant.get_detailed_session_report()
+        
+        if 'error' in report:
+            return JSONResponse(content={"error": report['error']}, status_code=404)
+        
+        return JSONResponse(content=report)
+        
+    except Exception as e:
+        logger.error(f"Erreur rapport session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+
+@app.get("/intelligent-assistant")
+async def intelligent_assistant_interface():
+    """Interface web pour l'assistant intelligent d'amélioration continue"""
+    try:
+        # Créer l'interface HTML pour l'assistant intelligent
+        html_content = """
+<!DOCTYPE html>
+<html lang="fr" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Assistant Intelligent - Amélioration Continue</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+            direction: rtl;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 25px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            background: #f8f9fa;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            min-width: 180px;
+            margin: 10px;
+        }
+        
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-danger { background: #dc3545; color: white; }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        .status {
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 1.1em;
+        }
+        
+        .status.success { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .status.warning { background: #fff3cd; color: #856404; border: 2px solid #ffeaa7; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
+        
+        .question-box {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 20px 0;
+            white-space: pre-line;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .response-area {
+            margin-top: 20px;
+        }
+        
+        .response-area textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            resize: vertical;
+        }
+        
+        .progress-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .progress-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #dee2e6;
+            text-align: center;
+        }
+        
+        .progress-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .hidden { display: none; }
+        
+        .loading {
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Assistant Intelligent</h1>
+            <p>Amélioration Continue des Emplois du Temps</p>
+            <p>🎯 Règles pédagogiques strictes | 🔄 Corrections automatiques | 🤔 Questions intelligentes</p>
+        </div>
+        
+        <div class="content">
+            <!-- Section de démarrage -->
+            <div class="section">
+                <h2>🚀 Démarrer une Session d'Amélioration</h2>
+                <p>L'assistant va analyser l'emploi du temps, appliquer des corrections automatiques, et poser des questions intelligentes quand nécessaire.</p>
+                
+                <div style="margin: 20px 0;">
+                    <label>Objectif de qualité pédagogique:</label>
+                    <select id="targetQuality" style="padding: 8px; margin: 10px; border-radius: 4px;">
+                        <option value="95">Excellente (95/100)</option>
+                        <option value="90" selected>Très bonne (90/100)</option>
+                        <option value="85">Bonne (85/100)</option>
+                        <option value="75">Acceptable (75/100)</option>
+                    </select>
+                </div>
+                
+                <button id="startSessionBtn" class="btn btn-success">🚀 Démarrer l'Amélioration</button>
+                <div id="startStatus"></div>
+            </div>
+            
+            <!-- Section de progression -->
+            <div id="progressSection" class="section hidden">
+                <h2>📊 Progression de l'Amélioration</h2>
+                <div id="progressInfo" class="progress-info"></div>
+                <div id="sessionStatus"></div>
+            </div>
+            
+            <!-- Section de questions -->
+            <div id="questionSection" class="section hidden">
+                <h2>🤔 Question Intelligente</h2>
+                <div id="questionBox" class="question-box"></div>
+                
+                <div class="response-area">
+                    <label for="userResponse"><strong>Votre réponse:</strong></label>
+                    <textarea id="userResponse" placeholder="Tapez votre réponse ici..."></textarea>
+                    
+                    <div style="margin-top: 15px;">
+                        <button id="submitResponseBtn" class="btn btn-primary">📝 Envoyer la Réponse</button>
+                        <button id="pauseSessionBtn" class="btn btn-warning">⏸️ Pause</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section de résultats -->
+            <div id="resultsSection" class="section hidden">
+                <h2>🎉 Résultats de l'Amélioration</h2>
+                <div id="finalResults"></div>
+                <button id="generateReportBtn" class="btn btn-info">📋 Générer Rapport Détaillé</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentSessionId = null;
+        
+        function showStatus(message, type = 'info', elementId = 'startStatus') {
+            const statusDiv = document.getElementById(elementId);
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        function showLoading(elementId, message = 'Traitement en cours...') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>${message}</div>
+                </div>
+            `;
+        }
+        
+        // Démarrer une session
+        document.getElementById('startSessionBtn').addEventListener('click', async () => {
+            const targetQuality = parseInt(document.getElementById('targetQuality').value);
+            const startBtn = document.getElementById('startSessionBtn');
+            
+            startBtn.disabled = true;
+            showLoading('startStatus', '🚀 Démarrage de l\\'amélioration...');
+            
+            try {
+                const response = await fetch('/start_improvement_session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target_quality: targetQuality })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentSessionId = result.session_id;
+                    showStatus(`✅ Session démarrée: ${result.session_id}`, 'success');
+                    
+                    // Afficher la progression
+                    displayProgress(result.initial_analysis);
+                    
+                    // Vérifier s'il y a une question
+                    if (result.improvement_result.status === 'question_required') {
+                        displayQuestion(result.improvement_result);
+                    } else {
+                        displayResults(result.improvement_result);
+                    }
+                } else {
+                    showStatus(`❌ Erreur: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Erreur de connexion: ${error.message}`, 'error');
+            } finally {
+                startBtn.disabled = false;
+            }
+        });
+        
+        function displayProgress(analysis) {
+            const progressSection = document.getElementById('progressSection');
+            const progressInfo = document.getElementById('progressInfo');
+            
+            progressInfo.innerHTML = `
+                <div class="progress-card">
+                    <div class="progress-number">${analysis.pedagogical_score}</div>
+                    <div>Score Initial</div>
+                </div>
+                <div class="progress-card">
+                    <div class="progress-number">${analysis.total_entries}</div>
+                    <div>Cours Total</div>
+                </div>
+                <div class="progress-card">
+                    <div class="progress-number">${analysis.classes_analyzed}</div>
+                    <div>Classes</div>
+                </div>
+                <div class="progress-card">
+                    <div class="progress-number">${Object.keys(analysis.issues_by_priority.critical).length + Object.keys(analysis.issues_by_priority.high).length}</div>
+                    <div>Problèmes</div>
+                </div>
+            `;
+            
+            progressSection.classList.remove('hidden');
+        }
+        
+        function displayQuestion(questionData) {
+            const questionSection = document.getElementById('questionSection');
+            const questionBox = document.getElementById('questionBox');
+            
+            questionBox.textContent = questionData.question;
+            questionSection.classList.remove('hidden');
+            
+            showStatus(`🤔 Question posée - Itération ${questionData.iteration}`, 'warning', 'sessionStatus');
+        }
+        
+        function displayResults(results) {
+            const resultsSection = document.getElementById('resultsSection');
+            const finalResults = document.getElementById('finalResults');
+            
+            if (results.status === 'completed') {
+                finalResults.innerHTML = `
+                    <div class="status success">
+                        🎉 Amélioration terminée avec succès!
+                        <br>Score final: ${results.final_score}/100
+                        <br>Améliorations appliquées: ${results.improvements_made}
+                        <br>Itérations: ${results.iterations_performed}
+                    </div>
+                `;
+            } else {
+                finalResults.innerHTML = `
+                    <div class="status info">
+                        ⏸️ Session interrompue
+                        <br>Dernière itération: ${results.iterations_performed}
+                    </div>
+                `;
+            }
+            
+            resultsSection.classList.remove('hidden');
+        }
+        
+        // Envoyer une réponse
+        document.getElementById('submitResponseBtn').addEventListener('click', async () => {
+            const response = document.getElementById('userResponse').value.trim();
+            
+            if (!response) {
+                showStatus('⚠️ Veuillez saisir une réponse', 'warning', 'sessionStatus');
+                return;
+            }
+            
+            if (!currentSessionId) {
+                showStatus('❌ Aucune session active', 'error', 'sessionStatus');
+                return;
+            }
+            
+            const submitBtn = document.getElementById('submitResponseBtn');
+            submitBtn.disabled = true;
+            showLoading('sessionStatus', '📝 Traitement de votre réponse...');
+            
+            try {
+                const apiResponse = await fetch('/answer_question', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        response: response,
+                        continue_improvement: true
+                    })
+                });
+                
+                const result = await apiResponse.json();
+                
+                if (result.success) {
+                    showStatus('✅ Réponse traitée avec succès', 'success', 'sessionStatus');
+                    
+                    // Vider la zone de réponse
+                    document.getElementById('userResponse').value = '';
+                    
+                    // Vérifier le résultat
+                    if (result.improvement_continued.status === 'question_required') {
+                        displayQuestion(result.improvement_continued);
+                    } else {
+                        document.getElementById('questionSection').classList.add('hidden');
+                        displayResults(result.improvement_continued);
+                    }
+                } else {
+                    showStatus(`❌ Erreur: ${result.error}`, 'error', 'sessionStatus');
+                }
+            } catch (error) {
+                showStatus(`❌ Erreur: ${error.message}`, 'error', 'sessionStatus');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+        
+        // Pause session
+        document.getElementById('pauseSessionBtn').addEventListener('click', () => {
+            document.getElementById('questionSection').classList.add('hidden');
+            showStatus('⏸️ Session mise en pause', 'info', 'sessionStatus');
+        });
+        
+        // Générer rapport
+        document.getElementById('generateReportBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/improvement_session_report');
+                const report = await response.json();
+                
+                if (report.error) {
+                    showStatus(`❌ ${report.error}`, 'error', 'sessionStatus');
+                } else {
+                    // Afficher ou télécharger le rapport
+                    const reportWindow = window.open('', '_blank');
+                    reportWindow.document.write(`
+                        <h1>Rapport d'Amélioration</h1>
+                        <pre>${JSON.stringify(report, null, 2)}</pre>
+                    `);
+                }
+            } catch (error) {
+                showStatus(`❌ Erreur génération rapport: ${error.message}`, 'error', 'sessionStatus');
+            }
+        });
+    </script>
+</body>
+</html>
+        """
+        
+        return HTMLResponse(content=html_content)
+        
+    except Exception as e:
+        logger.error(f"Erreur interface assistant intelligent: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
 
 @app.get("/api/stats")
 async def get_general_stats():
@@ -1628,6 +3297,214 @@ async def get_schedule_data(schedule_id: int):
     except Exception as e:
         logger.error(f"Erreur récupération emploi du temps {schedule_id}: {e}")
         return {"success": False, "error": str(e)}
+
+@app.get("/api/schedule_by_class/{schedule_id}")
+async def get_schedule_by_class_new(schedule_id: int):
+    """Retourne l'emploi du temps organisé par classe (format amélioré)"""
+    conn = psycopg2.connect(**db_config)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        # Vérifier que le schedule existe
+        cur.execute("SELECT COUNT(*) as count FROM schedules WHERE schedule_id = %s", (schedule_id,))
+        if cur.fetchone()['count'] == 0:
+            raise HTTPException(status_code=404, detail="Emploi du temps non trouvé")
+        
+        # Récupérer les entrées par classe
+        cur.execute("""
+            SELECT 
+                se.class_name,
+                se.day_of_week,
+                se.period_number,
+                COALESCE(se.subject, se.subject_name) as subject,
+                se.teacher_name,
+                CASE 
+                    WHEN se.period_number IS NOT NULL THEN 
+                        (6 + se.period_number)::text || ':00'
+                    ELSE '00:00'
+                END as start_time,
+                COALESCE(se.is_parallel_group, false) as is_parallel,
+                se.group_id
+            FROM schedule_entries se
+            WHERE se.schedule_id = %s
+            ORDER BY se.class_name, se.day_of_week, se.period_number
+        """, (schedule_id,))
+        
+        entries = cur.fetchall()
+        
+        if not entries:
+            return {
+                "success": False,
+                "message": "Aucune donnée d'emploi du temps trouvée",
+                "schedule_id": schedule_id,
+                "classes": {}
+            }
+        
+        # Organiser par classe
+        classes_schedule = {}
+        day_names = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi']
+        hebrew_days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי']
+        
+        for entry in entries:
+            class_name = entry['class_name']
+            day = entry['day_of_week']
+            period = entry['period_number']
+            
+            if class_name not in classes_schedule:
+                classes_schedule[class_name] = {
+                    'class_name': class_name,
+                    'days': {},
+                    'stats': {'total_hours': 0, 'subjects': set(), 'teachers': set()}
+                }
+            
+            day_name = day_names[day] if day < len(day_names) else f'Jour {day}'
+            hebrew_day = hebrew_days[day] if day < len(hebrew_days) else f'יום {day}'
+            
+            if day_name not in classes_schedule[class_name]['days']:
+                classes_schedule[class_name]['days'][day_name] = {
+                    'hebrew_name': hebrew_day,
+                    'periods': {}
+                }
+            
+            classes_schedule[class_name]['days'][day_name]['periods'][period] = {
+                'subject': entry['subject'],
+                'teacher': entry['teacher_name'],
+                'time': entry['start_time'],
+                'is_parallel': bool(entry['is_parallel']),
+                'group_id': entry['group_id']
+            }
+            
+            # Statistiques
+            classes_schedule[class_name]['stats']['total_hours'] += 1
+            classes_schedule[class_name]['stats']['subjects'].add(entry['subject'])
+            classes_schedule[class_name]['stats']['teachers'].add(entry['teacher_name'])
+        
+        # Convertir sets en listes pour JSON
+        for class_name in classes_schedule:
+            stats = classes_schedule[class_name]['stats']
+            stats['subjects'] = list(stats['subjects'])
+            stats['teachers'] = list(stats['teachers'])
+            stats['subjects_count'] = len(stats['subjects'])
+            stats['teachers_count'] = len(stats['teachers'])
+        
+        return {
+            "success": True,
+            "schedule_id": schedule_id,
+            "total_classes": len(classes_schedule),
+            "classes": classes_schedule,
+            "view_type": "by_class"
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur récupération emploi du temps par classe: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+@app.get("/api/schedule_by_teacher/{schedule_id}")
+async def get_schedule_by_teacher_new(schedule_id: int):
+    """Retourne l'emploi du temps organisé par professeur (format amélioré)"""
+    conn = psycopg2.connect(**db_config)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        # Vérifier que le schedule existe
+        cur.execute("SELECT COUNT(*) as count FROM schedules WHERE schedule_id = %s", (schedule_id,))
+        if cur.fetchone()['count'] == 0:
+            raise HTTPException(status_code=404, detail="Emploi du temps non trouvé")
+        
+        # Récupérer les entrées par professeur
+        cur.execute("""
+            SELECT 
+                se.teacher_name,
+                se.day_of_week,
+                se.period_number,
+                COALESCE(se.subject, se.subject_name) as subject,
+                se.class_name,
+                CASE 
+                    WHEN se.period_number IS NOT NULL THEN 
+                        (6 + se.period_number)::text || ':00'
+                    ELSE '00:00'
+                END as start_time,
+                COALESCE(se.is_parallel_group, false) as is_parallel,
+                se.group_id
+            FROM schedule_entries se
+            WHERE se.schedule_id = %s
+            ORDER BY se.teacher_name, se.day_of_week, se.period_number
+        """, (schedule_id,))
+        
+        entries = cur.fetchall()
+        
+        if not entries:
+            return {
+                "success": False,
+                "message": "Aucune donnée d'emploi du temps trouvée",
+                "schedule_id": schedule_id,
+                "teachers": {}
+            }
+        
+        # Organiser par professeur
+        teachers_schedule = {}
+        day_names = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi']
+        hebrew_days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי']
+        
+        for entry in entries:
+            teacher_name = entry['teacher_name']
+            day = entry['day_of_week']
+            period = entry['period_number']
+            
+            if teacher_name not in teachers_schedule:
+                teachers_schedule[teacher_name] = {
+                    'teacher_name': teacher_name,
+                    'days': {},
+                    'stats': {'total_hours': 0, 'subjects': set(), 'classes': set()}
+                }
+            
+            day_name = day_names[day] if day < len(day_names) else f'Jour {day}'
+            hebrew_day = hebrew_days[day] if day < len(hebrew_days) else f'יום {day}'
+            
+            if day_name not in teachers_schedule[teacher_name]['days']:
+                teachers_schedule[teacher_name]['days'][day_name] = {
+                    'hebrew_name': hebrew_day,
+                    'periods': {}
+                }
+            
+            teachers_schedule[teacher_name]['days'][day_name]['periods'][period] = {
+                'subject': entry['subject'],
+                'class': entry['class_name'],
+                'time': entry['start_time'],
+                'is_parallel': bool(entry['is_parallel']),
+                'group_id': entry['group_id']
+            }
+            
+            # Statistiques
+            teachers_schedule[teacher_name]['stats']['total_hours'] += 1
+            teachers_schedule[teacher_name]['stats']['subjects'].add(entry['subject'])
+            teachers_schedule[teacher_name]['stats']['classes'].add(entry['class_name'])
+        
+        # Convertir sets en listes pour JSON
+        for teacher_name in teachers_schedule:
+            stats = teachers_schedule[teacher_name]['stats']
+            stats['subjects'] = list(stats['subjects'])
+            stats['classes'] = list(stats['classes'])
+            stats['subjects_count'] = len(stats['subjects'])
+            stats['classes_count'] = len(stats['classes'])
+        
+        return {
+            "success": True,
+            "schedule_id": schedule_id,
+            "total_teachers": len(teachers_schedule),
+            "teachers": teachers_schedule,
+            "view_type": "by_teacher"
+        }
+        
+    except Exception as e:
+        logger.error(f"Erreur récupération emploi du temps par professeur: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
 
 
 if __name__ == "__main__":

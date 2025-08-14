@@ -1,416 +1,1056 @@
-<!doctype html>
-<html lang="fr" data-locale="fr" dir="ltr">
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestion des contraintes & Génération - Version Corrigée</title>
-  <style>
-    body {
-      font-family: system-ui, sans-serif; 
-      margin:0; 
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color:#1f2937;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      background: white;
-      border-radius: 12px;
-      padding: 30px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    }
-    h1 {
-      color: #4a5568;
-      margin-bottom: 30px;
-      text-align: center;
-    }
-    .generation-options {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-    .option-card {
-      border: 2px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 20px;
-      transition: all 0.3s;
-    }
-    .option-card:hover {
-      border-color: #667eea;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    .option-card h3 {
-      margin-top: 0;
-      color: #2d3748;
-    }
-    .option-card p {
-      color: #718096;
-      margin: 10px 0;
-    }
-    button {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-    button:hover {
-      transform: translateY(-2px);
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .status {
-      margin-top: 20px;
-      padding: 15px;
-      border-radius: 6px;
-      background: #f7fafc;
-      border-left: 4px solid #667eea;
-    }
-    .status.success {
-      background: #f0fdf4;
-      border-left-color: #10b981;
-    }
-    .status.error {
-      background: #fef2f2;
-      border-left-color: #ef4444;
-    }
-    .checkbox-group {
-      margin: 15px 0;
-    }
-    .checkbox-group label {
-      display: flex;
-      align-items: center;
-      margin: 8px 0;
-      cursor: pointer;
-    }
-    .checkbox-group input[type="checkbox"] {
-      margin-right: 8px;
-    }
-    .progress {
-      display: none;
-      margin-top: 20px;
-    }
-    .progress-bar {
-      height: 20px;
-      background: #e2e8f0;
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #667eea, #764ba2);
-      width: 0%;
-      transition: width 0.3s;
-      animation: shimmer 1s infinite;
-    }
-    @keyframes shimmer {
-      0% { opacity: 0.8; }
-      50% { opacity: 1; }
-      100% { opacity: 0.8; }
-    }
-    .results {
-      display: none;
-      margin-top: 30px;
-      padding: 20px;
-      background: #f8fafc;
-      border-radius: 8px;
-    }
-    .badge {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: bold;
-      margin-left: 10px;
-    }
-    .badge.recommended {
-      background: #10b981;
-      color: white;
-    }
-    .badge.fast {
-      background: #3b82f6;
-      color: white;
-    }
-    .badge.quality {
-      background: #f59e0b;
-      color: white;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎓 Générateur d'Emploi du Temps - École Israélienne</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .status-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .status-card.success {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .status-card.error {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .status-card.warning {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .generate-section {
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .generate-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 20px 60px;
+            border-radius: 50px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+        }
+
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(16, 185, 129, 0.4);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-container {
+            display: none;
+            margin: 30px 0;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .results-section {
+            display: none;
+            margin-top: 40px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 2px solid #e5e7eb;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .metric-value.excellent { color: #10b981; }
+        .metric-value.good { color: #3b82f6; }
+        .metric-value.warning { color: #f59e0b; }
+        .metric-value.danger { color: #ef4444; }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .schedule-section {
+            margin-top: 40px;
+            display: none;
+        }
+
+        .schedule-controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .btn-secondary {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            margin: 0 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: #4f46e5;
+            transform: translateY(-1px);
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+
+        .schedule-table th,
+        .schedule-table td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+        }
+
+        .schedule-table th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: 600;
+        }
+
+        .schedule-table th:first-child {
+            background: #374151;
+        }
+
+        .lesson-block {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            margin: 2px;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+
+        .lesson-block.parallel {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            position: relative;
+        }
+
+        .lesson-block.parallel::before {
+            content: "👥";
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 10px;
+        }
+
+        .lesson-subject {
+            font-weight: bold;
+            margin-bottom: 3px;
+            direction: rtl;
+        }
+
+        .lesson-class {
+            font-size: 10px;
+            opacity: 0.9;
+        }
+
+        .lesson-teacher {
+            font-size: 9px;
+            opacity: 0.8;
+            margin-top: 2px;
+            direction: rtl;
+        }
+
+        .hebrew-day {
+            direction: rtl;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .generate-btn {
+                padding: 15px 40px;
+                font-size: 1.1rem;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>🎯 Générateur d'Emploi du Temps - École Hébraïque</h1>
-    
-    <div class="generation-options">
-      <!-- Option 1: Génération Rapide Corrigée -->
-      <div class="option-card">
-        <h3>⚡ Génération Rapide <span class="badge fast">RAPIDE</span></h3>
-        <p>Utilise la logique corrigée des cours parallèles</p>
-        <ul>
-          <li>✅ Cours parallèles synchronisés</li>
-          <li>✅ Respect des contraintes de base</li>
-          <li>⏱️ Temps: ~1 minute</li>
-        </ul>
-        <button onclick="generateCorrected()">Générer Rapidement</button>
-      </div>
-
-      <!-- Option 2: Optimisation Sans Trous -->
-      <div class="option-card">
-        <h3>🎯 Sans Trous <span class="badge recommended">RECOMMANDÉ</span></h3>
-        <p>Élimine tous les trous dans l'emploi du temps</p>
-        
-        <div class="checkbox-group">
-          <label>
-            <input type="checkbox" id="eliminate_gaps" checked>
-            Éliminer les trous
-          </label>
-          <label>
-            <input type="checkbox" id="prevent_conflicts" checked>
-            Prévenir les conflits
-          </label>
-          <label>
-            <input type="checkbox" id="group_by_day" checked>
-            Grouper par jour
-          </label>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Générateur d'Emploi du Temps</h1>
+            <p>École Israélienne - Optimisation Automatique Intégrée</p>
         </div>
-        
-        <button onclick="generateFixed()">Générer Sans Trous</button>
-      </div>
 
-      <!-- Option 3: Optimisation Pédagogique -->
-      <div class="option-card">
-        <h3>📚 Pédagogique Avancée <span class="badge quality">QUALITÉ MAX</span></h3>
-        <p>Optimisation complète avec critères pédagogiques</p>
-        
-        <div class="checkbox-group">
-          <label>
-            <input type="checkbox" id="two_hour_blocks" checked>
-            Blocs de 2h consécutives
-          </label>
-          <label>
-            <input type="checkbox" id="minimize_days" checked>
-            Minimiser les jours
-          </label>
-          <label>
-            <input type="checkbox" id="respect_religious" checked>
-            Contraintes religieuses
-          </label>
-          <label>
-            <input type="checkbox" id="monday_constraint" checked>
-            Lundi: ז,ט,ח après période 4
-          </label>
+        <div id="statusCard" class="status-card">
+            <p id="statusMessage">Prêt à générer l'emploi du temps...</p>
         </div>
-        
-        <button onclick="generatePedagogical()">Optimisation Complète</button>
-      </div>
 
-      <!-- Option 4: Depuis Solver Input -->
-      <div class="option-card">
-        <h3>📊 Depuis Base de Données</h3>
-        <p>Utilise directement les données de solver_input</p>
-        <ul>
-          <li>✅ Données actuelles de la BD</li>
-          <li>✅ Tous les cours configurés</li>
-          <li>✅ Paramètres par défaut</li>
-        </ul>
-        <button onclick="generateFromSolverInput()">Générer depuis BD</button>
-      </div>
+        <div class="generate-section">
+            <button id="generateBtn" class="generate-btn" onclick="generateSchedule()">
+                🚀 GÉNÉRER EMPLOI DU TEMPS OPTIMAL
+            </button>
+            <p style="margin-top: 15px; color: #666; font-size: 0.9rem;">
+                Utilise automatiquement les meilleurs algorithmes:<br>
+                Solver Amélioré → Solver Simple → Solver Flexible → Alternatives
+            </p>
+            
+            <div style="margin-top: 20px;">
+                <button class="btn-secondary" onclick="generateDemo()" style="font-size: 0.9rem;">
+                    🎯 Démonstration Rapide
+                </button>
+                <p style="margin-top: 8px; color: #888; font-size: 0.8rem;">
+                    Test de l'interface avec données simulées (10 secondes)
+                </p>
+            </div>
+        </div>
+
+        <div id="progressContainer" class="progress-container">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <div id="progressText" class="progress-text">Initialisation...</div>
+        </div>
+
+        <div id="resultsSection" class="results-section">
+            <h2>📊 Résultats de Génération</h2>
+            
+            <div id="metricsGrid" class="metrics-grid">
+                <!-- Métriques générées dynamiquement -->
+            </div>
+
+            <div id="scheduleSection" class="schedule-section">
+                <h3>📅 Emploi du Temps Généré</h3>
+                <div class="schedule-controls">
+                    <button class="btn-secondary" onclick="showSchedule()">Voir Emploi du Temps</button>
+                    <button class="btn-secondary" onclick="downloadSchedule()">Télécharger PDF</button>
+                </div>
+                <div id="scheduleGrid"></div>
+            </div>
+        </div>
     </div>
 
-    <div id="status" class="status" style="display: none;"></div>
-    
-    <div id="progress" class="progress">
-      <div class="progress-bar">
-        <div id="progress-fill" class="progress-fill"></div>
-      </div>
-      <p id="progress-text" style="text-align: center; margin-top: 10px;">Génération en cours...</p>
-    </div>
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let currentScheduleId = null;
 
-    <div id="results" class="results"></div>
-  </div>
+        // Afficher le statut
+        function showStatus(message, type = 'info') {
+            const card = document.getElementById('statusCard');
+            const messageEl = document.getElementById('statusMessage');
+            
+            card.className = `status-card ${type}`;
+            card.style.display = 'block';
+            messageEl.textContent = message;
+        }
 
-  <script>
-    const API_BASE = 'http://localhost:8000';
-    
-    function showStatus(message, type = 'info') {
-      const status = document.getElementById('status');
-      status.style.display = 'block';
-      status.className = `status ${type}`;
-      status.textContent = message;
-    }
-    
-    function showProgress(show = true) {
-      const progress = document.getElementById('progress');
-      progress.style.display = show ? 'block' : 'none';
-      if (show) {
-        animateProgress();
-      }
-    }
-    
-    function animateProgress() {
-      const fill = document.getElementById('progress-fill');
-      let width = 0;
-      const interval = setInterval(() => {
-        width += Math.random() * 10;
-        if (width > 90) width = 90;
-        fill.style.width = width + '%';
-      }, 500);
-      
-      // Store interval ID to clear later
-      fill.dataset.interval = interval;
-    }
-    
-    function stopProgress() {
-      const fill = document.getElementById('progress-fill');
-      if (fill.dataset.interval) {
-        clearInterval(fill.dataset.interval);
-      }
-      fill.style.width = '100%';
-      setTimeout(() => showProgress(false), 500);
-    }
-    
-    async function makeRequest(endpoint, payload = {}) {
-      try {
-        showProgress(true);
-        const response = await fetch(`${API_BASE}${endpoint}`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(payload)
+        // Afficher la progression
+        function showProgress(show = true, text = 'Traitement en cours...') {
+            const container = document.getElementById('progressContainer');
+            const textEl = document.getElementById('progressText');
+            
+            container.style.display = show ? 'block' : 'none';
+            if (show) {
+                textEl.textContent = text;
+                animateProgress();
+            }
+        }
+
+        // Animation de la barre de progression
+        function animateProgress() {
+            const fill = document.getElementById('progressFill');
+            let width = 0;
+            const interval = setInterval(() => {
+                width += Math.random() * 10 + 5;
+                if (width >= 95) width = 95;
+                fill.style.width = width + '%';
+            }, 800);
+            fill._interval = interval;
+        }
+
+        // Arrêter la progression
+        function stopProgress() {
+            const fill = document.getElementById('progressFill');
+            if (fill._interval) {
+                clearInterval(fill._interval);
+            }
+            fill.style.width = '100%';
+            setTimeout(() => showProgress(false), 1000);
+        }
+
+        // Validation des données
+        async function validateData() {
+            try {
+                const response = await fetch(`${API_BASE}/api/stats`);
+                const stats = await response.json();
+                
+                // Utiliser les données disponibles du serveur principal
+                const courseCount = stats.solver_input_courses || stats.general?.total_lessons || 0;
+                const classCount = stats.general?.total_classes || 0;
+                const teacherCount = stats.general?.total_teachers || 0;
+                
+                if (courseCount < 50 && classCount < 5) {
+                    throw new Error(`Données insuffisantes: ${courseCount} cours, ${classCount} classes`);
+                }
+                
+                showStatus(`✅ Validation OK: ${classCount} classes, ${teacherCount} professeurs`, 'success');
+                return true;
+            } catch (error) {
+                showStatus(`⚠️ ${error.message}`, 'warning');
+                return false;
+            }
+        }
+
+        // Génération automatique avec les meilleurs algorithmes
+        async function generateSchedule() {
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+
+            try {
+                // 1. Validation des données
+                showStatus('🔍 Validation des données...', 'info');
+                const isValid = await validateData();
+                if (!isValid) {
+                    showStatus('⚠️ Problème de validation, mais tentative de génération...', 'warning');
+                }
+
+                // 2. Génération avec algorithmes automatiques
+                showProgress(true, 'Lancement du solver amélioré avec emploi du temps complet...');
+                
+                const algorithms = [
+                    {
+                        endpoint: '/generate_schedule_parallel_sync_v2',
+                        name: '🚀 PARALLEL SYNC V2 (HEURES SUPPLÉMENTAIRES AUX BORDS)',
+                        payload: { time_limit: 300 },
+                        timeout: 350000  // 5:50 minutes
+                    },
+                    {
+                        endpoint: '/generate_schedule_parallel_sync',
+                        name: '🔄 PARALLEL SYNC (PRIORITÉ - Correction ז-1,ז-3,ז-4)',
+                        payload: { time_limit: 300 },
+                        timeout: 350000  // 5:50 minutes
+                    },
+                    {
+                        endpoint: '/generate_schedule_ultimate',
+                        name: '🏆 ULTIMATE SCHEDULER (Combine tous les algorithmes)',
+                        payload: { time_limit: 600, advanced: true, algorithms: ['pedagogical_v2', 'advanced_cpsat', 'corrected'] },
+                        timeout: 650000  // 10:50 minutes
+                    },
+                    {
+                        endpoint: '/generate_schedule_advanced_cpsat',
+                        name: '⭐ ADVANCED CP-SAT (Zéro trous + Objectif sophistiqué)',
+                        payload: { time_limit: 600, advanced: true },
+                        timeout: 650000  // 10:50 minutes
+                    },
+                    {
+                        endpoint: '/generate_schedule_pedagogical_v2', 
+                        name: '🎓 PEDAGOGICAL V2 (Blocs 2h + Zéro trous)',
+                        payload: { time_limit: 600, advanced: true },
+                        timeout: 650000  // 10:50 minutes
+                    },
+                    {
+                        endpoint: '/generate_schedule_adaptive',
+                        name: '🎯 Solver Adaptatif (Fallback)',
+                        payload: { time_limit: 300, advanced: true },
+                        timeout: 350000  // 5:50 minutes
+                    },
+                    {
+                        endpoint: '/generate_schedule_realistic',
+                        name: 'Solver Réaliste ⭐ (RECOMMANDÉ - 9 Périodes)',
+                        payload: { time_limit: 300, advanced: true },
+                        timeout: 350000  // 5:50 minutes
+                    },
+                    {
+                        endpoint: '/generate_schedule_simple',
+                        name: 'Solver Simple (Garanti mais Limité)',
+                        payload: { time_limit: 60, advanced: false },
+                        timeout: 80000  // 1:20 minutes
+                    },
+                    {
+                        endpoint: '/generate_schedule_fixed',
+                        name: 'Solver Fixé (Sans Conflits)',
+                        payload: { time_limit: 120 },
+                        timeout: 150000  // 2:30 minutes
+                    },
+                    {
+                        endpoint: '/generate_schedule',
+                        name: 'Solver Pédagogique (Avancé)',
+                        payload: { time_limit: 180, advanced: true },
+                        timeout: 220000  // 3:40 minutes
+                    }
+                ];
+
+                let result = null;
+                let algorithmUsed = '';
+
+                for (const algo of algorithms) {
+                    try {
+                        showProgress(true, `Essai: ${algo.name} (max ${Math.round(algo.timeout/60000)}min)...`);
+                        
+                        // Controller pour timeout
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), algo.timeout);
+                        
+                        const response = await fetch(`${API_BASE}${algo.endpoint}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(algo.payload),
+                            signal: controller.signal
+                        });
+
+                        clearTimeout(timeoutId);
+
+                        if (response.ok) {
+                            result = await response.json();
+                            if (result.success || result.schedule_id) {
+                                algorithmUsed = algo.name;
+                                break;
+                            }
+                        } else {
+                            console.warn(`${algo.name} HTTP ${response.status}:`, await response.text());
+                        }
+                    } catch (error) {
+                        if (error.name === 'AbortError') {
+                            console.warn(`${algo.name} timeout après ${Math.round(algo.timeout/60000)}min`);
+                            showProgress(true, `${algo.name} timeout - essai suivant...`);
+                        } else {
+                            console.warn(`${algo.name} failed:`, error);
+                        }
+                        continue;
+                    }
+                }
+
+                stopProgress();
+
+                if (result && (result.success || result.schedule_id)) {
+                    currentScheduleId = result.schedule_id;
+                    showStatus(`✅ Génération réussie avec ${algorithmUsed}!`, 'success');
+                    displayResults(result, algorithmUsed);
+                } else {
+                    throw new Error('Tous les algorithmes ont échoué');
+                }
+
+            } catch (error) {
+                stopProgress();
+                showStatus(`❌ Erreur: ${error.message}`, 'error');
+                console.error('Erreur génération:', error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Afficher les résultats
+        function displayResults(data, algorithm) {
+            const section = document.getElementById('resultsSection');
+            const grid = document.getElementById('metricsGrid');
+            
+            section.style.display = 'block';
+
+            // Métriques principales
+            const metrics = [
+                { 
+                    label: 'Score Qualité', 
+                    value: `${data.quality_score || 0}/100`,
+                    level: getScoreLevel(data.quality_score || 0)
+                },
+                { 
+                    label: 'Emploi du Temps', 
+                    value: data.schedule_id || 'N/A',
+                    level: data.schedule_id ? 'excellent' : 'danger'
+                },
+                { 
+                    label: 'Cours Traités', 
+                    value: data.total_courses || 0,
+                    level: 'good'
+                },
+                { 
+                    label: 'Trous Détectés', 
+                    value: data.gaps_count || 0,
+                    level: (data.gaps_count || 0) === 0 ? 'excellent' : 'warning'
+                },
+                { 
+                    label: 'Sync Parallèle', 
+                    value: data.parallel_sync_ok ? 'OK' : 'NOK',
+                    level: data.parallel_sync_ok ? 'excellent' : 'danger'
+                },
+                { 
+                    label: 'Temps (sec)', 
+                    value: Math.round(data.solve_time || 0),
+                    level: 'good'
+                }
+            ];
+
+            grid.innerHTML = metrics.map(metric => `
+                <div class="metric-card">
+                    <div class="metric-value ${metric.level}">${metric.value}</div>
+                    <div class="metric-label">${metric.label}</div>
+                </div>
+            `).join('');
+
+            // Afficher la section emploi du temps si on a un ID
+            if (currentScheduleId) {
+                const scheduleSection = document.getElementById('scheduleSection');
+                scheduleSection.style.display = 'block';
+            }
+        }
+
+        // Déterminer le niveau de qualité
+        function getScoreLevel(score) {
+            if (score >= 85) return 'excellent';
+            if (score >= 70) return 'good';
+            if (score >= 50) return 'warning';
+            return 'danger';
+        }
+
+        // Afficher l'emploi du temps
+        async function showSchedule() {
+            if (!currentScheduleId) {
+                showStatus('Aucun emploi du temps à afficher', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Chargement de l\'emploi du temps...', 'info');
+
+                // Essayer plusieurs endpoints
+                let response, scheduleData;
+                const endpoints = [
+                    `/api/schedule_by_class/${currentScheduleId}`,
+                    `/api/schedule_by_teacher/${currentScheduleId}`,
+                    `/get_schedule_by_class/${currentScheduleId}`,
+                    `/get_schedule/${currentScheduleId}`
+                ];
+
+                for (const endpoint of endpoints) {
+                    try {
+                        response = await fetch(`${API_BASE}${endpoint}`);
+                        if (response.ok) {
+                            scheduleData = await response.json();
+                            if (scheduleData.success || scheduleData.schedule_grid) {
+                                break;
+                            }
+                        }
+                    } catch (error) {
+                        continue;
+                    }
+                }
+
+                if (scheduleData && scheduleData.success) {
+                    if (scheduleData.view_type === 'by_class') {
+                        renderScheduleByClass(scheduleData);
+                    } else if (scheduleData.view_type === 'by_teacher') {
+                        renderScheduleByTeacher(scheduleData);
+                    } else if (scheduleData.schedule_grid) {
+                        renderScheduleTable(scheduleData);
+                    } else {
+                        showStatus('Format d\'emploi du temps non reconnu', 'error');
+                        return;
+                    }
+                    showStatus('Emploi du temps chargé!', 'success');
+                } else {
+                    showStatus('Impossible de charger l\'emploi du temps', 'error');
+                }
+
+            } catch (error) {
+                showStatus(`Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        // Rendu du tableau d'emploi du temps
+        function renderScheduleTable(scheduleData) {
+            const grid = document.getElementById('scheduleGrid');
+            const { schedule_grid, days } = scheduleData;
+
+            if (!schedule_grid || !days) {
+                grid.innerHTML = '<p>Données d\'emploi du temps non disponibles</p>';
+                return;
+            }
+
+            // Noms des jours en hébreu
+            const hebrewDays = {
+                'dimanche': 'ראשון',
+                'lundi': 'שני', 
+                'mardi': 'שלישי',
+                'mercredi': 'רביעי',
+                'jeudi': 'חמישי'
+            };
+
+            // Déterminer le nombre maximum de périodes
+            let maxPeriod = 0;
+            Object.values(schedule_grid).forEach(daySchedule => {
+                Object.keys(daySchedule).forEach(period => {
+                    maxPeriod = Math.max(maxPeriod, parseInt(period));
+                });
+            });
+
+            // Construire le tableau
+            let tableHtml = '<table class="schedule-table"><thead><tr><th>Période</th>';
+            
+            days.forEach(day => {
+                const hebrewDay = hebrewDays[day.toLowerCase()] || day;
+                tableHtml += `<th class="hebrew-day">${hebrewDay}</th>`;
+            });
+            
+            tableHtml += '</tr></thead><tbody>';
+
+            // Lignes de périodes
+            for (let period = 1; period <= maxPeriod; period++) {
+                tableHtml += `<tr><th>${period}</th>`;
+
+                days.forEach(day => {
+                    tableHtml += '<td>';
+                    
+                    if (schedule_grid[day] && schedule_grid[day][period]) {
+                        const lessons = schedule_grid[day][period];
+                        
+                        lessons.forEach(lesson => {
+                            const parallelClass = lesson.is_parallel ? ' parallel' : '';
+                            tableHtml += `
+                                <div class="lesson-block${parallelClass}">
+                                    <div class="lesson-subject">${lesson.subject || ''}</div>
+                                    <div class="lesson-class">${lesson.class_name || ''}</div>
+                                    <div class="lesson-teacher">${lesson.teacher_name || ''}</div>
+                                </div>
+                            `;
+                        });
+                    }
+                    
+                    tableHtml += '</td>';
+                });
+
+                tableHtml += '</tr>';
+            }
+
+            tableHtml += '</tbody></table>';
+            grid.innerHTML = tableHtml;
+        }
+
+        // Rendu par classe
+        function renderScheduleByClass(scheduleData) {
+            const grid = document.getElementById('scheduleGrid');
+            const { classes, total_classes } = scheduleData;
+
+            if (!classes || total_classes === 0) {
+                grid.innerHTML = '<p>Aucun emploi du temps trouvé par classe</p>';
+                return;
+            }
+
+            let html = '<div class="class-schedule-container">';
+            html += `<h3>📚 Emplois du temps par classe (${total_classes} classes)</h3>`;
+
+            // Créer un sélecteur de classe
+            html += '<div class="class-selector" style="margin: 20px 0;">';
+            html += '<label for="classSelect" style="margin-right: 10px;">Choisir une classe:</label>';
+            html += '<select id="classSelect" onchange="showSelectedClass()" style="padding: 5px; font-size: 1rem;">';
+            html += '<option value="">-- Sélectionner --</option>';
+
+            const sortedClasses = Object.keys(classes).sort();
+            sortedClasses.forEach(className => {
+                html += `<option value="${className}">${className}</option>`;
+            });
+
+            html += '</select>';
+            html += '</div>';
+
+            // Conteneur pour afficher la classe sélectionnée
+            html += '<div id="selectedClassSchedule"></div>';
+
+            // Stocker les données dans un élément caché (plus sûr que JavaScript)
+            html += `<div id="classesDataStore" style="display: none;">${JSON.stringify(classes).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
+
+            html += '</div>';
+            grid.innerHTML = html;
+
+            // Sélectionner automatiquement la première classe
+            if (sortedClasses.length > 0) {
+                setTimeout(() => {
+                    document.getElementById('classSelect').value = sortedClasses[0];
+                    showSelectedClass();
+                }, 100);
+            }
+        }
+
+        // Afficher la classe sélectionnée
+        function showSelectedClass() {
+            const select = document.getElementById('classSelect');
+            const container = document.getElementById('selectedClassSchedule');
+            const className = select.value;
+
+            if (!className) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // Récupérer les données depuis l'élément caché
+            const dataStore = document.getElementById('classesDataStore');
+            if (!dataStore) {
+                container.innerHTML = '<p>Erreur: données non disponibles</p>';
+                return;
+            }
+
+            let classesData;
+            try {
+                classesData = JSON.parse(dataStore.textContent);
+            } catch (e) {
+                console.error('Erreur parsing JSON:', e);
+                container.innerHTML = '<p>Erreur de données</p>';
+                return;
+            }
+
+            const classData = classesData[className];
+            if (!classData) return;
+
+            let html = `<div class="selected-class-view">`;
+            html += `<h4>📖 Classe ${className}</h4>`;
+            html += `<div class="class-stats">`;
+            html += `<span>📊 ${classData.stats.total_hours} heures</span> | `;
+            html += `<span>📚 ${classData.stats.subjects_count} matières</span> | `;
+            html += `<span>👨‍🏫 ${classData.stats.teachers_count} professeurs</span>`;
+            html += `</div>`;
+
+            // Tableau emploi du temps
+            html += '<table class="schedule-table" style="margin-top: 20px;">';
+            html += '<thead><tr><th>Période</th>';
+
+            const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi'];
+            const hebrewDays = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'];
+
+            days.forEach((day, index) => {
+                html += `<th class="hebrew-day">${hebrewDays[index]}</th>`;
+            });
+
+            html += '</tr></thead><tbody>';
+
+            // Déterminer les périodes disponibles
+            const allPeriods = new Set();
+            Object.values(classData.days).forEach(dayData => {
+                Object.keys(dayData.periods).forEach(period => {
+                    allPeriods.add(parseInt(period));
+                });
+            });
+
+            const periods = Array.from(allPeriods).sort((a, b) => a - b);
+
+            periods.forEach(period => {
+                html += `<tr><th>${period}</th>`;
+
+                days.forEach(day => {
+                    html += '<td>';
+                    
+                    const dayData = classData.days[day];
+                    if (dayData && dayData.periods[period]) {
+                        const course = dayData.periods[period];
+                        const parallelClass = course.is_parallel ? ' parallel' : '';
+                        html += `<div class="lesson-block${parallelClass}">`;
+                        html += `<div class="lesson-subject" style="direction: rtl;">${course.subject}</div>`;
+                        html += `<div class="lesson-teacher" style="direction: rtl;">${course.teacher}</div>`;
+                        html += `<div class="lesson-time">${course.time}</div>`;
+                        html += `</div>`;
+                    }
+                    
+                    html += '</td>';
+                });
+
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        // Rendu par professeur
+        function renderScheduleByTeacher(scheduleData) {
+            const grid = document.getElementById('scheduleGrid');
+            const { teachers, total_teachers } = scheduleData;
+
+            if (!teachers || total_teachers === 0) {
+                grid.innerHTML = '<p>Aucun emploi du temps trouvé par professeur</p>';
+                return;
+            }
+
+            let html = '<div class="teacher-schedule-container">';
+            html += `<h3>👨‍🏫 Emplois du temps par professeur (${total_teachers} professeurs)</h3>`;
+
+            // Créer un sélecteur de professeur
+            html += '<div class="teacher-selector" style="margin: 20px 0;">';
+            html += '<label for="teacherSelect" style="margin-right: 10px;">Choisir un professeur:</label>';
+            html += '<select id="teacherSelect" onchange="showSelectedTeacher()" style="padding: 5px; font-size: 1rem;">';
+            html += '<option value="">-- Sélectionner --</option>';
+
+            const sortedTeachers = Object.keys(teachers).sort();
+            sortedTeachers.forEach(teacherName => {
+                html += `<option value="${teacherName}">${teacherName}</option>`;
+            });
+
+            html += '</select>';
+            html += '</div>';
+
+            // Conteneur pour afficher le professeur sélectionné
+            html += '<div id="selectedTeacherSchedule"></div>';
+
+            // Stocker les données dans un élément caché (plus sûr que JavaScript)
+            html += `<div id="teachersDataStore" style="display: none;">${JSON.stringify(teachers).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
+
+            html += '</div>';
+            grid.innerHTML = html;
+
+            // Sélectionner automatiquement le premier professeur
+            if (sortedTeachers.length > 0) {
+                setTimeout(() => {
+                    document.getElementById('teacherSelect').value = sortedTeachers[0];
+                    showSelectedTeacher();
+                }, 100);
+            }
+        }
+
+        // Afficher le professeur sélectionné
+        function showSelectedTeacher() {
+            const select = document.getElementById('teacherSelect');
+            const container = document.getElementById('selectedTeacherSchedule');
+            const teacherName = select.value;
+
+            if (!teacherName) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // Récupérer les données depuis l'élément caché
+            const dataStore = document.getElementById('teachersDataStore');
+            if (!dataStore) {
+                container.innerHTML = '<p>Erreur: données non disponibles</p>';
+                return;
+            }
+
+            let teachersData;
+            try {
+                teachersData = JSON.parse(dataStore.textContent);
+            } catch (e) {
+                console.error('Erreur parsing JSON:', e);
+                container.innerHTML = '<p>Erreur de données</p>';
+                return;
+            }
+
+            const teacherData = teachersData[teacherName];
+            if (!teacherData) return;
+
+            let html = `<div class="selected-teacher-view">`;
+            html += `<h4>👨‍🏫 ${teacherName}</h4>`;
+            html += `<div class="teacher-stats">`;
+            html += `<span>📊 ${teacherData.stats.total_hours} heures</span> | `;
+            html += `<span>📚 ${teacherData.stats.subjects_count} matières</span> | `;
+            html += `<span>🏫 ${teacherData.stats.classes_count} classes</span>`;
+            html += `</div>`;
+
+            // Tableau emploi du temps
+            html += '<table class="schedule-table" style="margin-top: 20px;">';
+            html += '<thead><tr><th>Période</th>';
+
+            const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi'];
+            const hebrewDays = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי'];
+
+            days.forEach((day, index) => {
+                html += `<th class="hebrew-day">${hebrewDays[index]}</th>`;
+            });
+
+            html += '</tr></thead><tbody>';
+
+            // Déterminer les périodes disponibles
+            const allPeriods = new Set();
+            Object.values(teacherData.days).forEach(dayData => {
+                Object.keys(dayData.periods).forEach(period => {
+                    allPeriods.add(parseInt(period));
+                });
+            });
+
+            const periods = Array.from(allPeriods).sort((a, b) => a - b);
+
+            periods.forEach(period => {
+                html += `<tr><th>${period}</th>`;
+
+                days.forEach(day => {
+                    html += '<td>';
+                    
+                    const dayData = teacherData.days[day];
+                    if (dayData && dayData.periods[period]) {
+                        const course = dayData.periods[period];
+                        const parallelClass = course.is_parallel ? ' parallel' : '';
+                        html += `<div class="lesson-block${parallelClass}">`;
+                        html += `<div class="lesson-subject" style="direction: rtl;">${course.subject}</div>`;
+                        html += `<div class="lesson-class">${course.class}</div>`;
+                        html += `<div class="lesson-time">${course.time}</div>`;
+                        html += `</div>`;
+                    }
+                    
+                    html += '</td>';
+                });
+
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        // Télécharger l'emploi du temps
+        function downloadSchedule() {
+            if (!currentScheduleId) {
+                showStatus('Aucun emploi du temps à télécharger', 'error');
+                return;
+            }
+            
+            window.open(`${API_BASE}/get_schedule/${currentScheduleId}`, '_blank');
+        }
+
+        // Fonction de démonstration rapide
+        function generateDemo() {
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            
+            showStatus('🎯 Démonstration en cours...', 'info');
+            showProgress(true, 'Simulation de la génération...');
+            
+            // Simuler une génération réussie après 10 secondes
+            setTimeout(() => {
+                stopProgress();
+                
+                const demoResult = {
+                    success: true,
+                    schedule_id: 'DEMO_999',
+                    quality_score: 92,
+                    gaps_count: 1,
+                    parallel_sync_ok: true,
+                    solve_time: 8.5,
+                    total_courses: 87,
+                    parallel_groups: 6
+                };
+                
+                currentScheduleId = demoResult.schedule_id;
+                showStatus('✅ Démonstration réussie avec données simulées!', 'success');
+                displayResults(demoResult, 'Démonstration');
+                
+                btn.disabled = false;
+            }, 10000);
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            showStatus('✅ Interface prête - Cliquez pour générer l\'emploi du temps', 'success');
         });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.detail || `Erreur HTTP ${response.status}`);
-        }
-        
-        return data;
-      } catch (error) {
-        throw error;
-      } finally {
-        stopProgress();
-      }
-    }
-    
-    function showResults(data) {
-      const results = document.getElementById('results');
-      results.style.display = 'block';
-      
-      let html = '<h2>✅ Génération Réussie!</h2>';
-      
-      if (data.schedule_id) {
-        html += `<p><strong>ID de l'emploi du temps:</strong> ${data.schedule_id}</p>`;
-      }
-      
-      if (data.summary) {
-        html += '<h3>Résumé:</h3><ul>';
-        html += `<li>Total des cours: ${data.summary.total_lessons || data.total_entries}</li>`;
-        html += `<li>Classes couvertes: ${data.summary.classes_covered}</li>`;
-        html += `<li>Professeurs: ${data.summary.teachers_involved}</li>`;
-        if (data.summary.parallel_lessons) {
-          html += `<li>Cours parallèles: ${data.summary.parallel_lessons}</li>`;
-        }
-        if (data.summary.quality_score) {
-          html += `<li>Score qualité: ${data.summary.quality_score}%</li>`;
-        }
-        html += '</ul>';
-      }
-      
-      if (data.features) {
-        html += '<h3>Caractéristiques:</h3><ul>';
-        Object.entries(data.features).forEach(([key, value]) => {
-          if (value) {
-            html += `<li>✅ ${key.replace(/_/g, ' ')}</li>`;
-          }
-        });
-        html += '</ul>';
-      }
-      
-      html += `<p><a href="${API_BASE}/constraints-manager" target="_blank">Voir l'emploi du temps complet →</a></p>`;
-      
-      results.innerHTML = html;
-    }
-    
-    // Fonction 1: Génération Corrigée
-    async function generateCorrected() {
-      try {
-        showStatus('Génération avec logique corrigée...', 'info');
-        const data = await makeRequest('/generate_schedule_corrected');
-        showStatus('Génération réussie!', 'success');
-        showResults(data);
-      } catch (error) {
-        showStatus(`Erreur: ${error.message}`, 'error');
-      }
-    }
-    
-    // Fonction 2: Génération Sans Trous
-    async function generateFixed() {
-      try {
-        showStatus('Génération sans trous...', 'info');
-        const payload = {
-          eliminate_gaps: document.getElementById('eliminate_gaps').checked,
-          prevent_conflicts: document.getElementById('prevent_conflicts').checked
-        };
-        const data = await makeRequest('/generate_schedule_fixed', payload);
-        showStatus('Génération sans trous réussie!', 'success');
-        showResults(data);
-      } catch (error) {
-        showStatus(`Erreur: ${error.message}`, 'error');
-      }
-    }
-    
-    // Fonction 3: Optimisation Pédagogique
-    async function generatePedagogical() {
-      try {
-        showStatus('Optimisation pédagogique avancée...', 'info');
-        document.getElementById('progress-text').textContent = 'Optimisation en cours (peut prendre 2-3 minutes)...';
-        
-        const payload = {
-          optimization_level: 'pedagogical',
-          quality_target: 85,
-          features: {
-            two_hour_blocks: document.getElementById('two_hour_blocks').checked,
-            minimize_days: document.getElementById('minimize_days').checked,
-            respect_religious: document.getElementById('respect_religious').checked,
-            monday_constraint: document.getElementById('monday_constraint').checked
-          }
-        };
-        
-        const data = await makeRequest('/api/advanced/optimize', payload);
-        showStatus('Optimisation complète!', 'success');
-        showResults(data);
-      } catch (error) {
-        showStatus(`Erreur: ${error.message}`, 'error');
-      }
-    }
-    
-    // Fonction 4: Génération depuis Solver Input
-    async function generateFromSolverInput() {
-      try {
-        showStatus('Génération depuis la base de données...', 'info');
-        const data = await makeRequest('/generate_schedule_from_solver_input');
-        showStatus('Génération depuis BD réussie!', 'success');
-        showResults(data);
-      } catch (error) {
-        // Si erreur, essayer l'alternative
-        try {
-          showStatus('Tentative avec méthode alternative...', 'info');
-          const data = await makeRequest('/generate_clean_from_solver_input');
-          showStatus('Génération alternative réussie!', 'success');
-          showResults(data);
-        } catch (error2) {
-          showStatus(`Erreur: ${error2.message}`, 'error');
-        }
-      }
-    }
-  </script>
+    </script>
 </body>
 </html>

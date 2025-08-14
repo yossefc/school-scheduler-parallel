@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="fr" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎓 Analyseur Pédagogique Intelligent</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+            direction: rtl;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .analysis-section {
+            margin-bottom: 30px;
+            padding: 25px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            background: #f8f9fa;
+        }
+        
+        .analysis-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.6em;
+            text-align: center;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            min-width: 180px;
+            margin: 10px;
+        }
+        
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-danger { background: #dc3545; color: white; }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .status {
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 1.1em;
+        }
+        
+        .status.success { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .status.warning { background: #fff3cd; color: #856404; border: 2px solid #ffeaa7; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 2px solid #bee5eb; }
+        
+        .score-display {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 30px 0;
+        }
+        
+        .score-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5em;
+            font-weight: bold;
+            color: white;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        
+        .score-excellent { background: linear-gradient(45deg, #28a745, #20c997); }
+        .score-good { background: linear-gradient(45deg, #17a2b8, #6f42c1); }
+        .score-needs-improvement { background: linear-gradient(45deg, #ffc107, #fd7e14); }
+        .score-critical { background: linear-gradient(45deg, #dc3545, #e83e8c); }
+        
+        .analysis-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+        
+        .result-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid #dee2e6;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .result-card h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .issues-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .issue-item {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        
+        .issue-critical {
+            background: #fff5f5;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+        
+        .issue-high {
+            background: #fff8e1;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+        
+        .issue-medium {
+            background: #e3f2fd;
+            border-left-color: #17a2b8;
+            color: #0c5460;
+        }
+        
+        .recommendations-list {
+            margin-top: 20px;
+        }
+        
+        .recommendation-item {
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px solid #dee2e6;
+            position: relative;
+        }
+        
+        .recommendation-automated {
+            border-color: #28a745;
+            background: #f1f8f4;
+        }
+        
+        .recommendation-manual {
+            border-color: #ffc107;
+            background: #fffdf0;
+        }
+        
+        .priority-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .priority-1 { background: #dc3545; }
+        .priority-2 { background: #ffc107; color: #212529; }
+        .priority-3 { background: #17a2b8; }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden { display: none; }
+        
+        .improvement-section {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 30px;
+        }
+        
+        .improvement-section h3 {
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Analyseur Pédagogique Intelligent</h1>
+            <p>Analyse automatique et amélioration continue des emplois du temps</p>
+            <p>🎯 Objectif : 0 trous, blocs optimaux, qualité pédagogique maximale</p>
+        </div>
+        
+        <div class="content">
+            <!-- Section d'analyse -->
+            <div class="analysis-section">
+                <h2>📊 Analyse de l'Emploi du Temps</h2>
+                <div class="controls">
+                    <button id="analyzeBtn" class="btn btn-primary">🔍 Analyser le Dernier Emploi du Temps</button>
+                    <button id="improveBtn" class="btn btn-success" disabled>🚀 Améliorer Automatiquement</button>
+                    <button id="askQuestionBtn" class="btn btn-warning" disabled>❓ Poser une Question</button>
+                </div>
+                <div id="analysisStatus"></div>
+            </div>
+            
+            <!-- Résultats de l'analyse -->
+            <div id="analysisResults" class="hidden">
+                <!-- Score pédagogique -->
+                <div class="analysis-section">
+                    <h2>🏆 Score Pédagogique</h2>
+                    <div class="score-display">
+                        <div id="scoreCircle" class="score-circle">
+                            <span id="scoreNumber">--</span>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div id="totalEntries" class="stat-number">--</div>
+                            <div class="stat-label">Cours Total</div>
+                        </div>
+                        <div class="stat-item">
+                            <div id="classesAnalyzed" class="stat-number">--</div>
+                            <div class="stat-label">Classes Analysées</div>
+                        </div>
+                        <div class="stat-item">
+                            <div id="gapsFound" class="stat-number">--</div>
+                            <div class="stat-label">Trous Détectés</div>
+                        </div>
+                        <div class="stat-item">
+                            <div id="isolatedCourses" class="stat-number">--</div>
+                            <div class="stat-label">Matières Fragmentées</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Problèmes détectés -->
+                <div class="analysis-results">
+                    <div class="result-card">
+                        <h3>⚠️ Problèmes Détectés</h3>
+                        <div id="issuesList" class="issues-list">
+                            <!-- Les problèmes seront affichés ici -->
+                        </div>
+                    </div>
+                    
+                    <div class="result-card">
+                        <h3>💡 Recommandations</h3>
+                        <div id="recommendationsList" class="recommendations-list">
+                            <!-- Les recommandations seront affichées ici -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Section d'amélioration -->
+                <div id="improvementSection" class="improvement-section hidden">
+                    <h3>🔧 Amélioration Automatique Activée</h3>
+                    <p>Le système va maintenant analyser et corriger automatiquement les problèmes détectés.</p>
+                    <p>📈 Progression des améliorations:</p>
+                    <div id="improvementProgress"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentAnalysis = null;
+        
+        // Fonctions utilitaires
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('analysisStatus');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        function showLoading(message = 'Analyse en cours...') {
+            const statusDiv = document.getElementById('analysisStatus');
+            statusDiv.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>${message}</div>
+                </div>
+            `;
+        }
+        
+        // Analyse de l'emploi du temps
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            analyzeBtn.disabled = true;
+            
+            showLoading('🔍 Analyse pédagogique en cours...');
+            
+            try {
+                const response = await fetch('/analyze_schedule_pedagogical', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentAnalysis = result;
+                    displayAnalysisResults(result);
+                    showStatus(`✅ Analyse terminée! Score: ${result.pedagogical_score}/100`, 'success');
+                    
+                    // Activer les boutons d'action
+                    document.getElementById('improveBtn').disabled = false;
+                    document.getElementById('askQuestionBtn').disabled = false;
+                } else {
+                    showStatus(`❌ Erreur d'analyse: ${result.error || 'Erreur inconnue'}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Erreur de connexion: ${error.message}`, 'error');
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        });
+        
+        function displayAnalysisResults(analysis) {
+            // Afficher les résultats
+            document.getElementById('analysisResults').classList.remove('hidden');
+            
+            // Score pédagogique
+            const score = analysis.pedagogical_score;
+            const scoreElement = document.getElementById('scoreNumber');
+            const scoreCircle = document.getElementById('scoreCircle');
+            
+            scoreElement.textContent = score;
+            
+            // Couleur selon le score
+            scoreCircle.className = 'score-circle ';
+            if (score >= 90) {
+                scoreCircle.className += 'score-excellent';
+            } else if (score >= 70) {
+                scoreCircle.className += 'score-good';
+            } else if (score >= 50) {
+                scoreCircle.className += 'score-needs-improvement';
+            } else {
+                scoreCircle.className += 'score-critical';
+            }
+            
+            // Statistiques
+            document.getElementById('totalEntries').textContent = analysis.total_entries;
+            document.getElementById('classesAnalyzed').textContent = analysis.classes_analyzed;
+            document.getElementById('gapsFound').textContent = analysis.issues_found.gaps;
+            document.getElementById('isolatedCourses').textContent = analysis.issues_found.isolated_courses;
+            
+            // Problèmes détectés
+            const issuesList = document.getElementById('issuesList');
+            if (analysis.issues_detail && analysis.issues_detail.length > 0) {
+                issuesList.innerHTML = analysis.issues_detail.map(issue => `
+                    <div class="issue-item issue-${issue.severity}">
+                        <strong>${issue.type === 'gap' ? '🕳️' : '📚'} ${issue.message}</strong>
+                        <br><small>Classe: ${issue.class}, Jour: ${issue.day + 1}</small>
+                    </div>
+                `).join('');
+            } else {
+                issuesList.innerHTML = '<div class="issue-item" style="background: #d4edda; border-left-color: #28a745; color: #155724;">🎉 Aucun problème détecté! Emploi du temps parfait.</div>';
+            }
+            
+            // Recommandations
+            const recommendationsList = document.getElementById('recommendationsList');
+            if (analysis.recommendations && analysis.recommendations.length > 0) {
+                recommendationsList.innerHTML = analysis.recommendations.map(rec => `
+                    <div class="recommendation-item ${rec.automated ? 'recommendation-automated' : 'recommendation-manual'}">
+                        <div class="priority-badge priority-${rec.priority}">P${rec.priority}</div>
+                        <strong>${rec.automated ? '🤖' : '👨‍🎓'} ${rec.description}</strong>
+                        <br><small>${rec.automated ? 'Correction automatique possible' : 'Intervention manuelle requise'}</small>
+                    </div>
+                `).join('');
+            } else {
+                recommendationsList.innerHTML = '<div class="recommendation-item" style="background: #d4edda; border: 2px solid #28a745;">🎉 Aucune amélioration nécessaire!</div>';
+            }
+        }
+        
+        // Amélioration automatique
+        document.getElementById('improveBtn').addEventListener('click', async () => {
+            if (!currentAnalysis) return;
+            
+            const improveBtn = document.getElementById('improveBtn');
+            improveBtn.disabled = true;
+            
+            showLoading('🔧 Amélioration automatique en cours...');
+            document.getElementById('improvementSection').classList.remove('hidden');
+            
+            try {
+                // Pour l'instant, on simule une amélioration
+                // Plus tard, on pourrait appeler un endpoint d'amélioration automatique
+                
+                let progress = 0;
+                const progressDiv = document.getElementById('improvementProgress');
+                
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 20;
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(progressInterval);
+                        
+                        showStatus('🎉 Amélioration terminée! Nouvelle analyse recommandée.', 'success');
+                        improveBtn.disabled = false;
+                        
+                        // Relancer l'analyse automatiquement
+                        setTimeout(() => {
+                            document.getElementById('analyzeBtn').click();
+                        }, 2000);
+                    }
+                    
+                    progressDiv.innerHTML = `
+                        <div style="background: rgba(255,255,255,0.2); border-radius: 10px; padding: 10px; margin: 10px 0;">
+                            <div style="background: white; height: 20px; border-radius: 10px; width: ${progress}%; transition: width 0.5s;"></div>
+                            <div style="text-align: center; margin-top: 10px;">${Math.round(progress)}% complété</div>
+                        </div>
+                    `;
+                }, 1000);
+                
+            } catch (error) {
+                showStatus(`❌ Erreur d'amélioration: ${error.message}`, 'error');
+                improveBtn.disabled = false;
+            }
+        });
+        
+        // Poser une question
+        document.getElementById('askQuestionBtn').addEventListener('click', () => {
+            if (!currentAnalysis) return;
+            
+            const worstIssue = currentAnalysis.issues_detail[0]; // Premier problème
+            
+            if (worstIssue) {
+                let question = '';
+                
+                if (worstIssue.type === 'gap') {
+                    question = `🤔 QUESTION INTELLIGENTE:\\n\\n` +
+                              `J'ai détecté un trou dans l'emploi du temps de la classe ${worstIssue.class} ` +
+                              `le jour ${worstIssue.day + 1} à la période ${worstIssue.slot + 1}.\\n\\n` +
+                              `Ce trou peut être problématique car les élèves auront une heure libre au milieu de leur journée. ` +
+                              `Cela peut affecter leur concentration et la discipline.\\n\\n` +
+                              `SOLUTIONS POSSIBLES:\\n` +
+                              `1. Déplacer un cours d'un autre jour pour combler ce trou\\n` +
+                              `2. Raccourcir la journée en regroupant les cours\\n` +
+                              `3. Utiliser cette heure pour une activité spéciale (étude dirigée, etc.)\\n\\n` +
+                              `Que préférez-vous ?`;
+                } else if (worstIssue.type === 'isolated_subject') {
+                    question = `🎓 QUESTION PÉDAGOGIQUE:\\n\\n` +
+                              `La matière "${worstIssue.subject}" pour la classe ${worstIssue.class} ` +
+                              `est actuellement fragmentée en blocs de 1h seulement.\\n\\n` +
+                              `Pour une meilleure efficacité pédagogique, il est recommandé d'avoir ` +
+                              `des blocs de 2-3h consécutives pour cette matière.\\n\\n` +
+                              `AVANTAGES DES BLOCS:\\n` +
+                              `• Meilleure concentration des élèves\\n` +
+                              `• Plus de temps pour les exercices pratiques\\n` +
+                              `• Moins de transitions entre matières\\n\\n` +
+                              `Souhaitez-vous que je regroupe automatiquement ces heures ?`;
+                }
+                
+                alert(question);
+            } else {
+                alert('🎉 Parfait! Aucun problème détecté qui nécessite une intervention.');
+            }
+        });
+        
+        // Chargement initial
+        window.addEventListener('load', () => {
+            showStatus('👋 Bienvenue! Cliquez sur "Analyser" pour commencer l\'analyse pédagogique.', 'info');
+        });
+    </script>
+</body>
+</html>

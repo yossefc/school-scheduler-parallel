@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 import json
 from parallel_course_handler import ParallelCourseHandler
-from fixed_extraction import extract_solution_without_conflicts, analyze_gaps
+# Removed fixed_extraction import - functions integrated directly
 
 logger = logging.getLogger(__name__)
 
@@ -1049,17 +1049,57 @@ class ScheduleSolverWithConstraints:
 
     def _extract_solution(self):
         """Extrait la solution du solver sans conflits ni doublons"""
-        logger.info("Utilisation de l'extraction fixée...")
-        schedule = extract_solution_without_conflicts(self)
+        logger.info("Extraction directe de la solution...")
+        schedule = []
         
-        # Analyser les trous
-        gaps_count = analyze_gaps(schedule, self.classes)
+        # Extraction simple et directe
+        for course in self.courses:
+            for slot in self.time_slots:
+                var_name = f"course_{course['course_id']}_slot_{slot['slot_id']}"
+                if var_name in self.schedule_vars and self.solver.Value(self.schedule_vars[var_name]) == 1:
+                    schedule_entry = {
+                        'teacher_name': course.get('teacher_name', 'Unknown'),
+                        'class_name': course.get('class_name', 'Unknown'),
+                        'subject_name': course.get('subject_name', course.get('subject', 'Unknown')),
+                        'day_of_week': slot['day_of_week'],
+                        'period_number': slot['period_number'],
+                        'is_parallel_group': course.get('is_parallel', False),
+                        'group_id': course.get('group_id')
+                    }
+                    schedule.append(schedule_entry)
+        
+        # Analyser les trous simplement
+        gaps_count = self._simple_gaps_analysis(schedule)
         if gaps_count > 0:
             logger.warning(f"⚠️ {gaps_count} trous détectés dans l'emploi du temps")
         else:
             logger.info("✅ Aucun trou détecté")
             
         return schedule
+    
+    def _simple_gaps_analysis(self, schedule):
+        """Analyse simple des trous"""
+        gaps_count = 0
+        
+        # Grouper par classe et jour
+        for class_info in self.classes:
+            class_name = class_info.get('class_name', class_info)
+            
+            for day in range(5):  # Dimanche-Jeudi
+                # Périodes de cette classe ce jour
+                day_periods = []
+                for entry in schedule:
+                    if entry['class_name'] == class_name and entry['day_of_week'] == day:
+                        day_periods.append(entry['period_number'])
+                
+                if len(day_periods) >= 2:
+                    day_periods.sort()
+                    # Compter trous entre première et dernière période
+                    for period in range(day_periods[0] + 1, day_periods[-1]):
+                        if period not in day_periods:
+                            gaps_count += 1
+        
+        return gaps_count
 
     def save_schedule(self, schedule):
         """Sauvegarde l'emploi du temps dans la base de données"""

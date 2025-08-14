@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="fr" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Éditeur d'Emploi du Temps - Modifications Incrémentales</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+            direction: rtl;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 2.2em;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f9f9f9;
+        }
+        
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            text-align: center;
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            min-width: 140px;
+        }
+        
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-info { background: #17a2b8; color: white; }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            direction: rtl;
+        }
+        
+        .form-group input:focus, .form-group select:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        
+        .schedule-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .info-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            text-align: center;
+        }
+        
+        .info-card h3 {
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        
+        .info-card .number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .modification-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .day-btn {
+            padding: 10px;
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .day-btn:hover { background: #e9ecef; }
+        .day-btn.selected { background: #007bff; color: white; border-color: #007bff; }
+        
+        .slots-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .slot-btn {
+            padding: 8px;
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .slot-btn:hover { background: #e9ecef; }
+        .slot-btn.selected { background: #28a745; color: white; border-color: #28a745; }
+        
+        .conflicts-list {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .conflict-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: #fff;
+            border-radius: 4px;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .suggestions-list {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .suggestion-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: #fff;
+            border-radius: 4px;
+            border-left: 4px solid #17a2b8;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .suggestion-item:hover {
+            background: #f8f9fa;
+            transform: translateX(-5px);
+        }
+        
+        .hidden { display: none; }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Éditeur d'Emploi du Temps</h1>
+            <p>Système de Modification Incrémentale - Modifiez sans tout régénérer!</p>
+        </div>
+        
+        <div class="content">
+            <!-- Section Chargement -->
+            <div class="section">
+                <h2>📁 Charger un Emploi du Temps Existant</h2>
+                <div class="controls">
+                    <button id="loadLatestBtn" class="btn btn-primary">Charger le Plus Récent</button>
+                    <button id="loadSpecificBtn" class="btn btn-info">Charger par ID</button>
+                    <input type="number" id="scheduleIdInput" placeholder="ID de l'emploi du temps" style="max-width: 200px;">
+                </div>
+                <div id="loadStatus"></div>
+                <div id="scheduleInfo" class="schedule-info hidden"></div>
+            </div>
+            
+            <!-- Section Modifications -->
+            <div class="section" id="modificationSection" style="display: none;">
+                <h2>✏️ Modifier l'Emploi du Temps</h2>
+                
+                <div class="controls">
+                    <button id="moveBtn" class="btn btn-warning" data-action="move">Déplacer un Cours</button>
+                    <button id="changeTeacherBtn" class="btn btn-info" data-action="change_teacher">Changer Professeur</button>
+                    <button id="addBtn" class="btn btn-success" data-action="add">Ajouter un Cours</button>
+                    <button id="removeBtn" class="btn btn-danger" data-action="remove">Supprimer un Cours</button>
+                </div>
+                
+                <!-- Formulaire de modification -->
+                <div id="modificationForm" class="hidden">
+                    <h3 id="formTitle">Formulaire de Modification</h3>
+                    
+                    <div class="modification-form">
+                        <div class="form-group">
+                            <label>Classe:</label>
+                            <input type="text" id="className" placeholder="ex: ז-1">
+                        </div>
+                        <div class="form-group">
+                            <label>Matière:</label>
+                            <input type="text" id="subject" placeholder="ex: מתמטיקה">
+                        </div>
+                        <div class="form-group" id="teachersGroup">
+                            <label>Professeurs (séparés par des virgules):</label>
+                            <input type="text" id="teachers" placeholder="ex: אהרון יניב, וייס לירן">
+                        </div>
+                    </div>
+                    
+                    <!-- Position actuelle (pour déplacement) -->
+                    <div id="currentPositionGroup" class="hidden">
+                        <h4>Position Actuelle:</h4>
+                        <div>
+                            <label>Jour actuel:</label>
+                            <div class="days-grid" id="currentDaysGrid">
+                                <div class="day-btn" data-day="0">Dimanche</div>
+                                <div class="day-btn" data-day="1">Lundi</div>
+                                <div class="day-btn" data-day="2">Mardi</div>
+                                <div class="day-btn" data-day="3">Mercredi</div>
+                                <div class="day-btn" data-day="4">Jeudi</div>
+                            </div>
+                        </div>
+                        <div>
+                            <label>Période actuelle:</label>
+                            <div class="slots-grid" id="currentSlotsGrid">
+                                <div class="slot-btn" data-slot="0">1</div>
+                                <div class="slot-btn" data-slot="1">2</div>
+                                <div class="slot-btn" data-slot="2">3</div>
+                                <div class="slot-btn" data-slot="3">4</div>
+                                <div class="slot-btn" data-slot="4">5</div>
+                                <div class="slot-btn" data-slot="5">6</div>
+                                <div class="slot-btn" data-slot="6">7</div>
+                                <div class="slot-btn" data-slot="7">8</div>
+                                <div class="slot-btn" data-slot="8">9</div>
+                                <div class="slot-btn" data-slot="9">10</div>
+                                <div class="slot-btn" data-slot="10">11</div>
+                                <div class="slot-btn" data-slot="11">12</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Nouvelle position -->
+                    <div id="newPositionGroup">
+                        <h4>Nouvelle Position:</h4>
+                        <div>
+                            <label>Nouveau jour:</label>
+                            <div class="days-grid" id="newDaysGrid">
+                                <div class="day-btn" data-day="0">Dimanche</div>
+                                <div class="day-btn" data-day="1">Lundi</div>
+                                <div class="day-btn" data-day="2">Mardi</div>
+                                <div class="day-btn" data-day="3">Mercredi</div>
+                                <div class="day-btn" data-day="4">Jeudi</div>
+                            </div>
+                        </div>
+                        <div>
+                            <label>Nouvelle période:</label>
+                            <div class="slots-grid" id="newSlotsGrid">
+                                <div class="slot-btn" data-slot="0">1</div>
+                                <div class="slot-btn" data-slot="1">2</div>
+                                <div class="slot-btn" data-slot="2">3</div>
+                                <div class="slot-btn" data-slot="3">4</div>
+                                <div class="slot-btn" data-slot="4">5</div>
+                                <div class="slot-btn" data-slot="5">6</div>
+                                <div class="slot-btn" data-slot="6">7</div>
+                                <div class="slot-btn" data-slot="7">8</div>
+                                <div class="slot-btn" data-slot="8">9</div>
+                                <div class="slot-btn" data-slot="9">10</div>
+                                <div class="slot-btn" data-slot="10">11</div>
+                                <div class="slot-btn" data-slot="11">12</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="controls">
+                        <button id="applyModificationBtn" class="btn btn-success">Appliquer la Modification</button>
+                        <button id="cancelModificationBtn" class="btn btn-danger">Annuler</button>
+                    </div>
+                </div>
+                
+                <div id="modificationStatus"></div>
+                <div id="conflictsList" class="hidden"></div>
+                <div id="suggestionsList" class="hidden"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentScheduleId = null;
+        let currentAction = null;
+        let selectedCurrentDay = null;
+        let selectedCurrentSlot = null;
+        let selectedNewDay = null;
+        let selectedNewSlot = null;
+        
+        // Fonctions utilitaires
+        function showStatus(message, type = 'info', elementId = 'loadStatus') {
+            const statusDiv = document.getElementById(elementId);
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        function showLoading(elementId, message = 'Chargement...') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>${message}</div>
+                </div>
+            `;
+        }
+        
+        // Chargement d'un emploi du temps
+        document.getElementById('loadLatestBtn').addEventListener('click', async () => {
+            showLoading('loadStatus', 'Chargement du dernier emploi du temps...');
+            
+            try {
+                const response = await fetch('/load_existing_schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentScheduleId = result.schedule_id;
+                    showStatus(`✅ ${result.message}`, 'success');
+                    displayScheduleInfo(result);
+                    document.getElementById('modificationSection').style.display = 'block';
+                } else {
+                    showStatus(`❌ Erreur: ${result.error || 'Erreur inconnue'}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Erreur de connexion: ${error.message}`, 'error');
+            }
+        });
+        
+        document.getElementById('loadSpecificBtn').addEventListener('click', async () => {
+            const scheduleId = document.getElementById('scheduleIdInput').value;
+            if (!scheduleId) {
+                showStatus('⚠️ Veuillez entrer un ID d\'emploi du temps', 'warning');
+                return;
+            }
+            
+            showLoading('loadStatus', `Chargement de l'emploi du temps ${scheduleId}...`);
+            
+            try {
+                const response = await fetch(`/load_existing_schedule?schedule_id=${scheduleId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentScheduleId = result.schedule_id;
+                    showStatus(`✅ ${result.message}`, 'success');
+                    displayScheduleInfo(result);
+                    document.getElementById('modificationSection').style.display = 'block';
+                } else {
+                    showStatus(`❌ Erreur: ${result.error || 'Erreur inconnue'}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Erreur de connexion: ${error.message}`, 'error');
+            }
+        });
+        
+        function displayScheduleInfo(scheduleData) {
+            const infoDiv = document.getElementById('scheduleInfo');
+            const info = scheduleData.schedule_info;
+            
+            infoDiv.innerHTML = `
+                <div class="info-card">
+                    <h3>ID</h3>
+                    <div class="number">${scheduleData.schedule_id}</div>
+                </div>
+                <div class="info-card">
+                    <h3>Entrées</h3>
+                    <div class="number">${scheduleData.entries_count}</div>
+                </div>
+                <div class="info-card">
+                    <h3>Année</h3>
+                    <div class="number">${info.academic_year}</div>
+                </div>
+                <div class="info-card">
+                    <h3>Statut</h3>
+                    <div class="number">${info.status}</div>
+                </div>
+                <div class="info-card">
+                    <h3>Créé</h3>
+                    <div style="font-size: 0.9em;">${new Date(info.created_at).toLocaleDateString('fr-FR')}</div>
+                </div>
+            `;
+            infoDiv.classList.remove('hidden');
+        }
+        
+        // Gestion des boutons d'action
+        document.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                currentAction = e.target.dataset.action;
+                setupModificationForm(currentAction);
+                document.getElementById('modificationForm').classList.remove('hidden');
+            });
+        });
+        
+        function setupModificationForm(action) {
+            const formTitle = document.getElementById('formTitle');
+            const currentPositionGroup = document.getElementById('currentPositionGroup');
+            const newPositionGroup = document.getElementById('newPositionGroup');
+            const teachersGroup = document.getElementById('teachersGroup');
+            
+            // Reset selections
+            resetSelections();
+            
+            switch (action) {
+                case 'move':
+                    formTitle.textContent = 'Déplacer un Cours';
+                    currentPositionGroup.classList.remove('hidden');
+                    newPositionGroup.querySelector('h4').textContent = 'Nouvelle Position:';
+                    teachersGroup.style.display = 'none';
+                    break;
+                    
+                case 'change_teacher':
+                    formTitle.textContent = 'Changer le Professeur';
+                    currentPositionGroup.classList.add('hidden');
+                    newPositionGroup.querySelector('h4').textContent = 'Position du Cours:';
+                    teachersGroup.style.display = 'block';
+                    break;
+                    
+                case 'add':
+                    formTitle.textContent = 'Ajouter un Cours';
+                    currentPositionGroup.classList.add('hidden');
+                    newPositionGroup.querySelector('h4').textContent = 'Position du Nouveau Cours:';
+                    teachersGroup.style.display = 'block';
+                    break;
+                    
+                case 'remove':
+                    formTitle.textContent = 'Supprimer un Cours';
+                    currentPositionGroup.classList.add('hidden');
+                    newPositionGroup.querySelector('h4').textContent = 'Position du Cours à Supprimer:';
+                    teachersGroup.style.display = 'none';
+                    break;
+            }
+        }
+        
+        function resetSelections() {
+            selectedCurrentDay = null;
+            selectedCurrentSlot = null;
+            selectedNewDay = null;
+            selectedNewSlot = null;
+            
+            document.querySelectorAll('.day-btn, .slot-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+        }
+        
+        // Gestion de la sélection des jours et créneaux
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('day-btn')) {
+                const day = parseInt(e.target.dataset.day);
+                const isCurrentDay = e.target.closest('#currentDaysGrid');
+                
+                // Déselectionner les autres jours dans le même groupe
+                const parentGrid = e.target.parentElement;
+                parentGrid.querySelectorAll('.day-btn').forEach(btn => btn.classList.remove('selected'));
+                
+                // Sélectionner ce jour
+                e.target.classList.add('selected');
+                
+                if (isCurrentDay) {
+                    selectedCurrentDay = day;
+                } else {
+                    selectedNewDay = day;
+                }
+            }
+            
+            if (e.target.classList.contains('slot-btn')) {
+                const slot = parseInt(e.target.dataset.slot);
+                const isCurrentSlot = e.target.closest('#currentSlotsGrid');
+                
+                // Déselectionner les autres créneaux dans le même groupe
+                const parentGrid = e.target.parentElement;
+                parentGrid.querySelectorAll('.slot-btn').forEach(btn => btn.classList.remove('selected'));
+                
+                // Sélectionner ce créneau
+                e.target.classList.add('selected');
+                
+                if (isCurrentSlot) {
+                    selectedCurrentSlot = slot;
+                } else {
+                    selectedNewSlot = slot;
+                }
+            }
+        });
+        
+        // Application de la modification
+        document.getElementById('applyModificationBtn').addEventListener('click', async () => {
+            const className = document.getElementById('className').value.trim();
+            const subject = document.getElementById('subject').value.trim();
+            const teachers = document.getElementById('teachers').value.trim().split(',').map(t => t.trim()).filter(t => t);
+            
+            if (!className || !subject) {
+                showStatus('⚠️ Veuillez remplir la classe et la matière', 'warning', 'modificationStatus');
+                return;
+            }
+            
+            if (currentAction === 'move' && (selectedCurrentDay === null || selectedCurrentSlot === null || selectedNewDay === null || selectedNewSlot === null)) {
+                showStatus('⚠️ Veuillez sélectionner la position actuelle ET la nouvelle position', 'warning', 'modificationStatus');
+                return;
+            }
+            
+            if ((currentAction === 'change_teacher' || currentAction === 'add') && teachers.length === 0) {
+                showStatus('⚠️ Veuillez spécifier au moins un professeur', 'warning', 'modificationStatus');
+                return;
+            }
+            
+            if (selectedNewDay === null || selectedNewSlot === null) {
+                showStatus('⚠️ Veuillez sélectionner une position', 'warning', 'modificationStatus');
+                return;
+            }
+            
+            showLoading('modificationStatus', 'Application de la modification...');
+            
+            const requestData = {
+                schedule_id: currentScheduleId,
+                action: currentAction,
+                class_name: className,
+                subject: subject,
+                new_day: selectedNewDay,
+                new_slot: selectedNewSlot,
+                teachers: teachers.length > 0 ? teachers : null
+            };
+            
+            if (currentAction === 'move') {
+                requestData.old_day = selectedCurrentDay;
+                requestData.old_slot = selectedCurrentSlot;
+            }
+            
+            try {
+                const response = await fetch('/modify_schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentScheduleId = result.new_schedule_id;
+                    showStatus(`✅ ${result.message}`, 'success', 'modificationStatus');
+                    document.getElementById('modificationForm').classList.add('hidden');
+                    
+                    // Mettre à jour les infos de l'emploi du temps
+                    displayUpdatedScheduleInfo(result.summary);
+                } else {
+                    showStatus(`❌ Erreur: ${result.error}`, 'error', 'modificationStatus');
+                    
+                    if (result.conflicts && result.conflicts.length > 0) {
+                        displayConflicts(result.conflicts);
+                    }
+                    
+                    if (result.suggestions && result.suggestions.length > 0) {
+                        displaySuggestions(result.suggestions);
+                    }
+                }
+            } catch (error) {
+                showStatus(`❌ Erreur de connexion: ${error.message}`, 'error', 'modificationStatus');
+            }
+        });
+        
+        function displayUpdatedScheduleInfo(summary) {
+            const infoDiv = document.getElementById('scheduleInfo');
+            
+            infoDiv.innerHTML = `
+                <div class="info-card">
+                    <h3>Nouvel ID</h3>
+                    <div class="number">${summary.schedule_id}</div>
+                </div>
+                <div class="info-card">
+                    <h3>Entrées</h3>
+                    <div class="number">${summary.total_entries}</div>
+                </div>
+                <div class="info-card">
+                    <h3>Classes</h3>
+                    <div class="number">${summary.classes_count}</div>
+                </div>
+                <div class="info-card">
+                    <h3>Modifications</h3>
+                    <div class="number">${summary.modifications_count}</div>
+                </div>
+                <div class="info-card">
+                    <h3>Dernière Modif</h3>
+                    <div style="font-size: 0.8em;">${summary.last_modified ? new Date(summary.last_modified).toLocaleTimeString('fr-FR') : 'N/A'}</div>
+                </div>
+            `;
+        }
+        
+        function displayConflicts(conflicts) {
+            const conflictsDiv = document.getElementById('conflictsList');
+            
+            let html = '<div class="conflicts-list"><h4>⚠️ Conflits Détectés:</h4>';
+            conflicts.forEach(conflict => {
+                html += `<div class="conflict-item">${conflict.message || conflict.type}</div>`;
+            });
+            html += '</div>';
+            
+            conflictsDiv.innerHTML = html;
+            conflictsDiv.classList.remove('hidden');
+        }
+        
+        function displaySuggestions(suggestions) {
+            const suggestionsDiv = document.getElementById('suggestionsList');
+            
+            let html = '<div class="suggestions-list"><h4>💡 Suggestions:</h4>';
+            suggestions.forEach((suggestion, index) => {
+                const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi'];
+                html += `
+                    <div class="suggestion-item" onclick="applySuggestion(${suggestion.day}, ${suggestion.slot})">
+                        ${dayNames[suggestion.day]} - Période ${suggestion.slot + 1} (${suggestion.reason})
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            suggestionsDiv.innerHTML = html;
+            suggestionsDiv.classList.remove('hidden');
+        }
+        
+        function applySuggestion(day, slot) {
+            selectedNewDay = day;
+            selectedNewSlot = slot;
+            
+            // Mettre à jour la sélection visuelle
+            document.querySelectorAll('#newDaysGrid .day-btn').forEach((btn, index) => {
+                if (index === day) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.remove('selected');
+                }
+            });
+            
+            document.querySelectorAll('#newSlotsGrid .slot-btn').forEach((btn, index) => {
+                if (index === slot) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.remove('selected');
+                }
+            });
+            
+            showStatus('💡 Suggestion appliquée - vous pouvez maintenant confirmer la modification', 'info', 'modificationStatus');
+        }
+        
+        // Annulation de la modification
+        document.getElementById('cancelModificationBtn').addEventListener('click', () => {
+            document.getElementById('modificationForm').classList.add('hidden');
+            document.getElementById('modificationStatus').innerHTML = '';
+            document.getElementById('conflictsList').classList.add('hidden');
+            document.getElementById('suggestionsList').classList.add('hidden');
+        });
+    </script>
+</body>
+</html>

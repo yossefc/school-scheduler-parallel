@@ -1,1 +1,0 @@
-{"algorithm": "hybrid", "objectives": [{"name": "hard_constraints", "weight": 0.5}, {"name": "pedagogical_quality", "weight": 0.3}, {"name": "gap_minimization", "weight": 0.2}]}

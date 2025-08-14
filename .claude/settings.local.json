@@ -2,8 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(docker-compose:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(curl:*)",
+      "Bash(python test:*)",
+      "Bash(python:*)",
+      "Bash(docker ps:*)"
     ],
-    "deny": []
+    "deny": [],
+    "additionalDirectories": [
+      "D:\\d D:",
+      "D:\\",
+      "D:\\mnt\\d\\school-scheduler"
+    ]
   }
 }
